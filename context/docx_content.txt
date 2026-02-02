@@ -1,0 +1,112 @@
+College Newsletter Platform
+Product Requirements Document (PRD)
+
+Version 1.0 | 26 Jan 2026
+
+1. Overview
+A calm, premium, low-noise newsletter platform for college students. Instead of long reads, every update is condensed into a 2-3 minute summary and organized by department, industry insights, and student success stories.
+2. Problem Statement
+Students struggle to read long content due to poor attention and time constraints.
+The real competition is high-attention platforms (Instagram/YouTube), not other newsletter apps.
+If relevancy is slightly off or language feels difficult, students drop immediately.
+Students want visible growth (progress) to stay consistent.
+3. Goals & Non-Goals
+Goals
+Deliver department-relevant learning in 2-3 minutes per item.
+Make the homepage immediately useful (no hero section) with 'must-read' news.
+Auto-process ~1000+ sources into weekly buckets with consistent quality.
+Keep the experience calm and premium: limited choices, minimal noise, clear hierarchy.
+Non-Goals
+Competing on infinite scrolling or rage/engagement-based content loops.
+Publishing unverified charts/claims without traceable sources.
+4. Target Users
+5. Brand & Experience Principles
+Calm in a noisy world: minimal colors, controlled density, no clutter.
+Nostalgic + premium: editorial feel, consistent typography, predictable layouts.
+High signal only: fewer items, better curation.
+Readable by default: bullets over paragraphs, simple language.
+6. Information Architecture
+Home (Important News Only)
+Industrial Insights
+Departments (dropdown -> Dept Hub -> Dept Detail)
+Student Stories
+Search, Saved (MVP optional)
+7. Key Pages & Layout Blocks
+Home (Landing)
+Sticky navbar: Industrial Insights | Departments (dropdown) | Student Stories | Join/Login
+Must Read Today: 5-7 items max (high signal)
+Filter chips: All / Industry / Placements / Departments / Stories
+Department highlights strip (quick jump)
+Small 'Breaking / Breakthrough' spotlight (1-3 items)
+Industrial Insights
+Filter chips: Trends / Skills / Jobs / Company Moves
+Weekly featured insight (1 highlight)
+Ranked cards in 2-3 minute format
+Departments
+Department Hub: grid of departments with weekly counts
+Department Detail: This Week / Today toggle; Must Reads; Placement Angle; Industry link
+Student Stories
+Story cards with filters (dept, domain, role)
+Featured story of the week
+Lessons strip (3 takeaways)
+8. Content Processing Pipeline (Automation)
+Scrape & ingest ~1000 sources into a standard raw format (title, url, date, raw text).
+Clean & extract article body (remove nav/footer/subscribe blocks).
+Deduplicate (exact + near-duplicate) to avoid repetitive content.
+Classify: department, category (trend/job/story), difficulty, priority score.
+Summarize to 2-3 minute format: hook line, why it matters, 3-6 bullets, action step.
+Generate visuals: charts/diagrams via template renderer; AI imagery only for breaking/breakthrough.
+Assign weekly bucket (YYYY-W##) and auto-publish into Home / Weekly / Dept pages.
+9. Read Format Standard (2-3 Minutes)
+Headline (max 8 words)
+Why it matters (1 line)
+3-6 bullets (one idea per bullet, short lines)
+Optional: quick example (1-2 lines)
+Action step (1 line)
+10. Visualizer (Charts + Explainers)
+To stay premium and accurate at scale, charts are rendered via standard templates. AI-generated images are used only for Breaking News and Great Breakthroughs.
+Chart templates: Bar / Line / Donut (Apple/SaaS style: minimal grid, clear labels, rounded container).
+Concept visuals when data is missing: impact map, 1-2-3 steps, timeline.
+AI imagery: minimal abstract backgrounds with reserved space for chart overlay.
+Per article: max 1-2 visuals to protect reading time.
+11. Recommendations & Right-Side Suggestions
+Reading page includes a calm, limited sidebar with a tab-style selector (YouTube-like).
+Top suggestion chips (4): Suggested for you | Mech content | Related: <Topic Name> | Same: <Topic Name>
+Maximum 7 suggestions shown at once.
+Candidate sources: same department, similar topic, weekly best, relevant stories.
+Ranking emphasizes: similarity, department match, freshness (this week), quality, user preferences.
+12. Gamification (Learning-First, Minimal)
+Weekly goal meter (ex: 0/7 summaries).
+Completion nudge: 'You're one step away from completing' on exit intent.
+Streaks + gentle badges (no loud popups).
+Skill tags accumulate quietly (for future skill tree).
+13. Admin & Operations (MVP)
+Source management: add/remove sources, monitor failures.
+Review queue: low-confidence summaries require approval.
+Pin/feature: select breaking stories for homepage spotlight.
+Weekly digest auto-build with manual override.
+14. Success Metrics
+Weekly active users (WAU) and retention (D7/W4).
+Average session length (target: 2-6 minutes).
+Completion rate per read (target: >60%).
+Save/share rate (signal of usefulness).
+Relevancy feedback rate (downvotes/reports).
+15. Risks & Mitigations
+Risk: incorrect summaries or misleading charts -> Mitigation: confidence score + fall back to concept visuals.
+Risk: content overload -> Mitigation: cap cards shown, weekly curation, prioritize high-signal.
+Risk: inconsistent visuals -> Mitigation: template-first visuals, AI only for highlights.
+Risk: low relevancy -> Mitigation: strict department tagging and topic similarity thresholds.
+16. MVP Scope (First Release)
+News-first homepage + category filters
+Industrial Insights page
+Departments hub + department detail page
+Student Stories page
+2-3 minute summary cards
+Template charts + 1-3 highlighted AI visuals per week
+Right-side suggestions with 4 chips
+17. Roadmap (Next Iterations)
+Personalized onboarding goals and smarter ranking
+Saved library + collections
+Skill tree progression screen
+Email/WhatsApp weekly digest delivery
+Faculty/staff dashboard for department visibility
