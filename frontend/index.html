@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>College Newsletter - Test UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+        
+        .status-dot.online {
+            background: #28a745;
+            box-shadow: 0 0 10px #28a745;
+        }
+        
+        .status-dot.checking {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 .icon {
+            font-size: 1.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 600;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .token-display {
+            font-size: 0.8rem;
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 8px 16px;
+            background: #e0e0e0;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .endpoint-test {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .endpoint-test select {
+            width: auto;
+            min-width: 100px;
+        }
+        
+        .endpoint-test input {
+            flex: 1;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .news-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #667eea;
+        }
+        
+        .news-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .news-card p {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-right: 5px;
+            margin-top: 10px;
+        }
+        
+        .tag.breaking {
+            background: #ffebee;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎓 College Newsletter</h1>
+            <p>Test UI for Backend API</p>
+        </header>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-dot checking" id="api-status"></span>
+                <span>Backend API</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot checking" id="db-status"></span>
+                <span>Database</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot checking" id="ai-status"></span>
+                <span>Ollama AI</span>
+            </div>
+            <div class="status-item">
+                <span id="user-status">Not logged in</span>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <!-- Authentication Card -->
+            <div class="card">
+                <h2><span class="icon">🔐</span> Authentication</h2>
+                
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('login')">Login</button>
+                    <button class="tab" onclick="switchTab('register')">Register</button>
+                </div>
+                
+                <div id="login-section">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="login-email" placeholder="test@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="login-password" placeholder="password">
+                    </div>
+                    <button onclick="login()">Login</button>
+                </div>
+                
+                <div id="register-section" class="hidden">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="reg-name" placeholder="John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="reg-email" placeholder="john@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="reg-password" placeholder="min 8 characters">
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <select id="reg-dept">
+                            <option value="CSE">Computer Science</option>
+                            <option value="ECE">Electronics</option>
+                            <option value="MECH">Mechanical</option>
+                            <option value="CIVIL">Civil</option>
+                            <option value="IT">Information Technology</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Year of Study</label>
+                        <select id="reg-year">
+                            <option value="1">1st Year</option>
+                            <option value="2">2nd Year</option>
+                            <option value="3">3rd Year</option>
+                            <option value="4">4th Year</option>
+                        </select>
+                    </div>
+                    <button onclick="register()">Register</button>
+                </div>
+                
+                <div id="auth-result" class="result hidden"></div>
+            </div>
+            
+            <!-- API Tester Card -->
+            <div class="card">
+                <h2><span class="icon">🧪</span> API Tester</h2>
+                
+                <div class="endpoint-test">
+                    <select id="http-method">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                    <input type="text" id="api-endpoint" placeholder="/api/v1/auth/me" value="/api/v1/auth/me">
+                    <button onclick="testEndpoint()">Send</button>
+                </div>
+                
+                <div class="form-group">
+                    <label>Request Body (JSON)</label>
+                    <textarea id="request-body" placeholder='{"key": "value"}'></textarea>
+                </div>
+                
+                <div id="api-result" class="result hidden"></div>
+            </div>
+            
+            <!-- AI Content Tester Card -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2><span class="icon">🤖</span> AI Content Processor (Ollama)</h2>
+                
+                <div class="form-group">
+                    <label>News Title</label>
+                    <input type="text" id="ai-title" placeholder="OpenAI releases GPT-5 with breakthrough capabilities" 
+                           value="OpenAI announces GPT-5 with 10x performance improvement">
+                </div>
+                
+                <div class="form-group">
+                    <label>Original Content</label>
+                    <textarea id="ai-content" placeholder="Paste article content here...">OpenAI has announced GPT-5, their most advanced AI model yet. The new model demonstrates 10x improvement in reasoning capabilities compared to GPT-4. It can handle complex mathematical problems, write sophisticated code, and engage in deeper conversations. The model is available now for ChatGPT Plus subscribers. Industry experts are calling this a significant leap forward in AI capabilities.</textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="summarizeContent()">📝 Summarize</button>
+                    <button onclick="generateHeadline()">📰 Generate Headline</button>
+                </div>
+                
+                <div id="ai-result" class="result hidden"></div>
+            </div>
+            
+            <!-- Feed Preview Card -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2><span class="icon">📰</span> News Feed Preview</h2>
+                
+                <div id="news-feed">
+                    <div class="news-card">
+                        <h3>🚀 Sample: OpenAI Announces GPT-5</h3>
+                        <p>This is a sample news card. The real feed will show content from the database after Phase 2 implementation.</p>
+                        <span class="tag breaking">Breaking</span>
+                        <span class="tag">AI</span>
+                        <span class="tag">Tech</span>
+                    </div>
+                    
+                    <div class="news-card">
+                        <h3>💡 Sample: New Internship Opportunities</h3>
+                        <p>Multiple companies are hiring interns for Summer 2026. Apply before deadline.</p>
+                        <span class="tag">Opportunity</span>
+                        <span class="tag">Jobs</span>
+                    </div>
+                </div>
+                
+                <button onclick="loadFeed()" style="margin-top: 15px;">Refresh Feed</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let authToken = localStorage.getItem('token');
+        
+        // Check services status on load
+        async function checkStatus() {
+            // Check API
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                const dot = document.getElementById('api-status');
+                if (res.ok) {
+                    dot.className = 'status-dot online';
+                    dot.title = 'API Online';
+                } else {
+                    dot.className = 'status-dot';
+                    dot.title = 'API Error';
+                }
+            } catch (e) {
+                document.getElementById('api-status').className = 'status-dot';
+                document.getElementById('api-status').title = 'API Offline';
+            }
+            
+            // Check auth status
+            if (authToken) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        document.getElementById('user-status').textContent = 
+                            `Logged in: ${data.data.full_name}`;
+                    } else {
+                        localStorage.removeItem('token');
+                        authToken = null;
+                    }
+                } catch (e) {
+                    console.error('Auth check failed', e);
+                }
+            }
+            
+            // Note: DB and AI status would need dedicated endpoints
+            document.getElementById('db-status').className = 'status-dot online';
+            document.getElementById('db-status').title = 'Database Connected (assumed)';
+            document.getElementById('ai-status').className = 'status-dot checking';
+            document.getElementById('ai-status').title = 'Checking Ollama...';
+        }
+        
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'login') {
+                document.getElementById('login-section').classList.remove('hidden');
+                document.getElementById('register-section').classList.add('hidden');
+            } else {
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('register-section').classList.remove('hidden');
+            }
+        }
+        
+        // Login
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            showResult('auth-result', 'Loading...', false);
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    authToken = data.access_token;
+                    localStorage.setItem('token', authToken);
+                    showResult('auth-result', `✅ Login successful!\n\nToken: ${data.access_token.substring(0, 50)}...`, true);
+                    checkStatus();
+                } else {
+                    showResult('auth-result', `❌ Error: ${data.detail}`, false);
+                }
+            } catch (e) {
+                showResult('auth-result', `❌ Network error: ${e.message}`, false);
+            }
+        }
+        
+        // Register
+        async function register() {
+            const body = {
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                full_name: document.getElementById('reg-name').value,
+                department: document.getElementById('reg-dept').value,
+                year_of_study: parseInt(document.getElementById('reg-year').value)
+            };
+            
+            showResult('auth-result', 'Loading...', false);
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showResult('auth-result', `✅ Registration successful!\n\nUser: ${JSON.stringify(data.data, null, 2)}`, true);
+                    // Auto-fill login
+                    document.getElementById('login-email').value = body.email;
+                    document.getElementById('login-password').value = body.password;
+                    switchTab('login');
+                } else {
+                    showResult('auth-result', `❌ Error: ${data.detail}`, false);
+                }
+            } catch (e) {
+                showResult('auth-result', `❌ Network error: ${e.message}`, false);
+            }
+        }
+        
+        // Test any endpoint
+        async function testEndpoint() {
+            const method = document.getElementById('http-method').value;
+            const endpoint = document.getElementById('api-endpoint').value;
+            const bodyText = document.getElementById('request-body').value;
+            
+            showResult('api-result', 'Loading...', false);
+            
+            try {
+                const options = {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                
+                if (authToken) {
+                    options.headers['Authorization'] = `Bearer ${authToken}`;
+                }
+                
+                if (bodyText && ['POST', 'PUT'].includes(method)) {
+                    options.body = bodyText;
+                }
+                
+                const res = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await res.json();
+                
+                showResult('api-result', 
+                    `Status: ${res.status} ${res.statusText}\n\n${JSON.stringify(data, null, 2)}`,
+                    res.ok
+                );
+            } catch (e) {
+                showResult('api-result', `❌ Error: ${e.message}`, false);
+            }
+        }
+        
+        // AI Content Summarization
+        async function summarizeContent() {
+            const title = document.getElementById('ai-title').value;
+            const content = document.getElementById('ai-content').value;
+            
+            showResult('ai-result', '🤖 Asking Ollama to summarize... This may take 10-30 seconds.', false);
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/ai/summarize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': authToken ? `Bearer ${authToken}` : ''
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showResult('ai-result', 
+                        `✅ Summary Generated!\n\n${JSON.stringify(data.data, null, 2)}`, 
+                        true
+                    );
+                } else {
+                    showResult('ai-result', 
+                        `❌ Error: ${data.detail || data.error || 'Unknown error'}\n\nMake sure Ollama is running with: ollama run llama3.2`, 
+                        false
+                    );
+                }
+            } catch (e) {
+                showResult('ai-result', 
+                    `❌ Error: ${e.message}\n\nMake sure:\n1. Backend server is running\n2. Ollama is installed and running\n3. llama3.2 model is pulled`, 
+                    false
+                );
+            }
+        }
+        
+        // AI Headline Generation
+        async function generateHeadline() {
+            const title = document.getElementById('ai-title').value;
+            const content = document.getElementById('ai-content').value;
+            
+            showResult('ai-result', '🤖 Asking Ollama for a catchy headline...', false);
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/ai/headline`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': authToken ? `Bearer ${authToken}` : ''
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showResult('ai-result', 
+                        `✅ Headline Generated!\n\n"${data.data.headline}"\n\nOriginal: "${title}"`, 
+                        true
+                    );
+                } else {
+                    showResult('ai-result', 
+                        `❌ Error: ${data.detail || data.error || 'Unknown error'}`, 
+                        false
+                    );
+                }
+            } catch (e) {
+                showResult('ai-result', 
+                    `❌ Error: ${e.message}\n\nMake sure Ollama is running!`, 
+                    false
+                );
+            }
+        }
+        
+        // Load feed
+        function loadFeed() {
+            // This would fetch from API in Phase 2
+            alert('Feed loading will be implemented in Phase 2 with content pipeline!');
+        }
+        
+        // Helper to show results
+        function showResult(elementId, text, isSuccess) {
+            const el = document.getElementById(elementId);
+            el.textContent = text;
+            el.classList.remove('hidden', 'error', 'success');
+            el.classList.add(isSuccess ? 'success' : 'error');
+        }
+        
+        // Initial status check
+        checkStatus();
+        setInterval(checkStatus, 30000); // Check every 30s
+    </script>
+</body>
+</html>

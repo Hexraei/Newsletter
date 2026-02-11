@@ -1,266 +1,345 @@
-# College Newsletter Platform - Automated Scraping System
+# College Newsletter Platform
 
-## Overview
+A comprehensive content aggregation and newsletter platform designed for college students. Delivers curated tech news, opportunities, and insights in a 2-3 minute read format.
 
-This repository contains a production-ready content aggregation and scraping system designed for a college newsletter platform. The system automatically collects, processes, and organizes technology-focused content from multiple sources to deliver curated news to college students.
+## 🎯 Project Overview
 
-## Current State
+**Current Status:** Phase 2 Complete (AI Integration)  
+**Stack:** FastAPI + PostgreSQL + Redis + Local AI  
+**Cost:** $0/month (Self-hosted + Free AI)
 
-### Implemented Components
+### Key Features
 
-1. **Scraping Platform** (`scraper_platform/`)
-   - Modular scraper architecture with base classes
-   - Support for 7 content sources
-   - Excel-based tracking and data persistence
-   - Automated newsletter generation
+- ✅ **Authentication System** - JWT-based auth with user profiles
+- ✅ **AI Content Processing** - Automatic summarization and headline generation
+- ✅ **Multiple AI Providers** - Pollinations AI (default), Groq, OpenAI, Ollama
+- ✅ **Test Frontend** - HTML/JS UI for API testing
+- ✅ **Breaking News Detection** - Architecture ready
+- ⏳ **Content Pipeline** - Scraper integration (Phase 3)
+- ⏳ **Personalized Feed** - Recommendation engine (Phase 3)
 
-2. **Content Sources**
-   - Hacker News (Firebase API)
-   - Reddit (JSON API)
-   - GitHub (Search API)
-   - Medium (RSS Feeds)
-   - Product Hunt (RSS Feeds)
-   - YouTube (Transcript API)
-   - Twitter/X (twscrape library with mock fallback)
+---
 
-3. **Documentation** (`reports/`)
-   - Architecture specifications
-   - Source categorization matrix
-   - Scraping methodology documentation
-
-### System Capabilities
-
-- Automated content collection from 7 major platforms
-- Deduplication via content hashing
-- Engagement tracking (upvotes, comments, stars, etc.)
-- Excel-based data persistence
-- Newsletter generation in Markdown format
-- Category classification (security, AI/ML, startups, etc.)
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 newsletter/
-├── README.md                          # This file
-├── requirements.txt                   # Python dependencies
-├── context/                          # Original PRD documents
-│   ├── College_Newsletter_PRD_v1.docx
-│   ├── docx_content.txt
-│   ├── pdf_content.txt
-│   ├── pdf_tables.json
-│   └── Untitled 21.pdf
-├── reports/                          # Architecture documentation
+├── backend/                 # FastAPI Backend
+│   ├── app/
+│   │   ├── api/v1/         # API routes (auth, ai)
+│   │   ├── core/           # Security, config
+│   │   ├── models/         # Database models (11 tables)
+│   │   ├── schemas/        # Pydantic schemas
+│   │   ├── services/       # Business logic
+│   │   └── integrations/   # AI providers
+│   ├── alembic/            # Database migrations
+│   ├── tests/              # Test suite
+│   ├── setup_db.ps1        # Database setup script
+│   ├── setup_ollama.ps1    # Ollama setup script
+│   ├── requirements.txt
+│   └── .env                # Configuration
+│
+├── frontend/               # Test UI
+│   └── index.html          # Complete test interface
+│
+├── scraper_platform/       # Existing scrapers
+│   ├── main.py
+│   └── src/
+│       ├── base_scraper.py
+│       └── scrapers/       # 7 working scrapers
+│
+├── reports/                # Documentation
 │   ├── AGENTS.md
 │   ├── Master_Scraping_Logic.md
-│   ├── scraping_logic.md
-│   ├── Scraping_Logic_Architecture.pdf
-│   ├── Source_Categories.md
-│   ├── Twitter_Scraping_Options.md
-│   └── Ultimate_Free_Scraping_Architecture.md
-└── scraper_platform/                 # Production scraping code
-    ├── main.py                       # Main orchestrator
-    ├── requirements.txt              # Platform dependencies
-    └── src/
-        ├── base_scraper.py           # Base scraper class
-        ├── excel_tracker.py          # Excel logging system
-        └── scrapers/
-            ├── hackernews_scraper.py
-            ├── reddit_scraper.py
-            ├── github_scraper.py
-            ├── medium_scraper.py
-            ├── producthunt_scraper.py
-            ├── youtube_scraper.py
-            └── twitter_scraper.py
+│   └── ...
+│
+├── FREE_AI_OPTIONS.md      # Free AI setup guide
+├── GROQ_SETUP.md          # Groq setup guide
+├── OLLAMA_SETUP.md        # Ollama setup guide
+├── QUICKSTART.md          # 5-minute start guide
+└── README.md              # This file
 ```
 
-## Installation
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.11 or higher
-- pip package manager
 
-### Setup
+- Python 3.11+
+- PostgreSQL 15+ (or use SQLite for testing)
+- Redis (optional for testing)
+
+### 1. Clone & Setup
+
 ```bash
-# Clone repository and navigate to scraper platform
-cd scraper_platform
+git clone <your-repo-url>
+cd newsletter
 
-# Install dependencies
+# Backend setup
+cd backend
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Linux/Mac
+source venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-### Dependencies
-Core dependencies include:
-- httpx (async HTTP client)
-- feedparser (RSS parsing)
-- pandas (data manipulation)
-- openpyxl (Excel handling)
-- youtube-transcript-api (YouTube captions)
-- twscrape (Twitter scraping - optional)
+### 2. Configure Environment
 
-## Usage
-
-### Run Full Scraping Cycle
 ```bash
-cd scraper_platform
-python main.py
+# Copy example
+cp .env.example .env
+
+# Edit .env with your settings (or keep defaults for free AI)
 ```
 
-This executes the complete scraping pipeline:
-1. Fetches content from all 7 sources
-2. Stores data in Excel format
-3. Generates JSON export
-4. Creates Markdown newsletter
+### 3. Setup Database
 
-### Output Files
-All outputs are stored in `scraper_platform/data/`:
-- `scraper_tests.xlsx` - Complete dataset with all scraped items
-- `scraped_YYYYMMDD_HHMMSS.json` - JSON export
-- `newsletter_YYYYMMDD.md` - Generated newsletter
-
-### Individual Scraper Testing
-Each scraper can be tested independently:
+**Option A: With Docker**
 ```bash
-python -m src.scrapers.hackernews_scraper
-python -m src.scrapers.youtube_scraper
+docker-compose up -d postgres redis
 ```
 
-## Technical Architecture
+**Option B: Local PostgreSQL**
+```powershell
+# Windows - Run as Admin
+.\setup_db.ps1
 
-### Base Scraper Pattern
-All scrapers inherit from `BaseScraper` which provides:
-- HTTP client with retry logic
-- Standardized item format (`ScrapedItem`)
-- Logging infrastructure
-- Content deduplication (SHA-256 hashing)
+# Or manually:
+# 1. Install PostgreSQL
+# 2. Create database: newsletter
+# 3. Update DATABASE_URL in .env
+```
 
-### Data Schema
-Each scraped item contains:
-- `source`: Platform name
-- `source_type`: Category classification
-- `title`: Content title
-- `url`: Direct link
-- `content`: Text snippet or transcript
-- `author`: Content creator
-- `published_at`: Original publication date
-- `scraped_at`: Collection timestamp
-- `engagement`: Platform-specific metrics
-- `metadata`: Source-specific fields
-- `content_hash`: Deduplication identifier
+### 4. Run Migrations
 
-### Source-Specific Implementation Details
+```bash
+alembic upgrade head
+```
 
-**Hacker News**
-- Method: Official Firebase API
-- Auth: None required
-- Rate Limit: 1000 requests/minute
-- Data: Top stories, Ask HN, Show HN
+### 5. Start Backend
 
-**Reddit**
-- Method: JSON API (replaces blocked RSS)
-- Auth: None for read-only
-- Rate Limit: ~30 requests/minute
-- Data: Hot posts from configured subreddits
+```bash
+uvicorn app.main:app --reload
+```
 
-**GitHub**
-- Method: Search API
-- Auth: Optional (increases rate limit from 60 to 5000/hour)
-- Data: Trending repositories by language
+Backend will be at: `http://localhost:8000`
 
-**Medium**
-- Method: Publication RSS feeds
-- Auth: None
-- Data: Articles from tech publications
+### 6. Open Frontend
 
-**Product Hunt**
-- Method: Category RSS feeds
-- Auth: None
-- Data: Featured products and launches
+```bash
+cd ../frontend
+# Simply open in browser
+start index.html
 
-**YouTube**
-- Method: youtube-transcript-api library
-- Auth: None
-- Data: Video transcripts and metadata
-- Note: Fetches captions directly without audio download
+# Or use Python server
+python -m http.server 3000
+```
 
-**Twitter/X**
-- Method: twscrape library
-- Auth: Requires Twitter account credentials
-- Fallback: Mock mode for testing without credentials
-- Data: Tweets, replies, engagement metrics
+---
 
-## Changes Made
+## 🤖 AI Configuration
 
-### Phase 1: Core Architecture (Initial)
-- Established base scraper pattern
-- Implemented Hacker News, Reddit, GitHub scrapers
-- Created Excel tracking system
-- Built main orchestrator
+### Option 1: Pollinations AI (DEFAULT) ⭐
+**FREE** - No signup required! Works immediately.
 
-### Phase 2: Content Expansion
-- Added Medium publication RSS scraper
-- Added Product Hunt RSS scraper
-- Implemented quality scoring for Medium articles
-- Added category classification system
+Just start the backend - it's already configured.
 
-### Phase 3: Video and Social Integration
-- Implemented YouTube transcript scraper using youtube-transcript-api
-- Added Twitter scraper using twscrape library
-- Created mock mode for Twitter testing without credentials
-- Added transcript availability tracking
+### Option 2: Groq (Fastest)
+**FREE tier** - 20 requests/minute
 
-### Phase 4: Cleanup and Documentation
-- Removed deprecated test files and utilities
-- Moved documentation to reports folder
-- Cleaned Python cache files
-- Consolidated requirements
+1. Sign up: https://console.groq.com/
+2. Get API key
+3. Add to `.env`:
+```env
+GROQ_API_KEY=gsk_your_key_here
+```
 
-## Limitations and Considerations
+### Option 3: Ollama (Local)
+**FREE** - Runs on your machine
 
-### Rate Limits
-- GitHub: 60 requests/hour without authentication
-- Reddit: Subject to IP blocking if abused
-- Twitter: Requires valid account credentials for real data
+```powershell
+# Install Ollama
+.\setup_ollama.ps1
 
-### Content Availability
-- YouTube videos without captions return no transcript
-- Some Medium RSS feeds may be malformed (handled gracefully)
-- Twitter scraping requires active accounts and may break with platform changes
+# Or manually:
+# 1. Download from https://ollama.com/
+# 2. ollama pull llama3.2
+# 3. ollama serve
+```
 
-### Data Volume
-Typical collection per run:
-- Hacker News: 30 items
-- Reddit: 50-60 items
-- GitHub: 40 items
-- Medium: 60-70 items
-- Product Hunt: 70-80 items
-- YouTube: Variable based on video list
-- Twitter: Variable based on search/users
+See `OLLAMA_SETUP.md` for details.
 
-## Future Enhancements
+---
 
-1. **Database Integration**
-   - Migrate from Excel to PostgreSQL
-   - Implement proper queue system (Redis/BullMQ)
+## 🧪 Testing
 
-2. **Deployment**
-   - Docker containerization
-   - Oracle Cloud deployment configuration
-   - Scheduled execution via cron or GitHub Actions
+### Backend Tests
 
-3. **Monitoring**
-   - Health check endpoints
-   - Failure alerting
-   - Metrics dashboard
+```bash
+cd backend
 
-4. **Content Processing**
-   - NLP-based summarization
-   - Duplicate detection across sources
-   - Breaking news detection algorithm
+# Run all tests
+pytest tests/ -v
 
-## License
+# Run specific test
+pytest tests/test_auth.py -v
 
-Project documentation and specifications are proprietary. Scraping implementations respect robots.txt and platform terms of service.
+# AI system test
+python test_ai_system.py
+```
 
-## Contact
+### API Testing
 
-For questions regarding the architecture or implementation, refer to documentation in the `reports/` directory.
+Open frontend at `frontend/index.html` and use the built-in API tester, or use curl:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Register
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"testpass","full_name":"Test User"}'
+
+# AI Summarize
+curl -X POST http://localhost:8000/api/v1/ai/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test","content":"AI is transforming education..."}'
+```
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| `QUICKSTART.md` | 5-minute setup guide |
+| `FREE_AI_OPTIONS.md` | All free AI options |
+| `GROQ_SETUP.md` | Groq setup (fastest free) |
+| `OLLAMA_SETUP.md` | Local AI setup |
+| `backend/DATABASE_SETUP.md` | Database setup details |
+| `backend/README.md` | Backend-specific docs |
+| `frontend/README.md` | Frontend test UI docs |
+| `reports/` | Architecture & planning docs |
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+- **Framework:** FastAPI (async)
+- **Database:** PostgreSQL 15+ (SQLAlchemy 2.0)
+- **Cache:** Redis
+- **Auth:** JWT (python-jose) + bcrypt
+- **AI:** Pollinations AI (default), Groq, OpenAI, Ollama
+- **Migrations:** Alembic
+- **Testing:** pytest + pytest-asyncio
+
+### Frontend (Test UI)
+- Pure HTML/CSS/JS (no build step)
+- Responsive design
+- Real-time API testing
+
+### Scrapers
+- Python async (httpx)
+- 7 sources: Hacker News, Reddit, GitHub, Medium, Product Hunt, YouTube, Twitter
+
+---
+
+## 🗺️ Roadmap
+
+### Phase 1: Foundation ✅
+- [x] FastAPI project structure
+- [x] PostgreSQL + Redis setup
+- [x] User authentication (JWT)
+- [x] Database models (11 tables)
+- [x] Alembic migrations
+
+### Phase 2: AI Integration ✅
+- [x] Multiple AI provider support
+- [x] Content summarization
+- [x] Headline generation
+- [x] Free AI options (Pollinations, Groq)
+- [x] Test frontend UI
+
+### Phase 3: Content Pipeline ⏳ (Next)
+- [ ] Integrate existing scrapers
+- [ ] Content vectorization
+- [ ] Attractiveness scoring
+- [ ] Processing queue
+- [ ] Breaking news detection (BNDE)
+
+### Phase 4: Feed & Delivery ⏳
+- [ ] Personalized feed generation
+- [ ] Newsletter creation
+- [ ] Email delivery (SendGrid)
+- [ ] Discord notifications
+
+### Phase 5: Production ⏳
+- [ ] React/Vue frontend
+- [ ] Docker deployment
+- [ ] CI/CD pipeline
+- [ ] Monitoring
+
+---
+
+## 💰 Cost Breakdown
+
+| Component | Cost | Notes |
+|-----------|------|-------|
+| **PostgreSQL** | $0 | Self-hosted |
+| **Redis** | $0 | Self-hosted |
+| **AI (Pollinations)** | $0 | Free, no signup |
+| **Backend** | $0 | Self-hosted |
+| **Frontend** | $0 | Static HTML |
+| **Total** | **$0/month** | Completely free! |
+
+Optional upgrades:
+- Groq: FREE tier available
+- OpenAI: $5-20/month for heavy use
+- Cloud hosting: $5-50/month
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests
+5. Submit a pull request
+
+---
+
+## 📝 License
+
+This project is proprietary. See LICENSE file for details.
+
+---
+
+## 🆘 Support
+
+Having issues?
+
+1. Check `QUICKSTART.md` for common problems
+2. Run `python test_ai_system.py` to diagnose AI issues
+3. Check `backend/logs/` for error logs
+4. Open an issue with error details
+
+---
+
+## 🎉 Acknowledgments
+
+- FastAPI community for the excellent framework
+- Pollinations AI for free AI services
+- Ollama for local AI capabilities
+
+---
+
+**Ready to start?** See `QUICKSTART.md` for 5-minute setup!
