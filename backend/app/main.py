@@ -1,10 +1,18 @@
 """Main FastAPI application."""
 
+import sys
+from pathlib import Path
+# Add scraper_platform to Python path
+scraper_path = str(Path(__file__).parent.parent.parent / "scraper_platform")
+if scraper_path not in sys.path:
+    sys.path.insert(0, scraper_path)
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import router
 from app.config import settings
@@ -36,7 +44,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"] if settings.DEBUG else settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,6 +75,14 @@ async def root():
 
 # Include API router
 app.include_router(router)
+
+# Mount static files (frontend)
+frontend_path = Path(__file__).parent.parent.parent / "frontend"
+if frontend_path.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+    print(f"Static files mounted from: {frontend_path}")
+else:
+    print(f"Warning: Frontend path not found: {frontend_path}")
 
 
 # Exception handlers

@@ -159,8 +159,30 @@ async def get_user_stats(
     db: AsyncSession = Depends(get_db)
 ):
     """Get user statistics."""
-    # TODO: Implement proper stats calculation
-    # For now, return basic stats
+    from sqlalchemy import select, func
+    from app.models import UserSaves, UserReads, ProcessedContent
+    
+    # Count saved items
+    result = await db.execute(
+        select(func.count(UserSaves.id))
+        .where(UserSaves.user_id == str(current_user.id))
+    )
+    saved_count = result.scalar() or 0
+    
+    # Calculate favorite categories from reading history
+    result = await db.execute(
+        select(ProcessedContent.category, func.count(ProcessedContent.id))
+        .join(UserReads, UserReads.content_id == ProcessedContent.id)
+        .where(UserReads.user_id == str(current_user.id))
+        .where(ProcessedContent.category.isnot(None))
+        .group_by(ProcessedContent.category)
+        .order_by(func.count(ProcessedContent.id).desc())
+        .limit(5)
+    )
+    fav_categories = [
+        {"category": row[0], "count": row[1]}
+        for row in result.all()
+    ]
     
     stats = UserStats(
         total_reads=current_user.total_reads,
@@ -168,8 +190,8 @@ async def get_user_stats(
         weekly_goal=current_user.weekly_goal,
         weekly_progress=min(current_user.total_reads % 7, current_user.weekly_goal),
         skill_badges_count=len(current_user.skill_badges),
-        saved_items_count=0,  # TODO: Query actual count
-        favorite_categories=[]  # TODO: Calculate from history
+        saved_items_count=saved_count,
+        favorite_categories=fav_categories
     )
     
     return SingleResponse(data=stats)

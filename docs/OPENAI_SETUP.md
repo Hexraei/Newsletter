@@ -59,7 +59,7 @@ Should show **"ALL TESTS PASSED!"**
 
 ### Option 4: Ollama (100% FREE)
 
-Install locally - no API needed. See `OLLAMA_SETUP.md`
+Install locally - no API needed. See `docs/OLLAMA_SETUP.md`
 
 ---
 

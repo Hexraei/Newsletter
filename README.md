@@ -1,345 +1,210 @@
 # College Newsletter Platform
 
-A comprehensive content aggregation and newsletter platform designed for college students. Delivers curated tech news, opportunities, and insights in a 2-3 minute read format.
+A content aggregation and newsletter platform for college students. Scrapes tech news from 7 sources, processes it with AI, and delivers curated insights in a 2-3 minute read format.
 
-## 🎯 Project Overview
-
-**Current Status:** Phase 2 Complete (AI Integration)  
-**Stack:** FastAPI + PostgreSQL + Redis + Local AI  
-**Cost:** $0/month (Self-hosted + Free AI)
-
-### Key Features
-
-- ✅ **Authentication System** - JWT-based auth with user profiles
-- ✅ **AI Content Processing** - Automatic summarization and headline generation
-- ✅ **Multiple AI Providers** - Pollinations AI (default), Groq, OpenAI, Ollama
-- ✅ **Test Frontend** - HTML/JS UI for API testing
-- ✅ **Breaking News Detection** - Architecture ready
-- ⏳ **Content Pipeline** - Scraper integration (Phase 3)
-- ⏳ **Personalized Feed** - Recommendation engine (Phase 3)
+**Stack:** FastAPI + PostgreSQL + Redis + AI (Pollinations/Groq/OpenAI/Ollama)  
+**Cost:** $0/month (self-hosted + free AI)
 
 ---
 
-## 📁 Project Structure
+## Current Progress
+
+### ✅ Phase 1: Foundation — Complete
+- FastAPI backend with async architecture
+- PostgreSQL database with 11 tables (SQLAlchemy 2.0 + Alembic migrations)
+- Redis integration for caching and task queue
+- JWT authentication (access + refresh tokens) with bcrypt password hashing
+- User profiles with academic info, preferences, and gamification (streaks, badges)
+
+### ✅ Phase 2: AI Integration — Complete
+- 5 AI providers with automatic fallback: Pollinations (free default) → Groq → OpenAI → HuggingFace → Ollama
+- Content summarization, headline generation, and text embeddings
+- AI status monitoring and provider health checks
+
+### ✅ Phase 3: Content Pipeline — Complete
+- **5 of 7 scrapers working:** Hacker News, Reddit, GitHub Trending, Medium, Product Hunt
+- Scraper management API with admin controls (run individual/all, schedule, toggle sources)
+- Content processing pipeline: attractiveness scoring, AI summarization, tag generation, dedup
+- Feed service: personalized, trending, breaking news, daily digest, search, category filtering
+- Full pipeline orchestration (scrape → process → embed → publish)
+- Frontend UI: responsive SPA with dark mode, article reader, bookmarks, auth, search
+
+### ⚠️ Partially Done
+- **Twitter scraper** — stub only, not implemented (API access challenges)
+- **YouTube scraper** — stub only, not implemented
+- **Celery task queue** — tasks defined, scheduler not running
+- **Vector similarity search** — embeddings generated, search not wired up
+
+### ❌ Not Started (Future)
+- Email delivery (SendGrid config ready, logic not built)
+- Discord webhook notifications
+- Admin dashboard UI (API endpoints exist, no web panel)
+- React/Vue production frontend (currently pure HTML/CSS/JS)
+- Rate limiting enforcement
+- Monitoring and observability
+
+---
+
+## Project Structure
 
 ```
 newsletter/
-├── backend/                 # FastAPI Backend
+├── backend/                  # FastAPI Backend
 │   ├── app/
-│   │   ├── api/v1/         # API routes (auth, ai)
-│   │   ├── core/           # Security, config
-│   │   ├── models/         # Database models (11 tables)
-│   │   ├── schemas/        # Pydantic schemas
-│   │   ├── services/       # Business logic
-│   │   └── integrations/   # AI providers
-│   ├── alembic/            # Database migrations
-│   ├── tests/              # Test suite
-│   ├── setup_db.ps1        # Database setup script
-│   ├── setup_ollama.ps1    # Ollama setup script
-│   ├── requirements.txt
-│   └── .env                # Configuration
+│   │   ├── api/v1/           # Routes: auth, ai, feed, pipeline, scrapers
+│   │   ├── core/             # Security (JWT, bcrypt)
+│   │   ├── models/           # SQLAlchemy models (User, Content, Source, etc.)
+│   │   ├── schemas/          # Pydantic request/response schemas
+│   │   ├── services/         # Business logic (auth, feed, pipeline, scraper, content)
+│   │   ├── integrations/     # AI providers (Groq, OpenAI, Pollinations, Ollama, HF)
+│   │   ├── tasks/            # Celery task definitions
+│   │   └── config.py         # App settings
+│   ├── alembic/              # Database migrations
+│   ├── tests/                # pytest test suite
+│   ├── docker-compose.yml    # PostgreSQL + Redis
+│   └── requirements.txt
 │
-├── frontend/               # Test UI
-│   └── index.html          # Complete test interface
+├── frontend/                 # Web UI
+│   ├── index.html            # Main SPA (feed, auth, search, dark mode)
+│   └── reader.html           # Article reader view
 │
-├── scraper_platform/       # Existing scrapers
-│   ├── main.py
+├── scraper_platform/         # Content scrapers
+│   ├── main.py               # Orchestrator (runs all scrapers in parallel)
 │   └── src/
-│       ├── base_scraper.py
-│       └── scrapers/       # 7 working scrapers
+│       ├── base_scraper.py   # Async base with retry, dedup, logging
+│       ├── excel_tracker.py  # Results tracking
+│       └── scrapers/         # 7 scrapers (5 working, 2 stubs)
 │
-├── reports/                # Documentation
+├── docs/                     # Setup guides & reference
+│   ├── QUICKSTART.md         # 5-minute setup guide
+│   ├── FREE_AI_OPTIONS.md    # Free AI provider comparison
+│   ├── GROQ_SETUP.md         # Groq API setup
+│   ├── OLLAMA_SETUP.md       # Local AI with Ollama
+│   └── OPENAI_SETUP.md       # OpenAI setup
+│
+├── reports/                  # Architecture & design docs
 │   ├── AGENTS.md
 │   ├── Master_Scraping_Logic.md
 │   └── ...
 │
-├── FREE_AI_OPTIONS.md      # Free AI setup guide
-├── GROQ_SETUP.md          # Groq setup guide
-├── OLLAMA_SETUP.md        # Ollama setup guide
-├── QUICKSTART.md          # 5-minute start guide
-└── README.md              # This file
+├── context/                  # PRD & design references
+└── .github/workflows/ci.yml  # CI: pytest, flake8, black, mypy
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
-
 - Python 3.11+
-- PostgreSQL 15+ (or use SQLite for testing)
-- Redis (optional for testing)
+- PostgreSQL 15+
+- Redis (optional for dev)
 
-### 1. Clone & Setup
+### Setup
 
 ```bash
+# Clone and install
 git clone <your-repo-url>
-cd newsletter
-
-# Backend setup
-cd backend
+cd newsletter/backend
 python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Linux/Mac
-source venv/bin/activate
-
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux/Mac
 pip install -r requirements.txt
-```
 
-### 2. Configure Environment
+# Configure
+cp .env.example .env         # Edit with your settings or keep defaults
 
-```bash
-# Copy example
-cp .env.example .env
+# Database
+docker-compose up -d postgres redis   # Option A: Docker
+# .\setup_db.ps1                      # Option B: Local PostgreSQL
 
-# Edit .env with your settings (or keep defaults for free AI)
-```
-
-### 3. Setup Database
-
-**Option A: With Docker**
-```bash
-docker-compose up -d postgres redis
-```
-
-**Option B: Local PostgreSQL**
-```powershell
-# Windows - Run as Admin
-.\setup_db.ps1
-
-# Or manually:
-# 1. Install PostgreSQL
-# 2. Create database: newsletter
-# 3. Update DATABASE_URL in .env
-```
-
-### 4. Run Migrations
-
-```bash
+# Migrate and run
 alembic upgrade head
-```
-
-### 5. Start Backend
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-Backend will be at: `http://localhost:8000`
+Backend: `http://localhost:8000` · API docs: `http://localhost:8000/docs`
 
-### 6. Open Frontend
+Open `frontend/index.html` in a browser for the UI.
 
-```bash
-cd ../frontend
-# Simply open in browser
-start index.html
-
-# Or use Python server
-python -m http.server 3000
-```
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full walkthrough.
 
 ---
 
-## 🤖 AI Configuration
+## AI Configuration
 
-### Option 1: Pollinations AI (DEFAULT) ⭐
-**FREE** - No signup required! Works immediately.
+| Provider | Cost | Speed | Setup |
+|----------|------|-------|-------|
+| **Pollinations** (default) | Free | Medium | None — works out of the box |
+| **Groq** | Free tier | Fast | Add `GROQ_API_KEY` to `.env` ([guide](docs/GROQ_SETUP.md)) |
+| **OpenAI** | Paid | Fast | Add `OPENAI_API_KEY` to `.env` ([guide](docs/OPENAI_SETUP.md)) |
+| **Ollama** | Free | Slow | Install locally ([guide](docs/OLLAMA_SETUP.md)) |
+| **HuggingFace** | Free tier | Medium | Add `HF_API_KEY` to `.env` |
 
-Just start the backend - it's already configured.
-
-### Option 2: Groq (Fastest)
-**FREE tier** - 20 requests/minute
-
-1. Sign up: https://console.groq.com/
-2. Get API key
-3. Add to `.env`:
-```env
-GROQ_API_KEY=gsk_your_key_here
-```
-
-### Option 3: Ollama (Local)
-**FREE** - Runs on your machine
-
-```powershell
-# Install Ollama
-.\setup_ollama.ps1
-
-# Or manually:
-# 1. Download from https://ollama.com/
-# 2. ollama pull llama3.2
-# 3. ollama serve
-```
-
-See `OLLAMA_SETUP.md` for details.
+The system auto-selects the best available provider.
 
 ---
 
-## 🧪 Testing
+## API Endpoints
 
-### Backend Tests
+### Auth (`/api/v1/auth`)
+`POST /register` · `POST /login` · `POST /refresh` · `GET /me` · `PUT /me` · `POST /change-password` · `GET /stats`
+
+### AI (`/api/v1/ai`)
+`GET /status` · `GET /providers` · `POST /summarize` · `POST /headline` · `POST /embed`
+
+### Feed (`/api/v1/feed`)
+`GET /personalized` · `GET /trending` · `GET /breaking` · `GET /daily-digest` · `GET /search` · `GET /category/{cat}` · `POST /{id}/read` · `POST /{id}/save` · `POST /{id}/feedback` · `GET /stats`
+
+### Pipeline (`/api/v1/pipeline`)
+`POST /run` · `GET /status` · `POST /process` · `POST /embed` · `GET /stats`
+
+### Scrapers (`/api/v1/scrapers`) — Admin
+`GET /status` · `POST /run/{name}` · `POST /run-all` · `POST /process-pending` · `GET /stats`
+
+---
+
+## Testing
 
 ```bash
 cd backend
 
-# Run all tests
-pytest tests/ -v
-
-# Run specific test
-pytest tests/test_auth.py -v
-
-# AI system test
-python test_ai_system.py
-```
-
-### API Testing
-
-Open frontend at `frontend/index.html` and use the built-in API tester, or use curl:
-
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Register
-curl -X POST http://localhost:8000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"testpass","full_name":"Test User"}'
-
-# AI Summarize
-curl -X POST http://localhost:8000/api/v1/ai/summarize \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Test","content":"AI is transforming education..."}'
+pytest tests/ -v              # Run test suite
+python test_ai_system.py      # Diagnose AI providers
+python verify_phase1.py       # Verify Phase 1 setup
 ```
 
 ---
 
-## 📚 Documentation
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Backend** | FastAPI, SQLAlchemy 2.0 (async), Alembic, Celery |
+| **Database** | PostgreSQL 15, Redis 7 |
+| **Auth** | JWT (python-jose), bcrypt |
+| **AI** | Pollinations, Groq, OpenAI, HuggingFace, Ollama |
+| **Scrapers** | httpx (async), BeautifulSoup, RSS feeds |
+| **Frontend** | HTML/CSS/JS (no build step) |
+| **CI/CD** | GitHub Actions (pytest, flake8, black, mypy) |
+| **Infra** | Docker Compose |
+
+---
+
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| `QUICKSTART.md` | 5-minute setup guide |
-| `FREE_AI_OPTIONS.md` | All free AI options |
-| `GROQ_SETUP.md` | Groq setup (fastest free) |
-| `OLLAMA_SETUP.md` | Local AI setup |
-| `backend/DATABASE_SETUP.md` | Database setup details |
-| `backend/README.md` | Backend-specific docs |
-| `frontend/README.md` | Frontend test UI docs |
-| `reports/` | Architecture & planning docs |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | 5-minute setup guide |
+| [docs/FREE_AI_OPTIONS.md](docs/FREE_AI_OPTIONS.md) | Free AI provider comparison |
+| [docs/GROQ_SETUP.md](docs/GROQ_SETUP.md) | Groq setup |
+| [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) | Local AI with Ollama |
+| [docs/OPENAI_SETUP.md](docs/OPENAI_SETUP.md) | OpenAI setup |
+| [backend/DATABASE_SETUP.md](backend/DATABASE_SETUP.md) | Database setup details |
+| [reports/](reports/) | Architecture & scraping design docs |
 
 ---
 
-## 🛠️ Tech Stack
+## License
 
-### Backend
-- **Framework:** FastAPI (async)
-- **Database:** PostgreSQL 15+ (SQLAlchemy 2.0)
-- **Cache:** Redis
-- **Auth:** JWT (python-jose) + bcrypt
-- **AI:** Pollinations AI (default), Groq, OpenAI, Ollama
-- **Migrations:** Alembic
-- **Testing:** pytest + pytest-asyncio
-
-### Frontend (Test UI)
-- Pure HTML/CSS/JS (no build step)
-- Responsive design
-- Real-time API testing
-
-### Scrapers
-- Python async (httpx)
-- 7 sources: Hacker News, Reddit, GitHub, Medium, Product Hunt, YouTube, Twitter
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1: Foundation ✅
-- [x] FastAPI project structure
-- [x] PostgreSQL + Redis setup
-- [x] User authentication (JWT)
-- [x] Database models (11 tables)
-- [x] Alembic migrations
-
-### Phase 2: AI Integration ✅
-- [x] Multiple AI provider support
-- [x] Content summarization
-- [x] Headline generation
-- [x] Free AI options (Pollinations, Groq)
-- [x] Test frontend UI
-
-### Phase 3: Content Pipeline ⏳ (Next)
-- [ ] Integrate existing scrapers
-- [ ] Content vectorization
-- [ ] Attractiveness scoring
-- [ ] Processing queue
-- [ ] Breaking news detection (BNDE)
-
-### Phase 4: Feed & Delivery ⏳
-- [ ] Personalized feed generation
-- [ ] Newsletter creation
-- [ ] Email delivery (SendGrid)
-- [ ] Discord notifications
-
-### Phase 5: Production ⏳
-- [ ] React/Vue frontend
-- [ ] Docker deployment
-- [ ] CI/CD pipeline
-- [ ] Monitoring
-
----
-
-## 💰 Cost Breakdown
-
-| Component | Cost | Notes |
-|-----------|------|-------|
-| **PostgreSQL** | $0 | Self-hosted |
-| **Redis** | $0 | Self-hosted |
-| **AI (Pollinations)** | $0 | Free, no signup |
-| **Backend** | $0 | Self-hosted |
-| **Frontend** | $0 | Static HTML |
-| **Total** | **$0/month** | Completely free! |
-
-Optional upgrades:
-- Groq: FREE tier available
-- OpenAI: $5-20/month for heavy use
-- Cloud hosting: $5-50/month
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests
-5. Submit a pull request
-
----
-
-## 📝 License
-
-This project is proprietary. See LICENSE file for details.
-
----
-
-## 🆘 Support
-
-Having issues?
-
-1. Check `QUICKSTART.md` for common problems
-2. Run `python test_ai_system.py` to diagnose AI issues
-3. Check `backend/logs/` for error logs
-4. Open an issue with error details
-
----
-
-## 🎉 Acknowledgments
-
-- FastAPI community for the excellent framework
-- Pollinations AI for free AI services
-- Ollama for local AI capabilities
-
----
-
-**Ready to start?** See `QUICKSTART.md` for 5-minute setup!
+This project is proprietary. See [LICENSE](LICENSE) for details.

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -109,11 +109,11 @@ class UserReads(Base):
     __tablename__ = "user_reads"
     
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )
     content_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        ForeignKey("processed_content.id", ondelete="CASCADE"),
         nullable=False
     )
     
@@ -131,11 +131,11 @@ class UserSaves(Base):
     __tablename__ = "user_saves"
     
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )
     content_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        ForeignKey("processed_content.id", ondelete="CASCADE"),
         nullable=False
     )
     collection_name: Mapped[str] = mapped_column(String(100), default="default")
@@ -150,11 +150,11 @@ class UserFeedback(Base):
     __tablename__ = "user_feedback"
     
     user_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )
     content_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        ForeignKey("processed_content.id", ondelete="CASCADE"),
         nullable=False
     )
     

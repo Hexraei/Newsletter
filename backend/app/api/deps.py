@@ -12,13 +12,14 @@ from app.models import User, get_db
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_PREFIX}/auth/login"
+    tokenUrl=f"{settings.API_V1_PREFIX}/auth/login",
+    auto_error=False
 )
 
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
     """Get current authenticated user from token."""
     credentials_exception = HTTPException(
@@ -26,6 +27,9 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    if not token:
+        raise credentials_exception
     
     # Decode token
     payload = decode_token(token)

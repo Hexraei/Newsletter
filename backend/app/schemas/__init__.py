@@ -1,5 +1,11 @@
 """Pydantic schemas."""
 
+from app.schemas.content import (
+    EmbedRequest,
+    FeedbackRequest,
+    HeadlineRequest,
+    SummarizeRequest,
+)
 from app.schemas.responses import (
     ErrorResponse,
     PaginatedResponse,
@@ -26,4 +32,8 @@ __all__ = [
     "PaginatedResponse",
     "SuccessResponse",
     "ErrorResponse",
+    "SummarizeRequest",
+    "HeadlineRequest",
+    "EmbedRequest",
+    "FeedbackRequest",
 ]

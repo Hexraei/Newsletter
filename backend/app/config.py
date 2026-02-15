@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     REDIS_POOL_SIZE: int = 50
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:8000", "null"]
     
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100

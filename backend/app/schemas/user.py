@@ -61,6 +61,13 @@ class UserInDB(UserBase):
 
     class Config:
         from_attributes = True
+    
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if v is not None:
+            return str(v)
+        return v
 
 
 # Properties to return via API

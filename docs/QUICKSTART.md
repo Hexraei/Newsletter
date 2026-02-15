@@ -124,8 +124,9 @@ D:\newsletter\
 │   └── .env               # Config
 ├── frontend	est_newsletter.py       # Test UI
 │   └── index.html         # Frontend
-├── OLLAMA_SETUP.md        # Ollama guide
-└── QUICKSTART.md          # This file
+├── docs/                  # Setup guides & docs
+│   ├── OLLAMA_SETUP.md
+│   └── QUICKSTART.md      # This file
 ```
 
 ---
@@ -147,7 +148,7 @@ D:\newsletter\
 
 1. Check service status with commands above
 2. Review setup guides:
-   - `OLLAMA_SETUP.md` - AI setup
+   - `docs/OLLAMA_SETUP.md` - AI setup
    - `backend/DATABASE_SETUP.md` - Database setup
 3. Check logs in terminal windows
 

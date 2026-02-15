@@ -63,7 +63,7 @@ HUGGINGFACE_API_KEY=hf_your_token_here
 - **Speed:** Slow (depends on your CPU)
 - **Setup time:** 15 minutes
 
-See `OLLAMA_SETUP.md`
+See `docs/OLLAMA_SETUP.md`
 
 ---
 

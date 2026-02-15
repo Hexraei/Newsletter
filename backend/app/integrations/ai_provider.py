@@ -192,7 +192,7 @@ def get_ai_provider_options() -> dict:
             "status": "available",
             "speed": "Slow",
             "cost": "Free",
-            "setup_docs": "OLLAMA_SETUP.md"
+            "setup_docs": "docs/OLLAMA_SETUP.md"
         })
     
     # Determine which one will be used
