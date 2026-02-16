@@ -6,6 +6,7 @@ Uses RSS feeds from publications (no auth required).
 import feedparser
 from datetime import datetime
 from typing import List, Dict, Any
+from urllib.parse import urlparse
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,12 +23,12 @@ class MediumScraper(BaseScraper):
         'Towards Data Science': 'https://towardsdatascience.com/feed',
         'JavaScript in Plain English': 'https://javascript.plainenglish.io/feed',
         'Python in Plain English': 'https://python.plainenglish.io/feed',
-        'Geek Culture': 'https://medium.com/geekculture/feed',
+        'Geek Culture': 'https://medium.com/feed/geekculture',
         'Free Code Camp': 'https://medium.freecodecamp.org/feed',
         'Hacker Noon': 'https://hackernoon.com/feed',
-        'The Startup': 'https://medium.com/swlh/feed',
+        'The Startup': 'https://medium.com/feed/swlh',
         'Level Up Coding': 'https://levelup.gitconnected.com/feed',
-        'Bits and Pretzels': 'https://bitsandpretzels.com/feed',
+        'Towards AI': 'https://medium.com/feed/towards-artificial-intelligence',
     }
     
     def __init__(self):
@@ -39,26 +40,30 @@ class MediumScraper(BaseScraper):
         
         try:
             self.logger.info(f"Fetching {name}")
-            feed = feedparser.parse(url)
-            
-            if feed.bozo:
-                self.logger.warning(f"Feed error for {name}: {feed.bozo_exception}")
+            feed = self._parse_feed_with_fallbacks(name, url)
+            if not feed or not feed.entries:
+                self.logger.warning(f"No entries found for {name} ({url})")
                 return items
             
             for entry in feed.entries[:limit]:
                 try:
                     # Clean URL (remove tracking params)
                     clean_url = entry.link.split('?')[0]
+
+                    clean_summary = self.clean_text(entry.get('summary', ''))
+                    if not clean_summary:
+                        clean_summary = self.clean_text(entry.get('description', ''))
+                    clean_summary = clean_summary[:1000]
                     
                     # Extract reading time if available
-                    reading_time = self._estimate_reading_time(entry.get('summary', ''))
+                    reading_time = self._estimate_reading_time(clean_summary)
                     
                     item = ScrapedItem(
                         source=f"Medium - {name}",
                         source_type="blog",
                         title=entry.title,
                         url=clean_url,
-                        content=entry.get('summary', '')[:1000],
+                        content=clean_summary,
                         author=entry.get('author', 'Unknown'),
                         published_at=self._parse_date(entry.get('published')),
                         metadata={
@@ -77,6 +82,41 @@ class MediumScraper(BaseScraper):
             self.logger.error(f"Error fetching {name}: {e}")
         
         return items
+
+    def _parse_feed_with_fallbacks(self, name: str, url: str):
+        """Parse feed URL and retry with Medium-compatible fallback URLs."""
+        candidates = self._build_feed_candidates(url)
+
+        for index, candidate_url in enumerate(candidates):
+            feed = feedparser.parse(candidate_url)
+
+            if feed.entries:
+                if index > 0:
+                    self.logger.info(f"Recovered feed for {name} using fallback URL: {candidate_url}")
+                if feed.bozo:
+                    self.logger.warning(f"Feed for {name} parsed with warnings: {feed.bozo_exception}")
+                return feed
+
+            if feed.bozo:
+                self.logger.warning(f"Feed error for {name} ({candidate_url}): {feed.bozo_exception}")
+
+        return None
+
+    def _build_feed_candidates(self, url: str) -> List[str]:
+        """Build candidate feed URLs for publications that changed Medium URL format."""
+        candidates = [url]
+        parsed = urlparse(url)
+
+        if parsed.netloc.endswith("medium.com"):
+            path_parts = [p for p in parsed.path.split('/') if p]
+
+            # Legacy publication feed pattern: /<slug>/feed
+            if len(path_parts) == 2 and path_parts[-1] == 'feed':
+                slug = path_parts[0]
+                candidates.append(f"https://medium.com/feed/{slug}")
+
+        # Keep order but remove accidental duplicates
+        return list(dict.fromkeys(candidates))
     
     async def scrape(self, publications: Dict[str, str] = None, limit: int = 10, **kwargs) -> List[ScrapedItem]:
         """

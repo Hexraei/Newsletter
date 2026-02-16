@@ -16,6 +16,7 @@ from app.tasks.scraper_tasks import (
     scrape_medium,
     scrape_producthunt,
     scrape_reddit,
+    scrape_twitter,
     trigger_all_scrapers,
     trigger_scraper,
 )
@@ -46,7 +47,7 @@ async def run_single_scraper(
 ):
     """Manually trigger a single scraper."""
     
-    valid_scrapers = ["hackernews", "reddit", "github", "medium", "producthunt"]
+    valid_scrapers = ["hackernews", "reddit", "twitter", "github", "medium", "producthunt"]
     
     if scraper_name not in valid_scrapers:
         raise HTTPException(
@@ -85,6 +86,7 @@ async def schedule_scraper(
     task_map = {
         "hackernews": scrape_hackernews,
         "reddit": scrape_reddit,
+        "twitter": scrape_twitter,
         "github": scrape_github,
         "medium": scrape_medium,
         "producthunt": scrape_producthunt,
@@ -253,4 +255,3 @@ async def dev_refresh_content(
         "scrape": scrape_result,
         "process": process_result,
     })
-

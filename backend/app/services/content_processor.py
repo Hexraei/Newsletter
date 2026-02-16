@@ -158,20 +158,37 @@ class ContentProcessor:
             print(f"AI summarization failed: {e}, using basic")
             return await self._process_basic(raw, score)
         
-        # Generate headline
-        try:
-            headline = await self.ai_provider.headline(
-                title=raw.original_title or "",
-                content=raw.original_content or ""
-            )
-        except Exception:
-            headline = raw.original_title
-        
         # Get source info for department tags
         source_result = await self.db.execute(
             select(Source).where(Source.id == raw.source_id)
         )
         source = source_result.scalar_one_or_none()
+        source_name = source.name if source else ""
+        
+        # Determine if this is breaking news using quality + recency + urgency rules
+        is_breaking = self._is_breaking_candidate(raw, score)
+        breaking_score = self._calculate_breaking_score(raw, score) if is_breaking else None
+        
+        # Generate appropriate headline
+        try:
+            if is_breaking:
+                # Use breaking news headline generator for urgent, impactful headlines
+                headline = await self.ai_provider.breaking_headline(
+                    title=raw.original_title or "",
+                    content=raw.original_content or "",
+                    source=source_name
+                )
+            else:
+                # Use regular headline generator
+                headline = await self.ai_provider.headline(
+                    title=raw.original_title or "",
+                    content=raw.original_content or ""
+                )
+        except Exception:
+            headline = raw.original_title
+        
+        # Extract featured image from metadata
+        featured_image_url = self._extract_featured_image(raw)
         
         # Create processed content
         processed = ProcessedContent(
@@ -192,7 +209,11 @@ class ContentProcessor:
             quality_score=min(100, score + 10),
             content_type="news",
             status="published",
-            published_at=datetime.now(timezone.utc)
+            published_at=datetime.now(timezone.utc),
+            is_breaking=is_breaking,
+            breaking_score=breaking_score,
+            breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
+            featured_image_url=featured_image_url
         )
         
         self.db.add(processed)
@@ -235,6 +256,10 @@ class ContentProcessor:
             if len(content) > 300:
                 summary += "..."
 
+        # Even in basic mode, keep media and breaking metadata consistent.
+        is_breaking = self._is_breaking_candidate(raw, score)
+        breaking_score = self._calculate_breaking_score(raw, score) if is_breaking else None
+
         processed = ProcessedContent(
             raw_content_id=raw.id,
             title=title,
@@ -253,6 +278,10 @@ class ContentProcessor:
             content_type="snippet",
             status="published",
             published_at=datetime.now(timezone.utc),
+            is_breaking=is_breaking,
+            breaking_score=breaking_score,
+            breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
+            featured_image_url=self._extract_featured_image(raw),
         )
         
         self.db.add(processed)
@@ -260,6 +289,76 @@ class ContentProcessor:
         await self.db.refresh(processed)
         
         return processed
+
+    def _content_age_hours(self, raw: RawContent) -> Optional[float]:
+        """Get content age in hours from published/scraped timestamp."""
+        dt = raw.published_at or raw.scraped_at
+        if not dt:
+            return None
+
+        now = datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        return max(0.0, (now - dt).total_seconds() / 3600)
+
+    def _has_urgent_keywords(self, raw: RawContent) -> bool:
+        """Detect urgent/breaking signals in text."""
+        text = f"{raw.original_title or ''} {raw.original_content or ''}".lower()
+        keywords = [
+            "breaking",
+            "just announced",
+            "outage",
+            "major",
+            "urgent",
+            "security flaw",
+            "data breach",
+            "acquires",
+            "launches",
+            "banned",
+            "lawsuit",
+            "recall",
+        ]
+        return any(k in text for k in keywords)
+
+    def _is_breaking_candidate(self, raw: RawContent, score: int) -> bool:
+        """Decide if a story should be marked as breaking.
+
+        Avoids marking every high-engagement post as breaking by adding recency
+        and urgency constraints.
+        """
+        age_hours = self._content_age_hours(raw)
+        if age_hours is None or age_hours > 48:
+            return False
+
+        if score >= 92 and age_hours <= 48:
+            return True
+        if score >= 85 and age_hours <= 24:
+            return True
+        if score >= 78 and age_hours <= 12 and self._has_urgent_keywords(raw):
+            return True
+
+        return False
+
+    def _calculate_breaking_score(self, raw: RawContent, score: int) -> int:
+        """Calculate weighted breaking score for ranking."""
+        age_hours = self._content_age_hours(raw)
+        boost = 0
+
+        if age_hours is not None:
+            if age_hours <= 2:
+                boost += 20
+            elif age_hours <= 6:
+                boost += 15
+            elif age_hours <= 12:
+                boost += 10
+            elif age_hours <= 24:
+                boost += 5
+
+        if self._has_urgent_keywords(raw):
+            boost += 8
+
+        return min(100, score + boost)
     
     def _detect_category(self, raw: RawContent) -> str:
         """Detect content category from metadata."""
@@ -305,6 +404,43 @@ class ContentProcessor:
                 topics.append(keyword.replace(" ", "-"))
         
         return topics[:5]  # Max 5 topics
+    
+    def _extract_featured_image(self, raw: RawContent) -> Optional[str]:
+        """Extract featured image URL from metadata.
+        
+        Checks for common Open Graph and Twitter Card image meta tags.
+        """
+        metadata = raw.raw_metadata or {}
+        
+        # Check for Open Graph image
+        if "og_image" in metadata:
+            return metadata["og_image"]
+        if "og:image" in metadata:
+            return metadata["og:image"]
+        
+        # Check for Twitter Card image
+        if "twitter_image" in metadata:
+            return metadata["twitter_image"]
+        if "twitter:image" in metadata:
+            return metadata["twitter:image"]
+        if "twitter:image:src" in metadata:
+            return metadata["twitter:image:src"]
+        
+        # Check for other common image fields
+        if "image" in metadata:
+            return metadata["image"]
+        if "thumbnail" in metadata:
+            return metadata["thumbnail"]
+        if "featured_image" in metadata:
+            return metadata["featured_image"]
+        
+        # Check in external_url metadata for Reddit/HN
+        external_url = metadata.get("external_url", "")
+        if external_url and ("youtube.com" in external_url or "youtu.be" in external_url):
+            # YouTube videos - could extract thumbnail if needed
+            pass
+        
+        return None
     
     async def get_processing_stats(self) -> Dict:
         """Get content processing statistics."""

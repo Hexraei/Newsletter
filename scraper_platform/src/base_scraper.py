@@ -7,12 +7,14 @@ import httpx
 import asyncio
 import logging
 import hashlib
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential
 from fake_useragent import UserAgent
 import json
+from html import unescape
 
 # Setup logging
 logging.basicConfig(
@@ -143,3 +145,27 @@ class BaseScraper(ABC):
             'last_scraped': datetime.now().isoformat(),
             'status': 'active'
         }
+
+    @staticmethod
+    def clean_text(raw_text: str, max_length: Optional[int] = None) -> str:
+        """Convert HTML-heavy feed content into clean plain text."""
+        if not raw_text:
+            return ""
+
+        text = raw_text
+
+        # Remove script/style and code-heavy blocks first
+        text = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<pre[^>]*>.*?</pre>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<code[^>]*>.*?</code>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+
+        # Strip remaining HTML tags and normalize text
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = unescape(text)
+        text = re.sub(r"\s+", " ", text).strip()
+
+        if max_length and len(text) > max_length:
+            return text[:max_length].rstrip() + "..."
+
+        return text

@@ -22,7 +22,7 @@ A content aggregation and newsletter platform for college students. Scrapes tech
 - AI status monitoring and provider health checks
 
 ### ✅ Phase 3: Content Pipeline — Complete
-- **5 of 7 scrapers working:** Hacker News, Reddit, GitHub Trending, Medium, Product Hunt
+- **6 of 7 scrapers working:** Hacker News, Reddit, Twitter/X (bird CLI), GitHub Trending, Medium, Product Hunt
 - Scraper management API with admin controls (run individual/all, schedule, toggle sources)
 - Content processing pipeline: attractiveness scoring, AI summarization, tag generation, dedup
 - Feed service: personalized, trending, breaking news, daily digest, search, category filtering
@@ -30,7 +30,7 @@ A content aggregation and newsletter platform for college students. Scrapes tech
 - Frontend UI: responsive SPA with dark mode, article reader, bookmarks, auth, search
 
 ### ⚠️ Partially Done
-- **Twitter scraper** — stub only, not implemented (API access challenges)
+- **Twitter scraper** — works via bird CLI (requires credentials)
 - **YouTube scraper** — stub only, not implemented
 - **Celery task queue** — tasks defined, scheduler not running
 - **Vector similarity search** — embeddings generated, search not wired up
@@ -136,12 +136,40 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full walkthrough.
 | Provider | Cost | Speed | Setup |
 |----------|------|-------|-------|
 | **Pollinations** (default) | Free | Medium | None — works out of the box |
-| **Groq** | Free tier | Fast | Add `GROQ_API_KEY` to `.env` ([guide](docs/GROQ_SETUP.md)) |
+| **Groq** | Free tier | Fast | Add `GROQ_API_KEY` (+ optional `GROQ_MODEL`) to `.env` ([guide](docs/GROQ_SETUP.md)) |
 | **OpenAI** | Paid | Fast | Add `OPENAI_API_KEY` to `.env` ([guide](docs/OPENAI_SETUP.md)) |
 | **Ollama** | Free | Slow | Install locally ([guide](docs/OLLAMA_SETUP.md)) |
 | **HuggingFace** | Free tier | Medium | Add `HF_API_KEY` to `.env` |
 
 The system auto-selects the best available provider.
+
+---
+
+## Twitter/X Scraper Setup (bird CLI)
+
+Twitter scraping uses `bird` CLI and needs your own X auth credentials.
+
+Set one of these credential methods:
+
+```bash
+# Method 1: Explicit credentials
+set BIRD_AUTH_TOKEN=your_auth_token
+set BIRD_CT0=your_ct0_token
+
+# Method 2: bird default env names
+set AUTH_TOKEN=your_auth_token
+set CT0=your_ct0_token
+```
+
+Optional browser profile extraction:
+
+```bash
+set BIRD_CHROME_PROFILE=Default
+# or
+set BIRD_FIREFOX_PROFILE=default-release
+```
+
+Then run scraper jobs normally (`run/twitter` or `run-all`).
 
 ---
 

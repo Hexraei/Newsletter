@@ -36,6 +36,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.scraper_tasks.scrape_reddit",
         "schedule": crontab(minute="*/30"),  # Every 30 minutes
     },
+    "scrape-twitter": {
+        "task": "app.tasks.scraper_tasks.scrape_twitter",
+        "schedule": crontab(minute="*/30"),  # Every 30 minutes
+    },
     "scrape-github": {
         "task": "app.tasks.scraper_tasks.scrape_github",
         "schedule": crontab(minute="0", hour="*/6"),  # Every 6 hours
@@ -94,6 +98,24 @@ def scrape_reddit(self):
             result = await service.run_scraper("reddit")
             return result
     
+    try:
+        return asyncio.run(_scrape())
+    except Exception as exc:
+        self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(bind=True, max_retries=3)
+def scrape_twitter(self):
+    """Scrape Twitter/X via bird CLI."""
+    import asyncio
+
+    async def _scrape():
+        async with AsyncSessionLocal() as db:
+            service = ScraperService(db)
+            await service.ensure_sources_exist()
+            result = await service.run_scraper("twitter")
+            return result
+
     try:
         return asyncio.run(_scrape())
     except Exception as exc:

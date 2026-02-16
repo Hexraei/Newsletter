@@ -67,6 +67,7 @@ Default option. Just start the backend.
 ### Option 2: Groq (Fastest Free)
 ```env
 GROQ_API_KEY=gsk_your_key_here
+GROQ_MODEL=llama-3.1-8b-instant
 ```
 Get key: https://console.groq.com/
 

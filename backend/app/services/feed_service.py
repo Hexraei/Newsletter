@@ -1,6 +1,6 @@
 """Feed curation service for generating personalized newsletters."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from sqlalchemy import select, func
@@ -30,7 +30,7 @@ class FeedService:
         )
         
         # Filter by recency (last 7 days)
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
         query = query.where(ProcessedContent.published_at >= week_ago)
         
         # Apply interest filters
@@ -129,27 +129,98 @@ class FeedService:
                 "summary": item.summary,
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
+                "is_breaking": item.is_breaking,
+                "breaking_score": item.breaking_score,
                 "topic_tags": item.topic_tags,
                 "reading_time_minutes": item.reading_time_minutes,
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "content_blocks": item.content_blocks,
+                "featured_image_url": item.featured_image_url,
                 "original_url": url_map.get(str(item.raw_content_id), None)
             }
             for item in items
         ]
     
     async def get_breaking_news(self, limit: int = 5) -> List[dict]:
-        """Get breaking news alerts."""
-        
+        """Get breaking news alerts.
+
+        Ranking is based on:
+        - breaking_score/attractiveness_score
+        - recency boost (newer is better)
+        - explicit is_breaking flag bonus
+        This prevents noisy but old high-score posts from dominating breaking alerts.
+        """
+
+        recent_window = datetime.now(timezone.utc) - timedelta(hours=48)
         result = await self.db.execute(
             select(ProcessedContent)
-            .where(ProcessedContent.is_breaking == True)
             .where(ProcessedContent.status == "published")
-            .order_by(ProcessedContent.breaking_detected_at.desc())
-            .limit(limit)
+            .where(ProcessedContent.published_at >= recent_window)
+            .order_by(ProcessedContent.published_at.desc())
+            .limit(200)
         )
-        items = result.scalars().all()
-        
+        candidates = result.scalars().all()
+
+        def rank(item: ProcessedContent) -> float:
+            base = float(item.breaking_score or item.attractiveness_score or 0)
+
+            # Recency boost
+            age_hours = 999.0
+            if item.published_at:
+                dt = item.published_at
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                age_hours = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds() / 3600)
+
+            if age_hours <= 2:
+                base += 20
+            elif age_hours <= 6:
+                base += 15
+            elif age_hours <= 12:
+                base += 10
+            elif age_hours <= 24:
+                base += 5
+
+            if item.is_breaking:
+                base += 10
+
+            text = f"{item.title or ''} {item.summary or ''}".lower()
+            urgent_terms = [
+                "breaking",
+                "outage",
+                "security",
+                "breach",
+                "launch",
+                "acquires",
+                "ban",
+                "announces",
+                "critical",
+            ]
+            if any(t in text for t in urgent_terms):
+                base += 6
+
+            return base
+
+        ranked = []
+        for item in candidates:
+            score = rank(item)
+            # Keep only strong breaking candidates
+            if score >= 85:
+                ranked.append((score, item))
+
+        ranked.sort(key=lambda x: x[0], reverse=True)
+        items = [item for _, item in ranked[:limit]]
+
+        # Fallback: if not enough breaking candidates, include top recent by attractiveness
+        if len(items) < limit:
+            existing_ids = {item.id for item in items}
+            fillers = [
+                c for c in candidates
+                if c.id not in existing_ids and (c.attractiveness_score or 0) >= 75
+            ]
+            fillers.sort(key=lambda i: float(i.attractiveness_score or 0), reverse=True)
+            items.extend(fillers[: max(0, limit - len(items))])
+
         # Fetch original URLs
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
         url_map = {}
@@ -159,15 +230,23 @@ class FeedService:
                 .where(RawContent.id.in_(raw_ids))
             )
             url_map = {str(row.id): row.original_url for row in raw_result.all()}
-        
+
         return [
             {
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
+                "content_blocks": item.content_blocks,
+                "category": item.category,
+                "topic_tags": item.topic_tags,
+                "reading_time_minutes": item.reading_time_minutes,
+                "attractiveness_score": item.attractiveness_score,
+                "is_breaking": item.is_breaking,
                 "breaking_score": item.breaking_score,
+                "featured_image_url": item.featured_image_url,
+                "published_at": item.published_at.isoformat() if item.published_at else None,
                 "detected_at": item.breaking_detected_at.isoformat() if item.breaking_detected_at else None,
-                "original_url": url_map.get(str(item.raw_content_id), None)
+                "original_url": url_map.get(str(item.raw_content_id), None),
             }
             for item in items
         ]
@@ -202,8 +281,8 @@ class FeedService:
     async def get_daily_digest(self, limit: int = 5) -> Dict:
         """Generate a daily digest of top content."""
         
-        today = datetime.utcnow().date()
-        today_start = datetime.combine(today, datetime.min.time())
+        today = datetime.now(timezone.utc).date()
+        today_start = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
         
         # Get top stories from today
         result = await self.db.execute(
@@ -291,8 +370,8 @@ class FeedService:
         avg_score = result.scalar() or 0
         
         # Today's content count
-        today = datetime.utcnow().date()
-        today_start = datetime.combine(today, datetime.min.time())
+        today = datetime.now(timezone.utc).date()
+        today_start = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
         
         result = await self.db.execute(
             select(func.count(ProcessedContent.id))

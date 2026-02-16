@@ -21,7 +21,7 @@ class GroqService:
             },
             timeout=30.0  # Groq is very fast
         )
-        self.model = "llama-3.2-3b-preview"  # Fast and cheap
+        self.model = getattr(settings, "GROQ_MODEL", "llama-3.1-8b-instant")
     
     async def summarize_content(
         self,
@@ -97,6 +97,67 @@ Create the best headline:"""
         headline = data["choices"][0]["message"]["content"].strip()
         return headline.strip('"').strip("'")
     
+    async def generate_breaking_headline(self, title: str, content: str, source: str = "") -> str:
+        """Generate urgent breaking news headline.
+        
+        Uses a specialized system prompt optimized for breaking news that:
+        - Creates urgency and immediacy
+        - Uses powerful action words
+        - Keeps it under 8 words for maximum impact
+        - Avoids clickbait while maintaining excitement
+        """
+        
+        system_prompt = """You are a breaking news headline writer for a college tech newsletter.
+        
+        RULES for breaking news headlines:
+        - MAX 8 words (shorter is better)
+        - Use urgent, active language
+        - Start with strong action verbs when possible
+        - Include key subject (company, technology, or event)
+        - Avoid exaggeration - be factual but exciting
+        - No questions, no clickbait phrases like "you won't believe"
+        - Target audience: college students interested in tech
+        
+        EXAMPLES of good breaking news headlines:
+        - "OpenAI Releases GPT-5 with Revolutionary Features"
+        - "Major Security Flaw Discovered in Popular Framework"
+        - "Google Acquires AI Startup for $2 Billion"
+        - "New JavaScript Framework Reaches 1 Million Downloads"
+        
+        Respond with ONLY the headline, no quotes, no explanation."""
+
+        user_prompt = f"""BREAKING NEWS from {source or 'Tech Source'}
+
+Original Title: {title}
+
+Content Summary: {content[:800]}
+
+Generate an urgent, factual breaking news headline (max 8 words):"""
+
+        response = await self.client.post(
+            "/chat/completions",
+            json={
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.6,
+                "max_tokens": 30
+            }
+        )
+        response.raise_for_status()
+        
+        data = response.json()
+        headline = data["choices"][0]["message"]["content"].strip()
+        # Clean up the headline
+        headline = headline.strip('"').strip("'").strip()
+        # Ensure it's not too long
+        words = headline.split()
+        if len(words) > 10:
+            headline = ' '.join(words[:8]) + '...'
+        return headline
+    
     def _parse_summary(self, text: str) -> dict:
         """Parse summary text."""
         lines = text.strip().split('\n')
@@ -143,6 +204,7 @@ async def check_groq_status(api_key: str) -> dict:
             return {
                 "status": "ready",
                 "provider": "Groq",
+                "model": getattr(settings, "GROQ_MODEL", "llama-3.1-8b-instant"),
                 "message": "Groq API is configured and working"
             }
         else:

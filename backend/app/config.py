@@ -43,7 +43,15 @@ class Settings(BaseSettings):
     
     # Discord
     DISCORD_WEBHOOK_URL: Optional[str] = None
-    
+
+    # Twitter/X (bird CLI)
+    BIRD_AUTH_TOKEN: Optional[str] = None
+    BIRD_CT0: Optional[str] = None
+    AUTH_TOKEN: Optional[str] = None
+    CT0: Optional[str] = None
+    BIRD_CHROME_PROFILE: Optional[str] = None
+    BIRD_FIREFOX_PROFILE: Optional[str] = None
+
     # File Storage
     STORAGE_ENDPOINT: Optional[str] = None
     STORAGE_ACCESS_KEY: Optional[str] = None
@@ -56,6 +64,7 @@ class Settings(BaseSettings):
     
     # Groq (RECOMMENDED - FREE, Fast, No credit card)
     GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
     
     # OpenAI (Best quality, paid)
     OPENAI_API_KEY: Optional[str] = None

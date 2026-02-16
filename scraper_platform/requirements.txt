@@ -6,4 +6,3 @@ python-dateutil>=2.8.0
 pydantic>=2.0.0
 tenacity>=8.2.0
 youtube-transcript-api>=0.6.0
-twscrape>=0.12.0

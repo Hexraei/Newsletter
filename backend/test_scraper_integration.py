@@ -15,6 +15,7 @@ print('\n[Step 1] Testing imports...')
 try:
     from src.scrapers.hackernews_scraper import HackerNewsScraper
     from src.scrapers.reddit_scraper import RedditScraper
+    from src.scrapers.twitter_scraper import TwitterScraper
     from src.scrapers.github_scraper import GitHubScraper
     print('[OK] Scrapers imported successfully')
 except Exception as e:
@@ -94,6 +95,7 @@ print('')
 print('Available scrapers:')
 print('  - hackernews')
 print('  - reddit')
+print('  - twitter')
 print('  - github')
 print('  - medium')
 print('  - producthunt')

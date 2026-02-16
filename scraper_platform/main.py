@@ -18,6 +18,7 @@ from src.scrapers.reddit_scraper import RedditScraper
 from src.scrapers.github_scraper import GitHubScraper
 from src.scrapers.medium_scraper import MediumScraper
 from src.scrapers.producthunt_scraper import ProductHuntScraper
+from src.scrapers.twitter_scraper import TwitterScraper
 
 
 class ScraperOrchestrator:
@@ -36,7 +37,7 @@ class ScraperOrchestrator:
         print("="*70)
         
         # 1. Hacker News
-        print("\n[1/5] Scraping Hacker News...")
+        print("\n[1/6] Scraping Hacker News...")
         try:
             async with HackerNewsScraper() as scraper:
                 items = await scraper.scrape(limit=30)
@@ -48,7 +49,7 @@ class ScraperOrchestrator:
             self.stats['hackernews'] = 0
         
         # 2. Reddit
-        print("\n[2/5] Scraping Reddit...")
+        print("\n[2/6] Scraping Reddit...")
         try:
             async with RedditScraper() as scraper:
                 items = await scraper.scrape(
@@ -62,8 +63,23 @@ class ScraperOrchestrator:
             print(f"  -> ERROR: {e}")
             self.stats['reddit'] = 0
         
-        # 3. GitHub
-        print("\n[3/5] Scraping GitHub...")
+        # 3. Twitter/X via bird CLI
+        print("\n[3/6] Scraping Twitter/X...")
+        try:
+            async with TwitterScraper() as scraper:
+                items = await scraper.scrape(
+                    usernames=['sama', 'OpenAI', 'AnthropicAI', 'TechCrunch'],
+                    limit=10
+                )
+                self.all_items.extend(items)
+                self.stats['twitter'] = len(items)
+                print(f"  -> Got {len(items)} items")
+        except Exception as e:
+            print(f"  -> ERROR: {e}")
+            self.stats['twitter'] = 0
+
+        # 4. GitHub
+        print("\n[4/6] Scraping GitHub...")
         try:
             async with GitHubScraper() as scraper:
                 items = await scraper.scrape(
@@ -77,8 +93,8 @@ class ScraperOrchestrator:
             print(f"  -> ERROR: {e}")
             self.stats['github'] = 0
         
-        # 4. Medium
-        print("\n[4/5] Scraping Medium...")
+        # 5. Medium
+        print("\n[5/6] Scraping Medium...")
         try:
             scraper = MediumScraper()
             items = await scraper.scrape(limit=10)
@@ -89,8 +105,8 @@ class ScraperOrchestrator:
             print(f"  -> ERROR: {e}")
             self.stats['medium'] = 0
         
-        # 5. Product Hunt
-        print("\n[5/5] Scraping Product Hunt...")
+        # 6. Product Hunt
+        print("\n[6/6] Scraping Product Hunt...")
         try:
             scraper = ProductHuntScraper()
             items = await scraper.scrape(limit=15)

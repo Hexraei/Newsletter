@@ -5,7 +5,7 @@
 ✅ **FREE tier** - 20 requests/minute, 1M tokens/day  
 ✅ **Extremely fast** - 500+ tokens/second  
 ✅ **No installation** - Just an API key  
-✅ **Uses Llama 3.2** - Same quality as Ollama
+✅ **Uses Llama 3.1/3.2** - configurable model selection
 
 ---
 
@@ -33,6 +33,7 @@ Edit `backend/.env`:
 ```env
 # Add this line
 GROQ_API_KEY=gsk_your_actual_key_here
+GROQ_MODEL=llama-3.1-8b-instant
 ```
 
 **That's it!** No other changes needed.
@@ -69,7 +70,7 @@ Should show:
 |--------|-------|
 | Requests/minute | 20 |
 | Tokens/day | 1,000,000 |
-| Models | Llama 3.2, Mixtral, Gemma |
+| Models | Llama 3.1, Llama 3.2, Mixtral, Gemma |
 
 **For testing:** More than enough  
 **For production:** Upgrade when needed
@@ -101,7 +102,7 @@ Should show:
 
 ### "Model not found"
 - Groq updates models regularly
-- The code uses `llama-3.2-3b-preview` which should work
+- Set `GROQ_MODEL` in `backend/.env` to an available model, e.g. `llama-3.1-8b-instant`
 
 ---
 

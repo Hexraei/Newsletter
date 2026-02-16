@@ -43,19 +43,22 @@ class ProductHuntScraper(BaseScraper):
                 try:
                     # Parse votes from title if available
                     votes = self._extract_votes(entry.title)
+                    clean_summary = self.clean_text(entry.get('summary', ''))
+                    if not clean_summary:
+                        clean_summary = self.clean_text(entry.get('description', ''))
                     
                     item = ScrapedItem(
                         source=f"Product Hunt - {name}",
                         source_type="product_launch",
                         title=entry.title,
                         url=entry.link,
-                        content=entry.get('summary', ''),
+                        content=clean_summary,
                         author=entry.get('author', 'Unknown'),
                         published_at=self._parse_date(entry.get('published')),
                         engagement={'upvotes': votes},
                         metadata={
                             'category': name,
-                            'description': entry.get('summary', '')
+                            'description': clean_summary
                         }
                     )
                     items.append(item)

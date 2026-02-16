@@ -60,6 +60,27 @@ class AIProvider:
         """Generate headline."""
         return await self.service.generate_headline(title, content)
     
+    async def breaking_headline(self, title: str, content: str, source: str = "") -> str:
+        """Generate breaking news headline with urgency.
+        
+        Uses specialized prompting for breaking news that:
+        - Creates urgency and immediacy
+        - Uses powerful action words
+        - Keeps it concise (under 8 words)
+        - Maintains factual accuracy while being exciting
+        """
+        # Check if the service has the specialized breaking headline method
+        if hasattr(self.service, 'generate_breaking_headline'):
+            return await self.service.generate_breaking_headline(title, content, source)
+        else:
+            # Fallback to regular headline with breaking news context
+            breaking_content = f"BREAKING: {content[:500]}"
+            headline = await self.service.generate_headline(title, breaking_content)
+            # Ensure it feels urgent
+            if not any(word in headline.lower() for word in ['breaking', 'urgent', 'just', 'now']):
+                headline = f"Breaking: {headline}"
+            return headline
+    
     async def embed(self, text: str) -> List[float]:
         """Generate embedding."""
         if hasattr(self.service, 'generate_embedding'):

@@ -10,13 +10,16 @@ print('='*60)
 # Test backend AI integration
 print('\n[Step 1] Checking AI configuration...')
 
+provider_name = "Unknown"
+
 try:
     from app.integrations.ai_provider import AIProvider, check_ai_status
     
     # Create provider - it will auto-select free option
     provider = AIProvider()
+    provider_name = provider.get_provider_name()
     print('[OK] AI Provider initialized')
-    print('[INFO] Using: ' + provider.get_provider_name())
+    print('[INFO] Using: ' + provider_name)
     
 except Exception as e:
     print('[FAIL] Could not initialize AI provider: ' + str(e))
@@ -61,6 +64,6 @@ print('='*60)
 print('SUCCESS! AI SYSTEM IS WORKING')
 print('='*60)
 print('')
-print('You can now use AI features without any signup!')
-print('Provider: Pollinations AI (Free)')
+print('You can now use AI summarization features.')
+print('Provider: ' + provider_name)
 print('')

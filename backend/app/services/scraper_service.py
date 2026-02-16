@@ -22,6 +22,7 @@ from src.scrapers.hackernews_scraper import HackerNewsScraper
 from src.scrapers.medium_scraper import MediumScraper
 from src.scrapers.producthunt_scraper import ProductHuntScraper
 from src.scrapers.reddit_scraper import RedditScraper
+from src.scrapers.twitter_scraper import TwitterScraper
 
 
 class ScraperService:
@@ -31,6 +32,7 @@ class ScraperService:
     SCRAPERS = {
         "hackernews": HackerNewsScraper,
         "reddit": RedditScraper,
+        "twitter": TwitterScraper,
         "github": GitHubScraper,
         "medium": MediumScraper,
         "producthunt": ProductHuntScraper,
@@ -66,6 +68,14 @@ class ScraperService:
                 "platform": "github",
                 "schedule_cron": "0 */6 * * *",  # Every 6 hours
                 "default_categories": ["opensource", "tools"],
+            },
+            {
+                "name": "Twitter",
+                "source_type": "api",
+                "url": "https://x.com",
+                "platform": "twitter",
+                "schedule_cron": "*/30 * * * *",  # Every 30 min
+                "default_categories": ["tech", "breaking"],
             },
             {
                 "name": "Medium",
@@ -128,6 +138,8 @@ class ScraperService:
                 items = await self._scrape_reddit(source.id, **kwargs)
             elif scraper_name == "github":
                 items = await self._scrape_github(source.id, **kwargs)
+            elif scraper_name == "twitter":
+                items = await self._scrape_twitter(source.id, **kwargs)
             elif scraper_name == "medium":
                 items = await self._scrape_medium(source.id, **kwargs)
             elif scraper_name == "producthunt":
@@ -236,6 +248,30 @@ class ScraperService:
                     "engagement": item.engagement,
                 })
         
+        return items
+
+    async def _scrape_twitter(self, source_id: int, limit: int = 20) -> List[Dict]:
+        """Scrape Twitter/X via bird CLI."""
+        items = []
+
+        async with TwitterScraper() as scraper:
+            scraped_items = await scraper.scrape(
+                usernames=['sama', 'OpenAI', 'AnthropicAI', 'TechCrunch'],
+                limit=limit,
+            )
+
+            for item in scraped_items:
+                items.append({
+                    "title": item.title,
+                    "url": item.url,
+                    "content": item.content,
+                    "author": item.author,
+                    "published_at": item.published_at,
+                    "source_platform": "twitter",
+                    "metadata": item.metadata,
+                    "engagement": item.engagement,
+                })
+
         return items
     
     async def _scrape_medium(self, source_id: int, limit: int = 20) -> List[Dict]:
