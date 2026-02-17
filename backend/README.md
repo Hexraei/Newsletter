@@ -82,6 +82,15 @@ Install: https://ollama.com/
 OPENAI_API_KEY=sk_your_key_here
 ```
 
+### Optional: Supabase Lite Feed Source/Cache
+```env
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Setup docs: `backend/SUPABASE_LITE_SETUP.md` and schema SQL: `backend/supabase_lite_schema.sql`
+
 ---
 
 ## 📚 API Endpoints

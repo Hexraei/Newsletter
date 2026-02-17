@@ -502,6 +502,7 @@
       padding: 16px 24px 24px;
       display: flex;
       justify-content: flex-end;
+      gap: 10px;
       border-top: 1px solid #1a1a1a;
     }
 
@@ -521,6 +522,10 @@
     .story-source-link:hover {
       background: #1a1a1a;
       color: #fff;
+    }
+
+    .story-source-link[hidden] {
+      display: none;
     }
 
     body.modal-open { overflow: hidden; }
@@ -661,15 +666,34 @@
 </head>
 <body>
 
+  <!-- AUTH GATE — redirect to auth.html if not logged in -->
+  <script>
+    (function() {
+      try {
+        var raw = localStorage.getItem('newsday_session');
+        if (!raw) { window.location.replace('auth.html'); return; }
+        var s = JSON.parse(raw);
+        if (!s.access_token || (s.expires_at && Date.now() > s.expires_at)) {
+          localStorage.removeItem('newsday_session');
+          window.location.replace('auth.html');
+          return;
+        }
+      } catch(e) {
+        window.location.replace('auth.html');
+        return;
+      }
+    })();
+  </script>
+
   <!-- NAVBAR -->
   <nav class="navbar">
     <span class="navbar-brand">NEWS DAY</span>
     <div class="navbar-links">
-      <a href="#department">Department news</a>
-      <a href="#insights">Industrial insights</a>
-      <a href="#stories">Student Stories</a>
-      <a href="#" data-nav="login">Log In</a>
-      <div class="navbar-avatar" id="navbar-avatar"></div>
+      <a href="department.html">Department news</a>
+      <a href="insights.html">Industrial insights</a>
+      <a href="stories.html">Student Stories</a>
+      <a href="auth.html" id="nav-auth-link">Log In</a>
+      <div class="navbar-avatar" id="navbar-avatar" title="Account"></div>
     </div>
   </nav>
 
@@ -680,7 +704,7 @@
       <div class="hero-source" id="hero-source">HACKER NEWS</div>
       <h1 class="hero-title" id="hero-title">Loading breaking news...</h1>
       <p class="hero-subtitle" id="hero-subtitle">Fetching the latest stories</p>
-      <a class="hero-btn" id="hero-btn" href="#" target="_blank">View</a>
+      <a class="hero-btn" id="hero-btn" href="#">Read AI Brief</a>
     </div>
 
     <div class="hero-visual" id="hero-visual">
@@ -714,7 +738,7 @@
           <h2 class="section-label-title">CS Department News</h2>
           <p class="section-label-desc">Core updates for computer science students: AI, systems, software engineering, security, and open-source tools.</p>
         </div>
-        <button class="section-label-btn" onclick="scrollToSection('department')">Read More</button>
+        <a class="section-label-btn" href="department.html">Read More</a>
       </div>
       <!-- cards injected by JS -->
     </div>
@@ -728,7 +752,7 @@
           <h2 class="section-label-title">CS Industrial Insights</h2>
           <p class="section-label-desc">Industry signals that affect CS careers: market shifts, policy changes, product launches, and tech adoption trends.</p>
         </div>
-        <button class="section-label-btn" onclick="scrollToSection('insights')">Read More</button>
+        <a class="section-label-btn" href="insights.html">Read More</a>
       </div>
     </div>
   </section>
@@ -755,9 +779,9 @@
     <div>
       <div class="footer-col-title">Sections</div>
       <ul class="footer-links">
-        <li><a href="#department">Department News</a></li>
-        <li><a href="#insights">Industrial Insights</a></li>
-        <li><a href="#stories">Student Stories</a></li>
+        <li><a href="department.html">Department News</a></li>
+        <li><a href="insights.html">Industrial Insights</a></li>
+        <li><a href="stories.html">Student Stories</a></li>
       </ul>
     </div>
     <div>
@@ -799,18 +823,23 @@
       <div class="story-modal-body">
         <div class="story-insight">
           <div class="story-insight-label">Quick Summary</div>
-          <div class="story-insight-text" id="story-quick-summary">Generating summary...</div>
+          <div class="story-insight-text" id="story-quick-summary">Preparing summary...</div>
         </div>
         <div class="story-insight">
           <div class="story-insight-label">Why It Matters</div>
-          <div class="story-insight-text" id="story-why-important">Generating context...</div>
+          <div class="story-insight-text" id="story-why-important">Preparing context...</div>
         </div>
         <div class="story-insight">
           <div class="story-insight-label">How It Affects Us</div>
-          <div class="story-insight-text" id="story-impact">Generating student impact...</div>
+          <div class="story-insight-text" id="story-impact">Preparing student impact...</div>
+        </div>
+        <div class="story-insight" id="story-full-article-block" hidden>
+          <div class="story-insight-label">Full AI Article (50-60 words)</div>
+          <div class="story-insight-text" id="story-full-article-text"></div>
         </div>
       </div>
       <div class="story-modal-footer">
+        <button class="story-source-link" id="story-toggle-article" type="button">Show Full AI Article</button>
         <a class="story-source-link" id="story-source-link" href="#" target="_blank" rel="noopener noreferrer">Open Original Source</a>
       </div>
     </div>
@@ -892,6 +921,9 @@
     const $storyQuickSummary = $('story-quick-summary');
     const $storyWhyImportant = $('story-why-important');
     const $storyImpact = $('story-impact');
+    const $storyFullArticleBlock = $('story-full-article-block');
+    const $storyFullArticleText = $('story-full-article-text');
+    const $storyToggleArticle = $('story-toggle-article');
     const $storySourceLink = $('story-source-link');
     const $storyModalClose = $('story-modal-close');
 
@@ -899,6 +931,7 @@
        CURATION + AI ENRICHMENT
     ======================================================== */
     const AI_SUMMARY_CACHE = new Map();
+    const STORY_DETAIL_STORAGE_KEY = 'newsletter_story_detail_cache_v2';
 
     const CS_KEYWORDS = [
       'computer science', 'software', 'programming', 'developer', 'coding',
@@ -1042,9 +1075,14 @@
         published_at: item.published_at || null,
         is_breaking: Boolean(item.is_breaking || isBreakingList),
         engagement: {
-          upvotes: item.attractiveness_score || 0,
-          comments: item.breaking_score || 0,
+          upvotes: item.attractiveness_score || item.engagement_score || 0,
+          comments: item.breaking_score || item.urgency_score || 0,
         },
+        final_score: Number(item.final_score || 0),
+        engagement_score: Number(item.engagement_score || 0),
+        recency_score: Number(item.recency_score || 0),
+        urgency_score: Number(item.urgency_score || 0),
+        relevance_score: Number(item.relevance_score || 0),
       };
     }
 
@@ -1190,6 +1228,77 @@
         .trim();
     }
 
+    function normalizeCompareText(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    const TITLE_STOPWORDS = new Set([
+      'the', 'a', 'an', 'and', 'or', 'to', 'of', 'for', 'in', 'on', 'at', 'with', 'from',
+      'is', 'are', 'was', 'were', 'be', 'being', 'been', 'this', 'that', 'these', 'those',
+      'they', 'their', 'them', 'you', 'your', 'we', 'our', 'it', 'its', 'as', 'by', 'about',
+      'news', 'update', 'says', 'say', 'report', 'reports', 'according', 'suggests', 'suggest'
+    ]);
+
+    function titleTerms(item) {
+      const tokens = normalizeCompareText(item.title || '')
+        .split(' ')
+        .filter(token => token.length >= 4 && !TITLE_STOPWORDS.has(token));
+      return Array.from(new Set(tokens)).slice(0, 8);
+    }
+
+    function stripSourcePrefix(text) {
+      let out = String(text || '').trim();
+      if (!out) return out;
+      out = out.replace(/^(reddit|hacker\s*news|github|medium|product\s*hunt|x|twitter|cs\s*desk|campus\s*tech)\s*[-|:]\s*/i, '');
+      out = out.replace(/^r\/[a-z0-9_]+\s*[-|:]\s*/i, '');
+      out = out.replace(/^(reddit|hacker\s*news|github|medium)\s*[-|:]\s*r\/[a-z0-9_]+\s*[-|:]\s*/i, '');
+      return out.trim();
+    }
+
+    function overlapCount(text, terms) {
+      const normalized = normalizeCompareText(text);
+      if (!normalized || !terms.length) return 0;
+      return terms.filter(term => normalized.includes(term)).length;
+    }
+
+    function isRelevantToStory(text, item) {
+      const clean = stripSourcePrefix(cleanAiLine(text));
+      if (!clean || countWords(clean) < 8) return false;
+      const terms = titleTerms(item);
+      if (!terms.length) return true;
+      const matched = overlapCount(clean, terms);
+      const minRequired = terms.length >= 4 ? 2 : 1;
+      return matched >= minRequired;
+    }
+
+    function titleAnchoredQuick(item) {
+      const title = cleanAiLine(item.title || 'This story');
+      return `${title}. This summary focuses on the core claim and immediate context students should evaluate carefully before drawing conclusions.`;
+    }
+
+    function titleAnchoredWhy(item) {
+      const terms = titleTerms(item).slice(0, 3).join(', ');
+      if (terms) {
+        return `It matters because this story influences how students interpret ${terms} developments, assess risk, and discuss responsible technical decisions.`;
+      }
+      return 'It matters because this story affects technical judgment, project choices, and informed conversations around current computing trends.';
+    }
+
+    function titleAnchoredImpact(item) {
+      const text = normalizeCompareText(`${item.title} ${item.category}`);
+      if (/risk|safety|security|breach|attack|privacy/.test(text)) {
+        return 'For students, this means prioritizing safe system design, better threat modeling, and stronger reasoning when evaluating AI claims in projects.';
+      }
+      if (/ai|model|openai|anthropic|llm/.test(text)) {
+        return 'For students, this is a signal to build practical AI literacy, compare model behavior critically, and explain tradeoffs clearly in interviews.';
+      }
+      return 'For students, use this update to refine your learning priorities, project framing, and evidence-based technical communication this semester.';
+    }
+
     function isUsefulAiLine(value) {
       const text = cleanAiLine(value);
       if (!text) return false;
@@ -1197,6 +1306,101 @@
       if (/^\W+$/.test(text)) return false;
       if (/^key points?$/i.test(text)) return false;
       return /[a-zA-Z]{4,}/.test(text);
+    }
+
+    function countWords(text) {
+      return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function ensureMinWords(text, minWords, fallback) {
+      const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+      if (countWords(cleaned) > minWords) return cleaned;
+
+      const base = cleaned || String(fallback || '').trim();
+      let expanded = base;
+      if (!expanded) return '';
+
+      if (!/[.!?]$/.test(expanded)) expanded += '.';
+      const extension = ' This matters for students because it affects learning choices, project direction, and interview discussions in practical ways.';
+      expanded = `${expanded.replace(/[.!?]$/, '')}.${extension}`;
+      return trimToWordCount(expanded, 40);
+    }
+
+    function loadPersistedStoryCache() {
+      try {
+        const raw = localStorage.getItem(STORY_DETAIL_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return;
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (!value || typeof value !== 'object') return;
+          const titlePart = key.split('|')[0] || '';
+          const cacheItem = { title: titlePart };
+          const quickSummary = String(value.quickSummary || '').trim();
+          const whyImportant = String(value.whyImportant || '').trim();
+          const impact = String(value.impact || '').trim();
+          const fullArticle = String(value.fullArticle || '').trim();
+          if (!quickSummary || !whyImportant || !impact || !fullArticle) return;
+          if (countWords(quickSummary) <= 12) return;
+          if (countWords(whyImportant) <= 12) return;
+          if (countWords(impact) <= 12) return;
+          if (!isRelevantToStory(quickSummary, cacheItem)) return;
+          if (!isRelevantToStory(whyImportant, cacheItem)) return;
+          storyDetailCache.set(key, { quickSummary, whyImportant, impact, fullArticle });
+        });
+      } catch {}
+    }
+
+    function persistStoryCache() {
+      try {
+        const maxEntries = 250;
+        const entries = Array.from(storyDetailCache.entries()).slice(-maxEntries);
+        const payload = Object.fromEntries(entries);
+        localStorage.setItem(STORY_DETAIL_STORAGE_KEY, JSON.stringify(payload));
+      } catch {}
+    }
+
+    function setStoryCache(cacheKey, value) {
+      storyDetailCache.set(cacheKey, value);
+      persistStoryCache();
+    }
+
+    function trimToWordCount(text, maxWords) {
+      const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+      if (words.length <= maxWords) return words.join(' ');
+      return words.slice(0, maxWords).join(' ').replace(/[,:;\-]+$/, '') + '.';
+    }
+
+    function buildArticle50to60Words(parts) {
+      const cleanParts = parts
+        .map(cleanAiLine)
+        .filter(isUsefulAiLine)
+        .map(line => line.replace(/[.!?]+$/g, '').trim());
+
+      let article = cleanParts.join('. ');
+      if (!article) {
+        article = 'This update highlights a meaningful shift in technology that students should track closely. It explains what changed, why the change matters now, and what skills or decisions may be affected next. Use it as a quick signal for projects, interview preparation, and informed technical discussions this week.';
+      }
+
+      article = article.replace(/\s+/g, ' ').trim();
+      if (!/[.!?]$/.test(article)) article += '.';
+
+      const words = countWords(article);
+      if (words > 60) {
+        return trimToWordCount(article, 60);
+      }
+      if (words >= 50) {
+        return article;
+      }
+
+      const filler = 'For students, this is worth reading because it can shape project choices, internship conversations, and the technical priorities teams care about in the near term.';
+      let expanded = `${article.replace(/[.!?]$/, '')}. ${filler}`;
+      expanded = trimToWordCount(expanded, 60);
+      if (countWords(expanded) < 50) {
+        expanded += ' Keep this on your radar as you plan your next learning steps.';
+        expanded = trimToWordCount(expanded, 60);
+      }
+      return expanded;
     }
 
     async function summarizeWithAI(item, section, backendOk) {
@@ -1277,13 +1481,14 @@
     function registerStory(item) {
       storySeq += 1;
       const id = `story-${storySeq}`;
+      const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
         title: item.title || '',
         source: item.source || 'CS Desk',
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
-        summary: item.meta || item.subtitle || item.summary || '',
+        summary: cleanSummary,
       });
       return id;
     }
@@ -1294,38 +1499,94 @@
         return 'Security and privacy changes can directly affect your projects, data, and internship work.';
       }
       if (/market|industry|funding|policy|regulation|ban|lawsuit/.test(text)) {
-        return 'Industry and policy shifts influence hiring, salaries, and the tools companies adopt.';
+        return 'Industry and policy shifts influence hiring trends, salaries, and the tools companies adopt.';
       }
-      return 'This topic is part of the core technical landscape CS students should track each week.';
+      return 'This topic reflects a shift in the technical landscape that CS students should actively track.';
     }
 
     function defaultImpact(item) {
       const text = normalizeText(item.title + ' ' + item.content + ' ' + item.category);
       if (/security|breach|attack|privacy|zero-day/.test(text)) {
-        return 'For us: prioritize secure coding, dependency updates, and threat-aware system design in coursework and real projects.';
+        return 'For students: prioritize secure coding, dependency hygiene, and threat-aware design in coursework and projects.';
       }
       if (/ai|machine learning|llm|neural/.test(text)) {
-        return 'For us: AI literacy and hands-on model tooling become increasingly important for interviews and modern product work.';
+        return 'For students: hands-on AI literacy and practical model tooling are becoming important for internships and interviews.';
       }
-      if (/market|industry|funding|policy|regulation|ban|lawsuit/.test(text)) {
-        return 'For us: this can change what skills are most valuable and where early-career opportunities are growing.';
-      }
-      return 'For us: use this as a signal to adjust your learning roadmap and align projects with current demand.';
+      return 'For students: align projects and learning plans with this signal to stay relevant and market-ready.';
+    }
+
+    function buildStoryPackage(item, summary, points) {
+      const fallbackQuick = shortText(item.summary || item.content || item.title || '', 170);
+      let quickSeed = stripSourcePrefix(cleanAiLine(summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
+        || fallbackSummary(item, 'department')
+        || 'This story captures a meaningful update students should track.';
+      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || defaultWhyImportant(item)))
+        || defaultWhyImportant(item);
+      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || defaultImpact(item)))
+        || defaultImpact(item);
+
+      if (!isRelevantToStory(quickSeed, item)) quickSeed = titleAnchoredQuick(item);
+      if (!isRelevantToStory(whySeed, item)) whySeed = titleAnchoredWhy(item);
+      if (!isRelevantToStory(impactSeed, item)) impactSeed = titleAnchoredImpact(item);
+
+      const quickSummary = shortText(
+        ensureMinWords(quickSeed, 12, 'This story highlights a meaningful technical update that students should understand clearly.'),
+        170
+      );
+      const whyImportant = shortText(
+        ensureMinWords(whySeed, 12, 'It matters because this change can influence skills, hiring expectations, and project quality.'),
+        190
+      );
+      const impact = shortText(
+        ensureMinWords(impactSeed, 12, 'Students should use this signal to adjust learning priorities and improve practical work.'),
+        190
+      );
+      const fullArticle = buildArticle50to60Words([
+        quickSummary,
+        whyImportant,
+        impact,
+        item.summary,
+      ]);
+      return { quickSummary, whyImportant, impact, fullArticle };
+    }
+
+    function buildHeuristicStoryPackage(item) {
+      const title = cleanAiLine(item.title || 'This story');
+      const base = stripSourcePrefix(item.summary || item.content || '');
+      const quickSeed = `${title}. ${base || 'The report highlights a concrete shift in technology conversations students should track this week.'}`;
+      const whySeed = titleAnchoredWhy(item);
+      const impactSeed = titleAnchoredImpact(item);
+
+      const quickSummary = shortText(ensureMinWords(quickSeed, 12, titleAnchoredQuick(item)), 170);
+      const whyImportant = shortText(ensureMinWords(whySeed, 12, defaultWhyImportant(item)), 190);
+      const impact = shortText(ensureMinWords(impactSeed, 12, defaultImpact(item)), 190);
+      const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, base]);
+      return { quickSummary, whyImportant, impact, fullArticle };
+    }
+
+    function isValidStoryPackage(pkg, item) {
+      if (!pkg || typeof pkg !== 'object') return false;
+      const quickSummary = String(pkg.quickSummary || '').trim();
+      const whyImportant = String(pkg.whyImportant || '').trim();
+      const impact = String(pkg.impact || '').trim();
+      const fullArticle = String(pkg.fullArticle || '').trim();
+      if (!quickSummary || !whyImportant || !impact || !fullArticle) return false;
+      if (countWords(quickSummary) <= 12 || countWords(whyImportant) <= 12 || countWords(impact) <= 12) return false;
+      if (!isRelevantToStory(quickSummary, item)) return false;
+      if (!isRelevantToStory(whyImportant, item)) return false;
+      return true;
     }
 
     async function getStoryInsights(item) {
       const cacheKey = `${item.title}|${item.url}`;
       if (storyDetailCache.has(cacheKey)) return storyDetailCache.get(cacheKey);
 
-      const fallback = {
-        quickSummary: shortText(item.summary || item.content || item.title || '', 170),
-        whyImportant: defaultWhyImportant(item),
-        impact: defaultImpact(item),
-      };
-
+      const fallback = buildStoryPackage(item, {}, []);
+      const heuristic = buildHeuristicStoryPackage(item);
       if (!backendIsLive) {
-        storyDetailCache.set(cacheKey, fallback);
-        return fallback;
+        const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
+        setStoryCache(cacheKey, result);
+        return result;
       }
 
       const text = item.content || item.summary || item.title || '';
@@ -1337,13 +1598,8 @@
         const res = await fetchWithTimeout(API + '/api/v1/ai/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: item.title || '',
-            content: text,
-            category,
-          }),
+          body: JSON.stringify({ title: item.title || '', content: text, category }),
         }, 10000);
-
         if (!res.ok) throw new Error(`AI summarize failed: ${res.status}`);
 
         const payload = await res.json();
@@ -1353,37 +1609,40 @@
           ? summary.key_points.map(cleanAiLine).filter(isUsefulAiLine)
           : [];
 
-        const quickSummary = (() => {
-          const candidates = [summary.hook, points[0], summary.why_it_matters, fallback.quickSummary];
-          for (const candidate of candidates) {
-            if (isUsefulAiLine(candidate)) return shortText(cleanAiLine(candidate), 170);
-          }
-          return fallback.quickSummary;
-        })();
+        const aiResult = buildStoryPackage(item, summary, points);
+        if (isValidStoryPackage(aiResult, item)) {
+          setStoryCache(cacheKey, aiResult);
+          return aiResult;
+        }
 
-        const whyImportant = (() => {
-          const candidates = [summary.why_it_matters, points[1], points[0], fallback.whyImportant];
-          for (const candidate of candidates) {
-            if (isUsefulAiLine(candidate)) return shortText(cleanAiLine(candidate), 180);
-          }
-          return fallback.whyImportant;
-        })();
-
-        const impact = (() => {
-          const candidates = [summary.action_step, points[2], points[1], fallback.impact];
-          for (const candidate of candidates) {
-            if (isUsefulAiLine(candidate)) return shortText(cleanAiLine(candidate), 190);
-          }
-          return fallback.impact;
-        })();
-
-        const result = { quickSummary, whyImportant, impact };
-        storyDetailCache.set(cacheKey, result);
+        const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
+        setStoryCache(cacheKey, result);
         return result;
       } catch {
-        storyDetailCache.set(cacheKey, fallback);
-        return fallback;
+        const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
+        setStoryCache(cacheKey, result);
+        return result;
       }
+    }
+
+    async function warmStoryInsights(data) {
+      const pool = [
+        ...(Array.isArray(data.breaking) ? data.breaking : []),
+        ...(Array.isArray(data.department) ? data.department : []),
+        ...(Array.isArray(data.insights) ? data.insights : []),
+        ...(Array.isArray(data.stories) ? data.stories : []),
+      ];
+      const seen = new Set();
+      const uniqueItems = [];
+      for (const item of pool) {
+        const key = `${item.title || ''}|${item.url || ''}`.toLowerCase();
+        if (!key.trim() || seen.has(key)) continue;
+        seen.add(key);
+        uniqueItems.push(item);
+      }
+      const missing = uniqueItems.filter(item => !storyDetailCache.has(`${item.title}|${item.url}`));
+      if (!missing.length) return;
+      await Promise.allSettled(missing.map(item => getStoryInsights(item)));
     }
 
     async function openStoryModal(item) {
@@ -1391,9 +1650,13 @@
 
       $storyModalTitle.textContent = item.title || 'Story';
       $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
-      $storyQuickSummary.textContent = 'Generating quick summary...';
-      $storyWhyImportant.textContent = 'Generating why this matters...';
-      $storyImpact.textContent = 'Generating impact for students...';
+      $storyQuickSummary.textContent = 'Preparing summary...';
+      $storyWhyImportant.textContent = 'Preparing context...';
+      $storyImpact.textContent = 'Preparing student impact...';
+      $storyFullArticleBlock.hidden = true;
+      $storyFullArticleText.textContent = '';
+      $storyToggleArticle.textContent = 'Show Full AI Article';
+      $storyToggleArticle.setAttribute('aria-expanded', 'false');
       $storySourceLink.href = item.url || '#';
 
       $storyModal.classList.add('open');
@@ -1404,12 +1667,17 @@
       $storyQuickSummary.textContent = insights.quickSummary;
       $storyWhyImportant.textContent = insights.whyImportant;
       $storyImpact.textContent = insights.impact;
+      $storyFullArticleText.textContent = insights.fullArticle;
+      $storyToggleArticle.hidden = !insights.fullArticle;
     }
 
     function closeStoryModal() {
       $storyModal.classList.remove('open');
       $storyModal.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('modal-open');
+      $storyFullArticleBlock.hidden = true;
+      $storyToggleArticle.textContent = 'Show Full AI Article';
+      $storyToggleArticle.setAttribute('aria-expanded', 'false');
     }
 
     /* ========================================================
@@ -1419,7 +1687,7 @@
       const storyId = registerStory(item);
       const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
 
-      return `<a class="article-card" href="${item.url || '#'}" target="_blank" data-story-id="${storyId}">
+      return `<a class="article-card" href="#" data-story-id="${storyId}">
         <div class="article-card-visual"></div>
         <div class="article-card-title">${item.title || ''}</div>
         <div class="article-card-meta">${cardMeta || item.source || ''}</div>
@@ -1468,29 +1736,35 @@
     }
 
     async function loadFromBackendAll() {
-      const fetchFeed = async (endpoint) => {
-        try {
-          const res = await fetchWithTimeout(API + endpoint, {}, 5000);
-          const data = await res.json();
-          const payload = data.data || data;
-          return payload.items || payload || [];
-        } catch {
-          return [];
+      try {
+        const res = await fetchWithTimeout(
+          API + '/api/v1/feed/all-sections?breaking_limit=8&department_limit=3&student_stories_limit=3&trending_limit=3',
+          {},
+          6000
+        );
+        if (!res.ok) return null;
+
+        const data = await res.json();
+        const payload = data.data || {};
+
+        const breaking = Array.isArray(payload.breaking) ? payload.breaking : [];
+        const department = Array.isArray(payload.department) ? payload.department : [];
+        const studentStories = Array.isArray(payload.student_stories) ? payload.student_stories : [];
+        const trending = Array.isArray(payload.trending) ? payload.trending : [];
+
+        if (!breaking.length && !department.length && !studentStories.length && !trending.length) {
+          return null;
         }
-      };
 
-      const [breaking, trending] = await Promise.all([
-        fetchFeed('/api/v1/feed/breaking?limit=8'),
-        fetchFeed('/api/v1/feed/trending?limit=20'),
-      ]);
-
-      const normalized = [
-        ...breaking.map(i => normalizeBackendItem(i, true)),
-        ...trending.map(i => normalizeBackendItem(i, false)),
-      ];
-
-      if (!normalized.length) return null;
-      return curateSections(normalized);
+        return {
+          breaking: breaking.map(item => toBreakingSlide(normalizeBackendItem(item, true))),
+          department: department.map(item => toSectionCard(normalizeBackendItem(item), 'CS')),
+          insights: trending.map(item => toSectionCard(normalizeBackendItem(item), 'TREND')),
+          stories: studentStories.map(item => toSectionCard(normalizeBackendItem(item), 'STORY')),
+        };
+      } catch {
+        return null;
+      }
     }
 
     async function loadFromScrapedFile() {
@@ -1542,7 +1816,7 @@
           content: slide.content || slide.subtitle || slide.title || '',
           summary: slide.subtitle || '',
         });
-        $btn.href = slide.url || '#';
+        $btn.href = '#';
         $btn.dataset.storyId = heroStoryId;
         $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
 
@@ -1619,6 +1893,12 @@
     });
 
     $storyModalClose.addEventListener('click', closeStoryModal);
+    $storyToggleArticle.addEventListener('click', () => {
+      const opening = $storyFullArticleBlock.hidden;
+      $storyFullArticleBlock.hidden = !opening;
+      $storyToggleArticle.textContent = opening ? 'Hide Full AI Article' : 'Show Full AI Article';
+      $storyToggleArticle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    });
     $storyModal.addEventListener('click', e => {
       if (e.target === $storyModal) closeStoryModal();
     });
@@ -1643,13 +1923,59 @@
     }
 
     /* ========================================================
+       SESSION-AWARE NAVBAR
+    ======================================================== */
+    function initNavbarAuth() {
+      const navLink = $('nav-auth-link');
+      const avatar = $('navbar-avatar');
+      try {
+        const raw = localStorage.getItem('newsday_session');
+        if (!raw) return;
+        const session = JSON.parse(raw);
+        if (!session.access_token) return;
+
+        // Logged in — swap "Log In" to "Log Out"
+        navLink.textContent = 'Log Out';
+        navLink.href = '#';
+        navLink.addEventListener('click', e => {
+          e.preventDefault();
+          localStorage.removeItem('newsday_session');
+          window.location.href = 'auth.html';
+        });
+
+        // Set avatar initials
+        const user = session.user;
+        if (user) {
+          const name = (user.user_metadata && user.user_metadata.full_name) || user.email || '';
+          const initials = name.includes('@')
+            ? name.charAt(0).toUpperCase()
+            : name.split(' ').map(w => w.charAt(0)).join('').toUpperCase().slice(0, 2);
+          if (initials) {
+            avatar.textContent = initials;
+            avatar.style.display = 'flex';
+            avatar.style.alignItems = 'center';
+            avatar.style.justifyContent = 'center';
+            avatar.style.fontSize = '11px';
+            avatar.style.fontWeight = '700';
+            avatar.style.fontFamily = "'Inter', sans-serif";
+            avatar.style.color = '#1a1918';
+            avatar.style.background = '#e8e5e0';
+          }
+        }
+      } catch {}
+    }
+
+    /* ========================================================
        INIT
     ======================================================== */
     document.addEventListener('DOMContentLoaded', async () => {
+      initNavbarAuth();
+      loadPersistedStoryCache();
       const data = await loadAllData();
       storyRegistry.clear();
-      storyDetailCache.clear();
       storySeq = 0;
+
+      await warmStoryInsights(data);
 
       // Hero
       slides = data.breaking.length ? data.breaking : DEMO.breaking;

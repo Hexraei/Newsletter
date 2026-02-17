@@ -19,17 +19,42 @@ from base_scraper import BaseScraper, ScrapedItem
 class RedditScraper(BaseScraper):
     """Scraper for Reddit using JSON API."""
     
-    # Student-relevant subreddits
+    # ── Subreddits organized by newsletter section relevance ──
+    # Department News (CS core)
+    # Student Stories (career, campus, projects)
+    # Industrial Insights (industry, futurism, markets)
+    # General Tech (cross-section)
     SUBREDDITS = {
+        # ── CS / Department core ──
         'technology': 'technology',
         'programming': 'programming',
-        'cs Career Questions': 'cscareerquestions',
         'Machine Learning': 'MachineLearning',
         'Web Dev': 'webdev',
         'Python': 'Python',
         'JavaScript': 'javascript',
-        'startups': 'startups',
+        'Comp Sci': 'compsci',
+        'Netsec': 'netsec',
+        'Artificial': 'artificial',
+        'LocalLLaMA': 'LocalLLaMA',
+        'SelfHosted': 'selfhosted',
+        # ── Student Stories / Career ──
+        'cs Career Questions': 'cscareerquestions',
+        'CS Majors': 'csMajors',
+        'Experience Dev': 'ExperiencedDevs',
+        'Learn Programming': 'learnprogramming',
+        'CS Students': 'cs50',
+        # ── Industrial Insights / Futurism ──
+        'Singularity': 'singularity',
+        'Futurology': 'Futurology',
+        'Startups': 'startups',
         'Entrepreneur': 'Entrepreneur',
+        'Tech News': 'technews',
+        'Artificial Intelligence': 'ArtificialInteligence',
+        'Economics': 'economics',
+        'Stocks': 'stocks',
+        'Energy': 'energy',
+        'Climate Tech': 'climatetech',
+        'Biotech': 'biotech',
     }
     
     def __init__(self):

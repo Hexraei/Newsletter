@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     # Discord
     DISCORD_WEBHOOK_URL: Optional[str] = None
 
+    # Supabase (optional for lite feed source/cache)
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_ANON_KEY: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
+    SUPABASE_SCRAPED_TABLE: str = "scraped_items"
+    SUPABASE_RANKED_CACHE_TABLE: str = "ranked_sections_cache"
+    SUPABASE_CACHE_KEY: str = "lite-all-sections"
+    SUPABASE_CACHE_TTL_MINUTES: int = 15
+    SUPABASE_FETCH_LIMIT: int = 400
+
     # Twitter/X (bird CLI)
     BIRD_AUTH_TOKEN: Optional[str] = None
     BIRD_CT0: Optional[str] = None

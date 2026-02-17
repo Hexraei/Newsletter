@@ -1,6 +1,8 @@
 """Free AI services requiring NO signup or API keys."""
 
-from typing import List
+import json
+import re
+from typing import Any, List
 
 import httpx
 
@@ -38,16 +40,32 @@ class FreeAIService:
     
     async def summarize_content(self, title: str, content: str, category: str = "tech") -> dict:
         """Summarize content."""
-        
-        system = """You summarize news for college students. Format:
-Hook: One catchy sentence
-Why it matters: One line
-Key points: 3-5 bullet points
-Action step: One practical takeaway
 
-Be concise and engaging."""
+        system = """You are a senior editor for a computer science college newsletter.
 
-        prompt = f"Title: {title}\n\nContent: {content[:2000]}\n\nProvide summary in the specified format."
+Your job is to interpret news intelligently, not just compress text.
+Focus on relevance for CS students: learning roadmap, internships, project decisions, interview prep, and technical trends.
+
+Return ONLY valid JSON with this exact schema:
+{
+  "hook": "one sharp sentence under 22 words",
+  "why_it_matters": "one concrete sentence under 28 words",
+  "key_points": ["3 to 5 concise factual bullets"],
+  "action_step": "one practical next step for students under 24 words"
+}
+
+Rules:
+- No markdown, no code fences, no extra keys.
+- Be specific, factual, and grounded in the provided content.
+- Avoid generic wording like "stay informed" or "this is important".
+- Mention technical or career implications when appropriate."""
+
+        prompt = (
+            f"Title: {title}\n"
+            f"Category: {category}\n\n"
+            f"Content:\n{content[:3000]}\n\n"
+            "Generate the JSON now."
+        )
         
         try:
             response = await self._generate(prompt, system)
@@ -72,48 +90,117 @@ Be concise and engaging."""
         """Generate embedding (not available in free tier)."""
         return []
     
-    def _parse_summary(self, text: str) -> dict:
-        """Parse summary from AI response."""
+    def _clean_line(self, value: Any, max_len: int = 240) -> str:
+        text = str(value or "").replace("\n", " ").strip()
+        text = re.sub(r"\s+", " ", text)
+        text = text.strip(" -*•\t")
+        if len(text) > max_len:
+            text = text[: max_len - 3].rstrip() + "..."
+        return text
+
+    def _extract_json_object(self, text: str) -> dict | None:
+        raw = text.strip()
+        candidates = [raw]
+
+        fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL | re.IGNORECASE)
+        if fenced_match:
+            candidates.append(fenced_match.group(1))
+
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidates.append(raw[start : end + 1])
+
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                continue
+        return None
+
+    def _normalize_summary(self, payload: dict) -> dict:
         result = {
             "hook": "",
             "why_it_matters": "",
             "key_points": [],
             "action_step": ""
         }
-        
+
+        result["hook"] = self._clean_line(payload.get("hook"))
+        result["why_it_matters"] = self._clean_line(payload.get("why_it_matters") or payload.get("why"))
+        result["action_step"] = self._clean_line(payload.get("action_step") or payload.get("next_step"))
+
+        raw_points = payload.get("key_points")
+        if isinstance(raw_points, list):
+            points = [self._clean_line(point, max_len=160) for point in raw_points]
+        elif isinstance(raw_points, str):
+            points = [self._clean_line(part, max_len=160) for part in re.split(r"[\n;•-]+", raw_points)]
+        else:
+            points = []
+
+        result["key_points"] = [point for point in points if len(point) >= 10][:5]
+        return result
+
+    def _parse_summary(self, text: str) -> dict:
+        """Parse summary from AI response."""
+        parsed_json = self._extract_json_object(text)
+        if parsed_json:
+            result = self._normalize_summary(parsed_json)
+            if result["hook"] and result["why_it_matters"] and result["action_step"] and result["key_points"]:
+                return result
+
+        result = {
+            "hook": "",
+            "why_it_matters": "",
+            "key_points": [],
+            "action_step": ""
+        }
+
         lines = text.strip().split('\n')
         current_section = None
-        
+
         for line in lines:
-            line = line.strip()
+            line = self._clean_line(line)
             if not line:
                 continue
-            
+
             lower = line.lower()
-            
-            if 'hook' in lower:
-                result['hook'] = line.split(':', 1)[-1].strip()
+
+            if 'hook' in lower or 'quick summary' in lower or lower.startswith('summary:'):
+                result['hook'] = self._clean_line(line.split(':', 1)[-1])
                 current_section = 'hook'
-            elif 'why' in lower and 'matter' in lower:
-                result['why_it_matters'] = line.split(':', 1)[-1].strip()
+            elif ('why' in lower and 'matter' in lower) or 'why important' in lower:
+                result['why_it_matters'] = self._clean_line(line.split(':', 1)[-1])
                 current_section = 'why'
-            elif 'action' in lower or 'takeaway' in lower or 'step' in lower:
-                result['action_step'] = line.split(':', 1)[-1].strip()
+            elif 'action' in lower or 'takeaway' in lower or 'step' in lower or 'how it affects' in lower:
+                result['action_step'] = self._clean_line(line.split(':', 1)[-1])
                 current_section = 'action'
             elif line.startswith('-') or line.startswith('•') or 'key' in lower:
-                point = line.lstrip('- •').strip()
+                point = self._clean_line(line.lstrip('- •'), max_len=160)
                 if point and len(point) > 5:
                     result['key_points'].append(point)
+            elif current_section == 'hook' and not result['hook']:
+                result['hook'] = self._clean_line(line)
+            elif current_section == 'why' and not result['why_it_matters']:
+                result['why_it_matters'] = self._clean_line(line)
+            elif current_section == 'action' and not result['action_step']:
+                result['action_step'] = self._clean_line(line)
         
         # Fallbacks
         if not result['hook']:
-            result['hook'] = "Breaking: Important update for students"
+            result['hook'] = "Key update students should notice now"
         if not result['why_it_matters']:
-            result['why_it_matters'] = "This affects your academic and career journey"
+            result['why_it_matters'] = "This can influence what you build, learn, and discuss in interviews this semester"
         if not result['key_points']:
-            result['key_points'] = ["Important development", "Students should be aware"]
+            result['key_points'] = [
+                "The story signals a relevant technical or industry shift",
+                "Students can use this context for projects and interview preparation",
+                "Expect follow-on changes in tools, workflows, or hiring priorities",
+            ]
         if not result['action_step']:
-            result['action_step'] = "Stay informed and share with peers"
+            result['action_step'] = "Translate this trend into one practical project, skill, or discussion topic this week"
         
         return result
     

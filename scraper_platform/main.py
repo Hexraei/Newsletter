@@ -53,7 +53,18 @@ class ScraperOrchestrator:
         try:
             async with RedditScraper() as scraper:
                 items = await scraper.scrape(
-                    subreddits=['technology', 'programming', 'cscareerquestions', 'MachineLearning'],
+                    subreddits=[
+                        # CS / Department core
+                        'technology', 'programming', 'MachineLearning',
+                        'compsci', 'netsec', 'LocalLLaMA', 'artificial',
+                        # Student Stories / Career
+                        'cscareerquestions', 'csMajors', 'ExperiencedDevs',
+                        'learnprogramming',
+                        # Industrial Insights / Futurism
+                        'singularity', 'Futurology', 'startups',
+                        'technews', 'ArtificialInteligence',
+                        'stocks', 'energy', 'biotech',
+                    ],
                     limit=15
                 )
                 self.all_items.extend(items)
