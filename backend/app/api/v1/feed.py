@@ -318,9 +318,25 @@ async def get_all_sections(
     department: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Unified section response for the homepage with optional department filtering."""
-    service = FeedService(db)
+    """Unified section response for the homepage with optional department filtering.
 
+    Serves pre-cached data for instant page loads. Falls back to live
+    computation on cache miss.
+    """
+    dept_key = (department or "CSE").upper()
+
+    # Try cached data first (instant response)
+    from sqlalchemy import text as sa_text
+    row = (await db.execute(
+        sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
+        {"d": dept_key},
+    )).first()
+
+    if row and row[0]:
+        return {"success": True, "data": row[0]}
+
+    # Cache miss — compute live
+    service = FeedService(db)
     breaking = await service.get_breaking_news(limit=breaking_limit, department=department)
     trending = await service.get_trending_content(limit=trending_limit, department=department)
     dept_feed = await service.get_personalized_feed(department=department, limit=department_limit)

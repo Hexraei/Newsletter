@@ -771,11 +771,7 @@
     /* ================================================================
        CONFIG
     ================================================================ */
-    const API = (() => {
-      const host = window.location.hostname;
-      if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
-      return window.location.origin;
-    })();
+    const API = window.location.origin;
 
     /* Department selector helpers */
     const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};

@@ -99,3 +99,8 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+    # Refresh feed cache after scraping
+    print("\nRefreshing feed cache...")
+    from refresh_feed_cache import refresh_all
+    asyncio.run(refresh_all())

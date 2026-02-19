@@ -933,11 +933,7 @@
     /* ========================================================
        CONFIG
     ======================================================== */
-    const API = (() => {
-      const host = window.location.hostname;
-      if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
-      return window.location.origin;
-    })();
+    const API = window.location.origin;
 
     /* ========================================================
        DEPARTMENT SELECTOR
@@ -1873,6 +1869,28 @@
     /* ========================================================
        DATA LOADING
     ======================================================== */
+    const CACHE_KEY = 'newsday_feed_cache';
+    const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+    function saveFeedCache(data) {
+      try {
+        const dept = getSelectedDept();
+        const store = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+        store[dept] = { ts: Date.now(), data: data };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+      } catch {}
+    }
+
+    function loadFeedCache() {
+      try {
+        const dept = getSelectedDept();
+        const store = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+        const entry = store[dept];
+        if (entry && (Date.now() - entry.ts) < CACHE_TTL) return entry.data;
+      } catch {}
+      return null;
+    }
+
     async function loadAllData() {
       let backendOk = false;
       try {
@@ -1894,7 +1912,9 @@
         data = JSON.parse(JSON.stringify(DEMO));
       }
 
-      return await enrichWithAI(data, backendOk);
+      const enriched = await enrichWithAI(data, backendOk);
+      saveFeedCache(enriched);
+      return enriched;
     }
 
     async function loadFromBackendAll() {
@@ -2149,17 +2169,11 @@
     /* ========================================================
        INIT
     ======================================================== */
-    document.addEventListener('DOMContentLoaded', async () => {
-      initNavbarAuth();
-      initDeptSelector();
-      loadPersistedStoryCache();
-      const data = await loadAllData();
+    function renderPage(data) {
       storyRegistry.clear();
       storySeq = 0;
 
-      await warmStoryInsights(data);
-
-      // Hero — use trending as fallback when no breaking (not CS demo data)
+      // Hero — use trending as fallback when no breaking
       const heroFallback = (data.insights && data.insights.length)
         ? data.insights.map(item => ({
             title: item.title || 'Latest Update',
@@ -2175,12 +2189,30 @@
       setTimeout(() => $heroText.classList.add('active'), 50);
       startAutoplay();
 
-      // Sections — only fall back to DEMO when backend is offline
+      // Sections
       const deptLabel = DEPT_LABELS[getSelectedDept()] || 'DEPT';
       const emptyCard = { title: 'More ' + (DEPT_NAMES[getSelectedDept()] || '') + ' news coming soon', meta: 'Sources are being collected for this department.', source: deptLabel, url: '#', category: deptLabel };
       populateSection('department-grid', data.department.length ? data.department : (backendIsLive ? [emptyCard] : DEMO.department));
       populateSection('insights-grid',   data.insights.length   ? data.insights   : (backendIsLive ? [emptyCard] : DEMO.insights));
       populateSection('stories-grid',    data.stories.length    ? data.stories    : (backendIsLive ? [emptyCard] : DEMO.stories));
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbarAuth();
+      initDeptSelector();
+      loadPersistedStoryCache();
+
+      // Instant render from localStorage cache
+      const cached = loadFeedCache();
+      if (cached) {
+        renderPage(cached);
+        await warmStoryInsights(cached);
+      }
+
+      // Fetch fresh data (fast — served from DB cache)
+      const data = await loadAllData();
+      await warmStoryInsights(data);
+      renderPage(data);
     });
   </script>
 </body>
