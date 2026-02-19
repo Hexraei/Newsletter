@@ -208,7 +208,15 @@ class ScraperService:
         
         async with RedditScraper() as scraper:
             scraped_items = await scraper.scrape(
-                subreddits=['technology', 'programming', 'cscareerquestions'],
+                subreddits=[
+                    'technology', 'programming', 'MachineLearning',
+                    'compsci', 'netsec', 'LocalLLaMA', 'artificial',
+                    'cscareerquestions', 'csMajors', 'ExperiencedDevs',
+                    'learnprogramming',
+                    'singularity', 'Futurology', 'startups',
+                    'technews', 'ArtificialInteligence',
+                    'stocks', 'energy', 'biotech',
+                ],
                 limit=limit
             )
             

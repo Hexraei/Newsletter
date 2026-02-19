@@ -1,7 +1,6 @@
 """Lightweight FastAPI app without database for testing."""
 
 import json
-import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
@@ -10,6 +9,18 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.integrations.ai_provider import AIProvider, check_ai_status
+from app.integrations.supabase_lite import SupabaseLiteClient
+from app.ranking_engine import (
+    candidate_to_feed_item,
+    rank_all_sections,
+    rank_breaking,
+    rank_department,
+    rank_student_stories,
+    rank_trending,
+)
+
+
+supabase_client = SupabaseLiteClient()
 
 
 class LiteSummarizeRequest(BaseModel):
@@ -25,67 +36,6 @@ def _safe_int(value: object) -> int:
         return int(value or 0)
     except Exception:
         return 0
-
-
-def _parse_json_field(value: object) -> dict:
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str) and value.strip():
-        try:
-            parsed = json.loads(value)
-            return parsed if isinstance(parsed, dict) else {}
-        except Exception:
-            return {}
-    return {}
-
-
-def _engagement_score(item: dict) -> int:
-    engagement = _parse_json_field(item.get("engagement"))
-    upvotes = _safe_int(engagement.get("upvotes"))
-    comments = _safe_int(engagement.get("comments"))
-    stars = _safe_int(engagement.get("stars"))
-    forks = _safe_int(engagement.get("forks"))
-
-    content_text = str(item.get("content") or "")
-    score_match = re.search(r"score\s*:\s*(\d+)", content_text, flags=re.IGNORECASE)
-    comments_match = re.search(r"comments\s*:\s*(\d+)", content_text, flags=re.IGNORECASE)
-
-    if upvotes == 0 and score_match:
-        upvotes = _safe_int(score_match.group(1))
-    if comments == 0 and comments_match:
-        comments = _safe_int(comments_match.group(1))
-
-    return upvotes + comments * 2 + stars + forks * 2
-
-
-def _summary_text(item: dict, max_len: int = 140) -> str:
-    content = str(item.get("content") or "").strip()
-    if content.lower().startswith("score:"):
-        content = ""
-
-    source = str(item.get("source") or "Campus Tech")
-    base = content if content else f"{source} update for CS students."
-    collapsed = " ".join(base.split())
-    return collapsed[: max_len - 3] + "..." if len(collapsed) > max_len else collapsed
-
-
-def _category_text(item: dict) -> str:
-    metadata = _parse_json_field(item.get("metadata"))
-    category = str(metadata.get("category") or "").strip()
-    return category if category else "general"
-
-
-def _breaking_score(item: dict) -> int:
-    title = str(item.get("title") or "").lower()
-    summary = _summary_text(item, max_len=180).lower()
-    text = f"{title} {summary}"
-    keywords = [
-        "breaking", "breach", "outage", "down", "critical", "urgent",
-        "incident", "attack", "leak", "ban", "lawsuit", "shutdown",
-        "acquires", "launch", "security",
-    ]
-    keyword_hits = sum(1 for k in keywords if k in text)
-    return _engagement_score(item) + keyword_hits * 25
 
 
 def _repo_root() -> Path:
@@ -111,18 +61,20 @@ def _load_scraped_items() -> list[dict]:
         return []
 
 
-def _to_feed_item(item: dict, is_breaking: bool = False) -> dict:
-    return {
-        "title": str(item.get("title") or ""),
-        "summary": _summary_text(item),
-        "source": str(item.get("source") or "Campus Tech"),
-        "url": str(item.get("url") or "#"),
-        "original_url": str(item.get("url") or "#"),
-        "category": _category_text(item),
-        "is_breaking": is_breaking,
-        "published_at": item.get("published_at"),
-        "attractiveness_score": _engagement_score(item),
-    }
+def _clamp_limit(limit: int, default: int, hard_max: int) -> int:
+    parsed = _safe_int(limit)
+    return max(1, min(parsed or default, hard_max))
+
+
+def _empty_items_response() -> dict:
+    return {"success": True, "data": {"items": []}}
+
+
+async def _load_items_for_feed() -> list[dict]:
+    supabase_items = await supabase_client.fetch_scraped_items()
+    if supabase_items:
+        return supabase_items
+    return _load_scraped_items()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -197,12 +149,12 @@ async def summarize_content_lite(request: LiteSummarizeRequest):
 async def lite_trending_feed(limit: int = 20):
     """Trending feed from latest scraped JSON (lite mode)."""
 
-    items = _load_scraped_items()
+    items = await _load_items_for_feed()
     if not items:
-        return {"success": True, "data": {"items": []}}
+        return _empty_items_response()
 
-    ranked = sorted(items, key=_engagement_score, reverse=True)
-    out = [_to_feed_item(item, is_breaking=False) for item in ranked[: max(1, min(limit, 60))]]
+    ranked = rank_trending(items, limit=_clamp_limit(limit, default=20, hard_max=60))
+    out = [candidate_to_feed_item(candidate) for candidate in ranked]
     return {"success": True, "data": {"items": out}}
 
 
@@ -210,13 +162,116 @@ async def lite_trending_feed(limit: int = 20):
 async def lite_breaking_feed(limit: int = 8):
     """Breaking feed from latest scraped JSON (lite mode)."""
 
-    items = _load_scraped_items()
+    items = await _load_items_for_feed()
     if not items:
-        return {"success": True, "data": {"items": []}}
+        return _empty_items_response()
 
-    ranked = sorted(items, key=_breaking_score, reverse=True)
-    out = [_to_feed_item(item, is_breaking=True) for item in ranked[: max(1, min(limit, 30))]]
+    ranked = rank_breaking(items, limit=_clamp_limit(limit, default=8, hard_max=30))
+    out = [candidate_to_feed_item(candidate) for candidate in ranked]
     return {"success": True, "data": {"items": out}}
+
+
+@app.get("/api/v1/feed/department", tags=["Feed"])
+async def lite_department_feed(limit: int = 12):
+    """Department news feed with CS relevance ranking."""
+
+    items = await _load_items_for_feed()
+    if not items:
+        return _empty_items_response()
+
+    ranked = rank_department(items, limit=_clamp_limit(limit, default=12, hard_max=30))
+    out = [candidate_to_feed_item(candidate) for candidate in ranked]
+    return {"success": True, "data": {"items": out}}
+
+
+@app.get("/api/v1/feed/student-stories", tags=["Feed"])
+async def lite_student_stories_feed(limit: int = 12):
+    """Student stories feed with career/community relevance ranking."""
+
+    items = await _load_items_for_feed()
+    if not items:
+        return _empty_items_response()
+
+    ranked = rank_student_stories(items, limit=_clamp_limit(limit, default=12, hard_max=30))
+    out = [candidate_to_feed_item(candidate) for candidate in ranked]
+    return {"success": True, "data": {"items": out}}
+
+
+@app.get("/api/v1/feed/all-sections", tags=["Feed"])
+async def lite_all_sections_feed(
+    breaking_limit: int = 8,
+    department_limit: int = 3,
+    student_stories_limit: int = 3,
+    trending_limit: int = 3,
+):
+    """Unified section response with backend-side ranking and scoring."""
+
+    cached = await supabase_client.fetch_ranked_cache()
+    if cached and {"breaking", "department", "student_stories", "trending"}.issubset(cached.keys()):
+        return {"success": True, "data": cached}
+
+    items = await _load_items_for_feed()
+    if not items:
+        return {
+            "success": True,
+            "data": {
+                "breaking": [],
+                "department": [],
+                "student_stories": [],
+                "trending": [],
+            },
+        }
+
+    ranked = rank_all_sections(
+        items,
+        limits={
+            "breaking": _clamp_limit(breaking_limit, default=8, hard_max=30),
+            "department": _clamp_limit(department_limit, default=3, hard_max=30),
+            "student_stories": _clamp_limit(student_stories_limit, default=3, hard_max=30),
+            "trending": _clamp_limit(trending_limit, default=3, hard_max=30),
+        },
+    )
+
+    payload = {
+        "success": True,
+        "data": {
+            "breaking": [candidate_to_feed_item(candidate) for candidate in ranked["breaking"]],
+            "department": [candidate_to_feed_item(candidate) for candidate in ranked["department"]],
+            "student_stories": [candidate_to_feed_item(candidate) for candidate in ranked["student_stories"]],
+            "trending": [candidate_to_feed_item(candidate) for candidate in ranked["trending"]],
+        },
+    }
+
+    await supabase_client.upsert_ranked_cache(payload["data"])
+    return payload
+
+
+@app.get("/api/v1/feed/search", tags=["Feed"])
+async def lite_search_feed(q: str = "", limit: int = 20):
+    """Search across all feed items by keyword (case-insensitive title/summary/category match)."""
+
+    query = (q or "").strip().lower()
+    if not query:
+        return _empty_items_response()
+
+    items = await _load_items_for_feed()
+    if not items:
+        return _empty_items_response()
+
+    capped = _clamp_limit(limit, default=20, hard_max=60)
+
+    matched: list[dict] = []
+    for item in items:
+        haystack = " ".join(
+            str(item.get(field) or "")
+            for field in ("title", "summary", "content", "category", "source")
+        ).lower()
+        if query in haystack:
+            matched.append(item)
+        if len(matched) >= capped:
+            break
+
+    return {"success": True, "data": {"items": matched, "query": query, "total": len(matched)}}
 
 
 # Note: Auth/feed/pipeline endpoints are not included in lite mode (DB required)

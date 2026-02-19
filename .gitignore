@@ -30,6 +30,10 @@ env/
 .env
 .env.local
 .env.*.local
+supabase.md
+**/supabase.md
+groq.md
+**/groq.md
 
 # Database
 *.db
