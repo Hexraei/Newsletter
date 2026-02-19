@@ -36,6 +36,7 @@ class User(Base):
     
     # Academic Info
     department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    department_key: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, index=True)
     year_of_study: Mapped[Optional[int]] = mapped_column(
         Integer,
         nullable=True

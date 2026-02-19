@@ -124,7 +124,7 @@ class ScraperService:
             result = await self.db.execute(
                 select(Source).where(Source.platform == scraper_name)
             )
-            source = result.scalar_one_or_none()
+            source = result.scalars().first()
             
             if not source:
                 return {"error": f"Source not configured: {scraper_name}"}
@@ -169,11 +169,6 @@ class ScraperService:
             print(f"Error running {scraper_name}: {e}")
             import traceback
             traceback.print_exc()
-            
-            # Update source failure count
-            if source:
-                source.failure_count += 1
-                await self.db.commit()
             
             return {
                 "scraper": scraper_name,

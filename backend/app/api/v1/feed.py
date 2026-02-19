@@ -44,34 +44,37 @@ async def get_personalized_feed(
 @router.get("/trending")
 async def get_trending(
     limit: int = Query(10, ge=1, le=50),
+    department: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Get trending content."""
     
     service = FeedService(db)
-    return await service.get_trending_content(limit=limit)
+    return await service.get_trending_content(limit=limit, department=department)
 
 
 @router.get("/breaking")
 async def get_breaking_news(
     limit: int = Query(5, ge=1, le=20),
+    department: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Get breaking news alerts."""
     
     service = FeedService(db)
-    return await service.get_breaking_news(limit=limit)
+    return await service.get_breaking_news(limit=limit, department=department)
 
 
 @router.get("/daily-digest")
 async def get_daily_digest(
     limit: int = Query(5, ge=1, le=10),
+    department: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Get daily digest of top content."""
     
     service = FeedService(db)
-    return await service.get_daily_digest(limit=limit)
+    return await service.get_daily_digest(limit=limit, department=department)
 
 
 @router.get("/search")
@@ -305,6 +308,32 @@ async def submit_feedback(
     await db.commit()
     
     return SuccessResponse(message="Feedback submitted")
+
+
+@router.get("/all-sections")
+async def get_all_sections(
+    breaking_limit: int = Query(8, ge=1, le=30),
+    department_limit: int = Query(3, ge=1, le=30),
+    trending_limit: int = Query(3, ge=1, le=30),
+    department: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Unified section response for the homepage with optional department filtering."""
+    service = FeedService(db)
+
+    breaking = await service.get_breaking_news(limit=breaking_limit, department=department)
+    trending = await service.get_trending_content(limit=trending_limit, department=department)
+    dept_feed = await service.get_personalized_feed(department=department, limit=department_limit)
+    dept_items = dept_feed.get("items", [])
+
+    return {
+        "success": True,
+        "data": {
+            "breaking": breaking,
+            "department": dept_items,
+            "trending": trending,
+        },
+    }
 
 
 @router.get("/stats")

@@ -2,9 +2,10 @@
 
 import asyncio
 import sys
+import os
 
-sys.path.insert(0, 'D:\\newsletter\\backend')
-sys.path.insert(0, 'D:\\newsletter\\scraper_platform')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scraper_platform'))
 
 print('='*60)
 print('SCRAPER INTEGRATION TEST')

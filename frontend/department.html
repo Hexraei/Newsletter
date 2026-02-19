@@ -80,6 +80,18 @@
     .navbar-links a:hover { opacity: 0.5; }
     .navbar-links a.active { font-weight: 600; }
 
+    /* Department selector */
+    .dept-selector { position: relative; font-family: 'Inter', sans-serif; font-size: 12px; }
+    .dept-selector-btn { background: var(--black); color: var(--white); border: none; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s; white-space: nowrap; }
+    .dept-selector-btn:hover { opacity: 0.75; }
+    .dept-selector-btn::after { content: ''; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--white); }
+    .dept-dropdown { display: none; position: absolute; top: calc(100% + 6px); right: 0; background: var(--white); border: 1px solid var(--gray-200); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); min-width: 260px; z-index: 200; padding: 6px 0; max-height: 400px; overflow-y: auto; }
+    .dept-dropdown.open { display: block; }
+    .dept-dropdown-item { padding: 10px 16px; cursor: pointer; font-size: 12px; color: var(--gray-500); transition: background 0.15s; display: flex; align-items: center; gap: 8px; }
+    .dept-dropdown-item:hover { background: var(--gray-100); }
+    .dept-dropdown-item.active { color: var(--black); font-weight: 600; background: var(--gray-100); }
+    .dept-dropdown-item .dept-abbr { font-weight: 700; min-width: 42px; font-size: 11px; color: var(--black); }
+
     /* ===== PAGE HEADER ===== */
     .page-header {
       margin-top: 66px;
@@ -569,6 +581,21 @@
   <nav class="navbar">
     <a class="navbar-brand" href="index.html">NEWS DAY</a>
     <div class="navbar-links">
+      <div class="dept-selector" id="dept-selector">
+        <button class="dept-selector-btn" id="dept-btn">CSE</button>
+        <div class="dept-dropdown" id="dept-dropdown">
+          <div class="dept-dropdown-item active" data-key="CSE"><span class="dept-abbr">CSE</span> Computer Science & Engineering</div>
+          <div class="dept-dropdown-item" data-key="IT"><span class="dept-abbr">IT</span> Information Technology</div>
+          <div class="dept-dropdown-item" data-key="AIDS"><span class="dept-abbr">AI&DS</span> Artificial Intelligence & Data Science</div>
+          <div class="dept-dropdown-item" data-key="ECE"><span class="dept-abbr">ECE</span> Electronics & Communication</div>
+          <div class="dept-dropdown-item" data-key="EEE"><span class="dept-abbr">EEE</span> Electrical & Electronics</div>
+          <div class="dept-dropdown-item" data-key="ME"><span class="dept-abbr">ME</span> Mechanical Engineering</div>
+          <div class="dept-dropdown-item" data-key="CE"><span class="dept-abbr">CE</span> Civil Engineering</div>
+          <div class="dept-dropdown-item" data-key="BT"><span class="dept-abbr">BT</span> Biotechnology Engineering</div>
+          <div class="dept-dropdown-item" data-key="CH"><span class="dept-abbr">CH</span> Chemical Engineering</div>
+          <div class="dept-dropdown-item" data-key="AE"><span class="dept-abbr">AE</span> Aeronautical / Aerospace</div>
+        </div>
+      </div>
       <a href="department.html" class="active">Department news</a>
       <a href="insights.html">Industrial insights</a>
       <a href="stories.html">Student Stories</a>
@@ -579,8 +606,8 @@
   <!-- PAGE HEADER -->
   <div class="page-header">
     <div class="page-header-left">
-      <h1>Department News</h1>
-      <p>Core updates for computer science students: AI, systems, software engineering, security, and open-source tools.</p>
+      <h1 id="dept-page-title">Department News</h1>
+      <p id="dept-page-desc">Core updates for your department.</p>
     </div>
     <a class="see-more-btn" href="index.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
@@ -749,6 +776,59 @@
       if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
       return window.location.origin;
     })();
+
+    /* Department selector helpers */
+    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};
+    const DEPT_DESCRIPTIONS = {
+      CSE: 'Core updates for computer science students: AI, systems, software engineering, security, and open-source tools.',
+      IT: 'IT infrastructure, cloud computing, networking, cybersecurity, and DevOps updates.',
+      AIDS: 'Machine learning, deep learning, NLP, computer vision, and data analytics news.',
+      ECE: 'Embedded systems, VLSI, signal processing, IoT, and telecommunications updates.',
+      EEE: 'Power systems, renewable energy, control systems, and electrical machines news.',
+      ME: 'Thermodynamics, manufacturing, CAD/CAM, robotics, and automotive engineering updates.',
+      CE: 'Structural, geotechnical, transportation, environmental, and construction news.',
+      BT: 'Genetic engineering, bioinformatics, pharmaceuticals, and molecular biology updates.',
+      CH: 'Process engineering, petrochemicals, polymers, and industrial chemistry news.',
+      AE: 'Aerodynamics, propulsion, avionics, space systems, and flight mechanics updates.',
+    };
+    const DEPT_NAMES = {
+      CSE:'Computer Science & Engineering', IT:'Information Technology',
+      AIDS:'Artificial Intelligence & Data Science', ECE:'Electronics & Communication',
+      EEE:'Electrical & Electronics', ME:'Mechanical Engineering',
+      CE:'Civil Engineering', BT:'Biotechnology', CH:'Chemical Engineering',
+      AE:'Aeronautical / Aerospace Engineering'
+    };
+    function getSelectedDept() { return localStorage.getItem('newsday_dept') || 'CSE'; }
+    function setSelectedDept(key) { localStorage.setItem('newsday_dept', key); }
+    function initDeptSelector() {
+      const btn = document.getElementById('dept-btn');
+      const dropdown = document.getElementById('dept-dropdown');
+      if (!btn || !dropdown) return;
+      const current = getSelectedDept();
+      btn.textContent = DEPT_LABELS[current] || current;
+
+      // Update page title and description
+      const pageTitle = document.getElementById('dept-page-title');
+      const pageDesc = document.getElementById('dept-page-desc');
+      if (pageTitle) pageTitle.textContent = (DEPT_NAMES[current] || current) + ' News';
+      if (pageDesc) pageDesc.textContent = DEPT_DESCRIPTIONS[current] || '';
+
+      btn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+      dropdown.querySelectorAll('.dept-dropdown-item').forEach(item => {
+        if (item.dataset.key === current) item.classList.add('active');
+        else item.classList.remove('active');
+        item.addEventListener('click', () => {
+          const key = item.dataset.key;
+          setSelectedDept(key);
+          btn.textContent = DEPT_LABELS[key] || key;
+          dropdown.querySelectorAll('.dept-dropdown-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          dropdown.classList.remove('open');
+          location.reload();
+        });
+      });
+      document.addEventListener('click', () => dropdown.classList.remove('open'));
+    }
 
     const PAGE_SECTION = 'department'; // which section this page is for
 
@@ -944,7 +1024,7 @@
       const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
         title: item.title || '',
-        source: item.source || 'CS Desk',
+        source: item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk'),
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
@@ -1118,7 +1198,7 @@
     async function openStoryModal(item) {
       if (!item) return;
       $storyModalTitle.textContent = item.title || 'Story';
-      $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+      $storyModalMeta.textContent = `${(item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk')).toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
       $storyQuickSummary.textContent = 'Preparing summary...';
       $storyWhyImportant.textContent = 'Preparing context...';
       $storyImpact.textContent = 'Preparing student impact...';
@@ -1168,7 +1248,7 @@
       const category = formatCategory(item);
       const ago = timeAgo(item.published_at);
       const meta = stripSourcePrefix(shortText(item.summary || item.content || item.meta || '', 140));
-      const source = item.source || 'CS Desk';
+      const source = item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk');
 
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
         <div class="feed-item-thumb"></div>
@@ -1205,7 +1285,7 @@
           <div class="sidebar-item-body">
             <div class="sidebar-item-cat">${cat}</div>
             <div class="sidebar-item-title">${item.title || ''}</div>
-            <div class="sidebar-item-meta">${item.source || 'CS Desk'}${ago ? ' - ' + ago : ''}</div>
+            <div class="sidebar-item-meta">${item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk')}${ago ? ' - ' + ago : ''}</div>
           </div>
         </a>`;
       }).join('');
@@ -1301,7 +1381,7 @@
       return {
         title: item.title || '',
         url: item.original_url || item.url || '#',
-        source: item.source || item.source_name || 'CS Desk',
+        source: item.source || item.source_name || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk'),
         summary,
         content: summary || item.title || '',
         category: item.category || '',
@@ -1324,9 +1404,10 @@
       if (backendOk) {
         try {
           // Load department items (up to 30)
+          const dept = getSelectedDept();
           const [deptRes, trendRes] = await Promise.allSettled([
-            fetchWithTimeout(API + '/api/v1/feed/department?limit=30', {}, 6000),
-            fetchWithTimeout(API + '/api/v1/feed/trending?limit=10', {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/department?limit=30&department=' + encodeURIComponent(dept), {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/trending?limit=10&department=' + encodeURIComponent(dept), {}, 6000),
           ]);
 
           if (deptRes.status === 'fulfilled' && deptRes.value.ok) {
@@ -1363,6 +1444,7 @@
        INIT
     ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
+      initDeptSelector();
       loadPersistedStoryCache();
       await loadData();
 

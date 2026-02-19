@@ -1,6 +1,7 @@
 """Test configuration and fixtures."""
 
 import asyncio
+import os
 from typing import AsyncGenerator, Generator
 
 import pytest
@@ -15,7 +16,7 @@ from app.main import app
 from app.models import Base, get_db
 
 # Test database URL
-TEST_DATABASE_URL = "postgresql+asyncpg://newsletter:newsletter123@localhost:5432/newsletter_test"
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/newsletter_test")
 
 # Create async engine for testing
 test_engine = create_async_engine(

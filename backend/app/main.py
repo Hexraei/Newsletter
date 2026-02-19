@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import router
@@ -62,15 +62,11 @@ async def health_check():
     }
 
 
-# Root endpoint
+# Root endpoint - redirect to frontend
 @app.get("/", tags=["Root"])
 async def root():
-    """Root endpoint."""
-    return {
-        "message": f"Welcome to {settings.APP_NAME}",
-        "version": settings.VERSION,
-        "docs_url": "/docs"
-    }
+    """Redirect to frontend."""
+    return RedirectResponse(url="/static/index.html")
 
 
 # Include API router

@@ -225,13 +225,14 @@ class RedditScraper(BaseScraper):
         
         return items
     
-    async def scrape(self, subreddits: List[str] = None, limit: int = 25, **kwargs) -> List[ScrapedItem]:
+    async def scrape(self, subreddits: List[str] = None, limit: int = 25, department_tags: List[str] = None, **kwargs) -> List[ScrapedItem]:
         """
         Main scraping method.
         
         Args:
             subreddits: List of subreddit names to scrape (default: all)
             limit: Number of posts per subreddit
+            department_tags: Tags to assign to all scraped items
         """
         if subreddits is None:
             subreddits = list(self.SUBREDDITS.values())[:5]
@@ -241,6 +242,9 @@ class RedditScraper(BaseScraper):
         all_items = []
         for subreddit in subreddits:
             items = await self.scrape_subreddit(subreddit, limit)
+            if department_tags:
+                for item in items:
+                    item.department_tags = department_tags
             all_items.extend(items)
         
         self.results = all_items

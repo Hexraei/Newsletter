@@ -58,6 +58,11 @@ class Source(Base):
         default=list,
         server_default="{}"
     )
+    department_tags: Mapped[List[str]] = mapped_column(
+        ARRAY(String),
+        default=list,
+        server_default="{}"
+    )
 
 
 class RawContent(Base):

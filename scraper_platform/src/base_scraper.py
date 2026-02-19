@@ -41,7 +41,8 @@ class ScrapedItem:
                  published_at: Optional[datetime] = None,
                  scraped_at: Optional[datetime] = None,
                  engagement: Dict[str, int] = None,
-                 metadata: Dict[str, Any] = None):
+                 metadata: Dict[str, Any] = None,
+                 department_tags: List[str] = None):
         self.source = source
         self.source_type = source_type
         self.title = title
@@ -52,6 +53,7 @@ class ScrapedItem:
         self.scraped_at = scraped_at or datetime.now()
         self.engagement = engagement or {}
         self.metadata = metadata or {}
+        self.department_tags = department_tags or []
         self.content_hash = self._generate_hash()
     
     def _generate_hash(self) -> str:
@@ -72,7 +74,8 @@ class ScrapedItem:
             'scraped_at': self.scraped_at.isoformat() if self.scraped_at else None,
             'engagement': json.dumps(self.engagement),
             'metadata': json.dumps(self.metadata),
-            'content_hash': self.content_hash
+            'content_hash': self.content_hash,
+            'department_tags': self.department_tags,
         }
 
 

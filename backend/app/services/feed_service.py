@@ -98,18 +98,24 @@ class FeedService:
             }
         }
     
-    async def get_trending_content(self, limit: int = 10) -> List[dict]:
+    async def get_trending_content(self, limit: int = 10, department: str = None) -> List[dict]:
         """Get trending content based on engagement scores."""
         
-        result = await self.db.execute(
+        query = (
             select(ProcessedContent)
             .where(ProcessedContent.status == "published")
-            .order_by(
-                ProcessedContent.attractiveness_score.desc(),
-                ProcessedContent.view_count.desc()
-            )
-            .limit(limit)
         )
+        
+        if department:
+            query = query.where(
+                ProcessedContent.department_tags.contains([department])
+            )
+        
+        query = query.order_by(
+            ProcessedContent.attractiveness_score.desc(),
+            ProcessedContent.view_count.desc()
+        ).limit(limit)
+        result = await self.db.execute(query)
         items = result.scalars().all()
         
         # Fetch original URLs
@@ -141,7 +147,7 @@ class FeedService:
             for item in items
         ]
     
-    async def get_breaking_news(self, limit: int = 5) -> List[dict]:
+    async def get_breaking_news(self, limit: int = 5, department: str = None) -> List[dict]:
         """Get breaking news alerts.
 
         Ranking is based on:
@@ -152,13 +158,17 @@ class FeedService:
         """
 
         recent_window = datetime.now(timezone.utc) - timedelta(hours=48)
-        result = await self.db.execute(
+        query = (
             select(ProcessedContent)
             .where(ProcessedContent.status == "published")
             .where(ProcessedContent.published_at >= recent_window)
-            .order_by(ProcessedContent.published_at.desc())
-            .limit(200)
         )
+        if department:
+            query = query.where(
+                ProcessedContent.department_tags.contains([department])
+            )
+        query = query.order_by(ProcessedContent.published_at.desc()).limit(200)
+        result = await self.db.execute(query)
         candidates = result.scalars().all()
 
         def rank(item: ProcessedContent) -> float:
@@ -205,7 +215,7 @@ class FeedService:
         for item in candidates:
             score = rank(item)
             # Keep only strong breaking candidates
-            if score >= 85:
+            if score >= 55:
                 ranked.append((score, item))
 
         ranked.sort(key=lambda x: x[0], reverse=True)
@@ -216,7 +226,7 @@ class FeedService:
             existing_ids = {item.id for item in items}
             fillers = [
                 c for c in candidates
-                if c.id not in existing_ids and (c.attractiveness_score or 0) >= 75
+                if c.id not in existing_ids and (c.attractiveness_score or 0) >= 35
             ]
             fillers.sort(key=lambda i: float(i.attractiveness_score or 0), reverse=True)
             items.extend(fillers[: max(0, limit - len(items))])
@@ -278,21 +288,26 @@ class FeedService:
             for item in items
         ]
     
-    async def get_daily_digest(self, limit: int = 5) -> Dict:
+    async def get_daily_digest(self, limit: int = 5, department: str = None) -> Dict:
         """Generate a daily digest of top content."""
         
         today = datetime.now(timezone.utc).date()
         today_start = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
         
         # Get top stories from today
-        result = await self.db.execute(
+        query = (
             select(ProcessedContent)
             .where(ProcessedContent.status == "published")
             .where(ProcessedContent.published_at >= today_start)
             .where(ProcessedContent.attractiveness_score >= 50)
-            .order_by(ProcessedContent.attractiveness_score.desc())
-            .limit(limit)
         )
+        if department:
+            query = query.where(
+                ProcessedContent.department_tags.contains([department])
+            )
+        query = query.order_by(ProcessedContent.attractiveness_score.desc()).limit(limit)
+        
+        result = await self.db.execute(query)
         today_items = result.scalars().all()
         
         # If not enough today, get recent high-quality content

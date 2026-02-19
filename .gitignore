@@ -77,3 +77,12 @@ frontend/node_modules/
 *.bak
 *.tmp
 *.temp
+
+# Extracted document content
+context/pdf_content.txt
+context/pdf_tables.json
+context/docx_content.txt
+context/*.pdf
+
+# Generated reports
+SCRAPER_RESULTS.md

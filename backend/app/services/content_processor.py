@@ -81,6 +81,7 @@ class ContentProcessor:
             "reddit": 5,
             "medium": 5,
             "producthunt": 5,
+            "rss": 8,
         }
         source_result = await self.db.execute(
             select(Source).where(Source.id == raw.source_id)
@@ -203,7 +204,7 @@ class ContentProcessor:
             },
             reading_time_minutes=2,
             category=self._detect_category(raw),
-            department_tags=source.default_categories if source else ["general"],
+            department_tags=(source.department_tags or source.default_categories) if source else ["general"],
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             quality_score=min(100, score + 10),
@@ -271,7 +272,7 @@ class ContentProcessor:
             },
             reading_time_minutes=max(1, len(content) // 1000 + 1),
             category=self._detect_category(raw),
-            department_tags=source.default_categories if source else ["general"],
+            department_tags=(source.department_tags or source.default_categories) if source else ["general"],
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             quality_score=score,
