@@ -86,3 +86,7 @@ context/*.pdf
 
 # Generated reports
 SCRAPER_RESULTS.md
+
+# Scraper output
+*.xlsx
+*.csv
