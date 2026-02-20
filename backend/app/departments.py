@@ -316,6 +316,7 @@ DEPARTMENT_SOURCES: Dict[str, Dict[str, Any]] = {
             "aerospace", "spacex", "aviation", "flying",
             "AerospaceEngineering", "space", "rocketry",
             "satellites", "defense",
+            "ISRO",
         ],
         "medium": [],
         "youtube": [
@@ -338,14 +339,109 @@ DEPARTMENT_SOURCES: Dict[str, Dict[str, Any]] = {
 }
 
 
-def get_all_reddit_subs_for_department(dept_key: str) -> List[str]:
-    """Return the Reddit subreddit list for a department."""
-    return DEPARTMENT_SOURCES.get(dept_key, {}).get("reddit", [])
+# ── INDIA-FOCUSED SOURCES ──────────────────────────────────────────────
+# These are appended to every department so students get Indian industry,
+# career, and education signals alongside international sources.
+
+# Sources shared across ALL departments
+INDIA_COMMON_RSS: List[Dict[str, str]] = [
+    # ─ Major Indian news (tech / business / education sections) ─
+    {"name": "Times of India Tech", "url": "https://timesofindia.indiatimes.com/rssfeeds/66949542.cms", "type": "india-news"},
+    {"name": "TOI Education", "url": "https://timesofindia.indiatimes.com/rssfeeds/913168846.cms", "type": "india-education"},
+    {"name": "The Hindu Sci-Tech", "url": "https://www.thehindu.com/sci-tech/feeder/default.rss", "type": "india-news"},
+    {"name": "The Hindu Education", "url": "https://www.thehindu.com/education/feeder/default.rss", "type": "india-education"},
+    {"name": "NDTV Gadgets", "url": "https://feeds.feedburner.com/ndtvgadgets-latest", "type": "india-news"},
+    {"name": "Indian Express Technology", "url": "https://indianexpress.com/section/technology/feed/", "type": "india-news"},
+    {"name": "Hindustan Times Tech", "url": "https://www.hindustantimes.com/feeds/rss/technology/rssfeed.xml", "type": "india-news"},
+    {"name": "Livemint Technology", "url": "https://www.livemint.com/rss/technology", "type": "india-news"},
+    {"name": "Economic Times Tech", "url": "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms", "type": "india-news"},
+    # ─ Indian startup / tech ecosystem ─
+    {"name": "YourStory", "url": "https://yourstory.com/feed", "type": "india-startup"},
+    {"name": "Inc42", "url": "https://inc42.com/feed/", "type": "india-startup"},
+    # ─ New verified Indian sources ─
+    {"name": "The Wire Science", "url": "https://science.thewire.in/feed/", "type": "india-news"},
+    {"name": "News18 Tech", "url": "https://www.news18.com/rss/tech.xml", "type": "india-news"},
+    {"name": "Moneycontrol Tech", "url": "https://www.moneycontrol.com/rss/technology.xml", "type": "india-news"},
+    {"name": "MediaNama", "url": "https://www.medianama.com/feed/", "type": "india-tech"},
+    # ─ Indian govt / STEM policy ─
+    {"name": "PIB India", "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3", "type": "india-policy"},
+    {"name": "ET Govt", "url": "https://government.economictimes.indiatimes.com/rss/topstories", "type": "india-policy"},
+]
+
+# India-specific Reddit subs shared across departments
+INDIA_COMMON_REDDIT: List[str] = [
+    "india", "Indian_Academia", "developersIndia", "Btechtards",
+    "Indian_Startups", "chennai", "TamilNadu",
+]
+
+# Department-specific Indian sources (only added to matching department)
+INDIA_DEPT_RSS: Dict[str, List[Dict[str, str]]] = {
+    "CSE": [
+        {"name": "Trak.in", "url": "https://trak.in/feed/", "type": "india-startup"},
+        {"name": "ET CIO", "url": "https://cio.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+    ],
+    "IT": [
+        {"name": "ETTelecom", "url": "https://telecom.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "CIO India", "url": "https://www.cio.com/in/feed/", "type": "india-industry"},
+        {"name": "ET HR", "url": "https://hr.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+    ],
+    "AIDS": [
+        {"name": "Analytics Vidhya Blog", "url": "https://www.analyticsvidhya.com/feed/", "type": "india-tech"},
+    ],
+    "ECE": [
+        {"name": "Electronics For You", "url": "https://www.electronicsforu.com/feed", "type": "india-tech"},
+    ],
+    "EEE": [
+        {"name": "Mercom India Solar", "url": "https://mercomindia.com/feed/", "type": "india-energy"},
+        {"name": "ETEnergyWorld", "url": "https://energy.economictimes.indiatimes.com/rss/topstories", "type": "india-energy"},
+    ],
+    "ME": [
+        {"name": "ETAuto", "url": "https://auto.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "Manufacturing Today India", "url": "https://www.manufacturingtodayindia.com/feed", "type": "india-industry"},
+        {"name": "Autocar India", "url": "https://www.autocarindia.com/RSS/rss.ashx", "type": "india-industry"},
+    ],
+    "CE": [
+        {"name": "ETInfra", "url": "https://infra.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "EPC World", "url": "https://www.epcworld.in/feed", "type": "india-industry"},
+    ],
+    "BT": [
+        {"name": "BioVoice News", "url": "https://www.biovoicenews.com/feed/", "type": "india-industry"},
+        {"name": "Express Pharma", "url": "https://www.expresspharma.in/feed/", "type": "india-industry"},
+        {"name": "ET Health", "url": "https://health.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+    ],
+    "CH": [
+        {"name": "Chemical Industry Digest", "url": "https://www.chemindigest.com/feed/", "type": "india-industry"},
+        {"name": "ETEnergyWorld", "url": "https://energy.economictimes.indiatimes.com/rss/topstories", "type": "india-energy"},
+    ],
+    "AE": [
+        {"name": "Livefist Defence", "url": "https://www.livefistdefence.com/feed/", "type": "india-defence"},
+        {"name": "Indian Defence Review", "url": "https://www.indiandefencereview.com/feed/", "type": "india-defence"},
+        {"name": "Defence Star", "url": "https://www.defencestar.in/feed/", "type": "india-defence"},
+    ],
+}
 
 
 def get_all_rss_feeds_for_department(dept_key: str) -> List[Dict]:
-    """Return the RSS feed list for a department."""
-    return DEPARTMENT_SOURCES.get(dept_key, {}).get("rss", [])
+    """Return the RSS feed list for a department, including India-focused sources."""
+    base = list(DEPARTMENT_SOURCES.get(dept_key, {}).get("rss", []))
+    # Append India common + department-specific Indian sources
+    seen_urls = {f["url"] for f in base}
+    for feed in INDIA_COMMON_RSS + INDIA_DEPT_RSS.get(dept_key, []):
+        if feed["url"] not in seen_urls:
+            base.append(feed)
+            seen_urls.add(feed["url"])
+    return base
+
+
+def get_all_reddit_subs_for_department(dept_key: str) -> List[str]:
+    """Return Reddit subs for a department, including India-focused subs."""
+    base = list(DEPARTMENT_SOURCES.get(dept_key, {}).get("reddit", []))
+    seen = {s.lower() for s in base}
+    for sub in INDIA_COMMON_REDDIT:
+        if sub.lower() not in seen:
+            base.append(sub)
+            seen.add(sub.lower())
+    return base
 
 
 def get_department_tag(dept_key: str) -> str:

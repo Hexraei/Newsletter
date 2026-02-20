@@ -82,6 +82,13 @@ class ContentProcessor:
             "medium": 5,
             "producthunt": 5,
             "rss": 8,
+            "research": 10,
+        }
+        # Extra bonus for India-specific source types
+        india_type_bonus = {
+            "india-news": 6, "india-tech": 7, "india-startup": 6,
+            "india-education": 7, "india-career": 8, "india-policy": 5,
+            "india-industry": 6, "india-energy": 6, "india-defence": 5,
         }
         source_result = await self.db.execute(
             select(Source).where(Source.id == raw.source_id)
@@ -89,6 +96,7 @@ class ContentProcessor:
         source = source_result.scalar_one_or_none()
         if source:
             score += source_bonus.get(source.platform, 0)
+            score += india_type_bonus.get(source.source_type, 0)
         
         return min(100, score)
     
@@ -191,6 +199,9 @@ class ContentProcessor:
         # Extract featured image from metadata
         featured_image_url = self._extract_featured_image(raw)
         
+        # Determine content type
+        content_type = self._detect_content_type(raw, source)
+
         # Create processed content
         processed = ProcessedContent(
             raw_content_id=raw.id,
@@ -208,7 +219,7 @@ class ContentProcessor:
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             quality_score=min(100, score + 10),
-            content_type="news",
+            content_type=content_type,
             status="published",
             published_at=datetime.now(timezone.utc),
             is_breaking=is_breaking,
@@ -260,6 +271,24 @@ class ContentProcessor:
         # Even in basic mode, keep media and breaking metadata consistent.
         is_breaking = self._is_breaking_candidate(raw, score)
         breaking_score = self._calculate_breaking_score(raw, score) if is_breaking else None
+        content_type = self._detect_content_type(raw, source)
+
+        # For research papers, create a better summary
+        if content_type == "research_paper":
+            metadata = raw.raw_metadata or {}
+            venue = metadata.get("venue", "")
+            citations = metadata.get("citations", 0)
+            authors = (raw.original_author or "")[:100]
+            parts = []
+            if authors:
+                parts.append(f"By {authors}")
+            if venue:
+                parts.append(f"Published in {venue}")
+            if citations:
+                parts.append(f"{citations} citations")
+            meta_line = " | ".join(parts)
+            abstract = (raw.original_content or "")[:300]
+            summary = f"{meta_line}. {abstract}" if meta_line else abstract
 
         processed = ProcessedContent(
             raw_content_id=raw.id,
@@ -276,7 +305,7 @@ class ContentProcessor:
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             quality_score=score,
-            content_type="snippet",
+            content_type=content_type if content_type == "research_paper" else "snippet",
             status="published",
             published_at=datetime.now(timezone.utc),
             is_breaking=is_breaking,
@@ -361,6 +390,21 @@ class ContentProcessor:
 
         return min(100, score + boost)
     
+    def _detect_content_type(self, raw: RawContent, source) -> str:
+        """Detect if content is a research paper based on source and metadata."""
+        metadata = raw.raw_metadata or {}
+        # Explicitly tagged by scraper
+        if metadata.get("content_type") == "research_paper":
+            return "research_paper"
+        # From research platform
+        if source and source.platform == "research":
+            return "research_paper"
+        # ArXiv source
+        url = (raw.original_url or "").lower()
+        if "arxiv.org" in url:
+            return "research_paper"
+        return "news"
+
     def _detect_category(self, raw: RawContent) -> str:
         """Detect content category from metadata."""
         title = (raw.original_title or "").lower()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Pre-compute feed cache — delegates to scrapers/refresh_cache.py."""
+"""Scrape research papers — delegates to scrapers/run_research.py."""
 import asyncio, sys, os
 
 _root = os.path.dirname(os.path.abspath(__file__))
@@ -10,7 +10,10 @@ sys.path.insert(0, os.path.join(_root, "scraper_platform"))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(_root, "backend", ".env"))
 
+from scrapers.run_research import main
 from scrapers.refresh_cache import refresh_all
 
 if __name__ == "__main__":
+    asyncio.run(main())
+    print("\nRefreshing feed cache...")
     asyncio.run(refresh_all())

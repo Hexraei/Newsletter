@@ -344,6 +344,74 @@ class FeedService:
             "total_stories": len(today_items),
             "categories": categories
         }
+
+    async def get_research_papers(
+        self, department: str = None, featured_limit: int = 3, general_limit: int = 10
+    ) -> Dict:
+        """Get research papers split into featured (top) and general (rest)."""
+        total = featured_limit + general_limit
+
+        query = (
+            select(ProcessedContent)
+            .where(
+                ProcessedContent.status == "published",
+                ProcessedContent.content_type == "research_paper",
+            )
+        )
+
+        if department:
+            query = query.where(
+                ProcessedContent.department_tags.contains([department])
+            )
+
+        query = query.order_by(
+            ProcessedContent.attractiveness_score.desc(),
+            ProcessedContent.published_at.desc(),
+        ).limit(total)
+
+        result = await self.db.execute(query)
+        items = result.scalars().all()
+
+        # Fetch original URLs and metadata
+        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        url_map = {}
+        meta_map = {}
+        if raw_ids:
+            raw_result = await self.db.execute(
+                select(RawContent.id, RawContent.original_url, RawContent.original_author, RawContent.raw_metadata)
+                .where(RawContent.id.in_(raw_ids))
+            )
+            for row in raw_result.all():
+                url_map[str(row.id)] = row.original_url
+                meta_map[str(row.id)] = {
+                    "author": row.original_author or "",
+                    **(row.raw_metadata or {}),
+                }
+
+        def _to_dict(item):
+            raw_id = str(item.raw_content_id) if item.raw_content_id else ""
+            meta = meta_map.get(raw_id, {})
+            return {
+                "id": str(item.id),
+                "title": item.title,
+                "summary": item.summary,
+                "category": item.category,
+                "attractiveness_score": item.attractiveness_score,
+                "topic_tags": item.topic_tags,
+                "published_at": item.published_at.isoformat() if item.published_at else None,
+                "content_blocks": item.content_blocks,
+                "original_url": url_map.get(raw_id),
+                "authors": meta.get("author", ""),
+                "venue": meta.get("venue", ""),
+                "citations": meta.get("citations", 0),
+                "doi": meta.get("doi", ""),
+            }
+
+        all_items = [_to_dict(item) for item in items]
+        return {
+            "featured": all_items[:featured_limit],
+            "papers": all_items[featured_limit:],
+        }
     
     async def record_read(self, content_id: str) -> bool:
         """Record that content was read."""

@@ -341,6 +341,7 @@ async def get_all_sections(
     trending = await service.get_trending_content(limit=trending_limit, department=department)
     dept_feed = await service.get_personalized_feed(department=department, limit=department_limit)
     dept_items = dept_feed.get("items", [])
+    research = await service.get_research_papers(department=department, featured_limit=3, general_limit=10)
 
     return {
         "success": True,
@@ -348,6 +349,7 @@ async def get_all_sections(
             "breaking": breaking,
             "department": dept_items,
             "trending": trending,
+            "research_papers": research,
         },
     }
 

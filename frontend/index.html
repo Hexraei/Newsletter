@@ -430,6 +430,57 @@
     }
     .section-label-btn:hover { background: #1a1a1a; color: #fff; }
 
+    /* Research paper list */
+    .research-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 0 max(20px, calc((100% - 1200px)/2));
+    }
+    .research-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #eee;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.15s;
+    }
+    .research-row:hover { background: #f8f8f8; }
+    .research-row-body { flex: 1; min-width: 0; }
+    .research-row-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .research-row-meta {
+      font-size: 0.78rem;
+      color: #777;
+      line-height: 1.3;
+    }
+    .research-row-abstract {
+      font-size: 0.82rem;
+      color: #555;
+      line-height: 1.4;
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .research-cite-badge {
+      font-size: 0.72rem;
+      background: #f0f0f0;
+      color: #555;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      margin-top: 6px;
+      align-self: flex-start;
+    }
+
     /* Article card */
     .article-card {
       display: flex;
@@ -775,6 +826,7 @@
       </div>
       <a href="department.html">Department news</a>
       <a href="insights.html">Industrial insights</a>
+      <a href="research.html">Research Papers</a>
       <a href="stories.html">Student Stories</a>
       <a href="auth.html" id="nav-auth-link">Log In</a>
       <div class="navbar-avatar" id="navbar-avatar" title="Account"></div>
@@ -841,6 +893,19 @@
     </div>
   </section>
 
+  <!-- RESEARCH PAPERS -->
+  <section class="content-section" id="research">
+    <div class="section-grid" id="research-featured-grid">
+      <div class="section-label-card">
+        <div>
+          <h2 class="section-label-title" id="research-section-title">Research Papers</h2>
+          <p class="section-label-desc" id="research-section-desc">Recently published and groundbreaking research relevant to your field — curated for students and early-career professionals.</p>
+        </div>
+        <a class="section-label-btn" href="research.html">Read More</a>
+      </div>
+    </div>
+  </section>
+
   <!-- STUDENT STORIES -->
   <section class="content-section" id="stories">
     <div class="section-grid" id="stories-grid">
@@ -865,6 +930,7 @@
       <ul class="footer-links">
         <li><a href="department.html">Department News</a></li>
         <li><a href="insights.html">Industrial Insights</a></li>
+        <li><a href="research.html">Research Papers</a></li>
         <li><a href="stories.html">Student Stories</a></li>
       </ul>
     </div>
@@ -986,6 +1052,12 @@
       const deptLabel = DEPT_LABELS[current] || current;
       if (iTitle) iTitle.textContent = deptLabel + ' Industrial Insights';
       if (iDesc) iDesc.textContent = 'Industry signals for ' + (DEPT_NAMES[current] || current) + ': market shifts, policy changes, and trends.';
+
+      // Update research section header
+      const rTitle = document.getElementById('research-section-title');
+      const rDesc = document.getElementById('research-section-desc');
+      if (rTitle) rTitle.textContent = deptLabel + ' Research Papers';
+      if (rDesc) rDesc.textContent = 'Recently published research relevant to ' + (DEPT_NAMES[current] || current) + ' — curated for students and early-career professionals.';
 
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1867,6 +1939,53 @@
     }
 
     /* ========================================================
+       RESEARCH PAPERS — render helpers
+    ======================================================== */
+    function renderResearchCard(paper) {
+      const storyId = registerStory(paper);
+      const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
+      const cite = paper.citations ? paper.citations + ' citations' : '';
+      return `<a class="article-card" href="#" data-story-id="${storyId}">
+        <div class="article-card-visual" style="background:#f4f0ff"></div>
+        <div class="article-card-title">${paper.title || ''}</div>
+        <div class="article-card-meta">${meta}${cite ? ' · ' + cite : ''}</div>
+      </a>`;
+    }
+
+    function renderResearchRow(paper) {
+      const url = paper.url || paper.original_url || '#';
+      const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
+      const cite = paper.citations ? `<span class="research-cite-badge">${paper.citations} citations</span>` : '';
+      const abstract = shortText(paper.summary || paper.meta || '', 180);
+      return `<a class="research-row" href="${url}" target="_blank" rel="noopener">
+        <div class="research-row-body">
+          <div class="research-row-title">${paper.title || ''}</div>
+          <div class="research-row-meta">${meta}</div>
+          ${abstract ? '<div class="research-row-abstract">' + abstract + '</div>' : ''}
+        </div>
+        ${cite}
+      </a>`;
+    }
+
+    function populateResearch(data) {
+      const rp = data.research_papers || {};
+      const featured = Array.isArray(rp.featured) ? rp.featured : [];
+      // Featured cards in grid (top 3 only on homepage)
+      const grid = $('research-featured-grid');
+      if (grid) {
+        const label = grid.querySelector('.section-label-card');
+        grid.innerHTML = '';
+        if (label) grid.appendChild(label);
+        featured.forEach(p => grid.insertAdjacentHTML('beforeend', renderResearchCard(p)));
+      }
+      // Show/hide section
+      const section = $('research');
+      if (section) {
+        section.style.display = featured.length ? '' : 'none';
+      }
+    }
+
+    /* ========================================================
        DATA LOADING
     ======================================================== */
     const CACHE_KEY = 'newsday_feed_cache';
@@ -1933,6 +2052,7 @@
         const breaking = Array.isArray(payload.breaking) ? payload.breaking : [];
         const department = Array.isArray(payload.department) ? payload.department : [];
         const trending = Array.isArray(payload.trending) ? payload.trending : [];
+        const research_papers = payload.research_papers || { featured: [], papers: [] };
 
         if (!breaking.length && !department.length && !trending.length) {
           // Backend is live but no content for this department — show empty state, not CS demo data
@@ -1953,6 +2073,7 @@
             department: [toSectionCard(emptyCard, DEPT_LABELS[dept])],
             insights: [],
             stories: [],
+            research_papers: research_papers,
           };
         }
 
@@ -1962,6 +2083,7 @@
           department: department.map(item => toSectionCard(normalizeBackendItem(item), deptLabel)),
           insights: trending.map(item => toSectionCard(normalizeBackendItem(item), 'TREND')),
           stories: [],
+          research_papers: research_papers,
         };
       } catch {
         return null;
@@ -2194,6 +2316,7 @@
       const emptyCard = { title: 'More ' + (DEPT_NAMES[getSelectedDept()] || '') + ' news coming soon', meta: 'Sources are being collected for this department.', source: deptLabel, url: '#', category: deptLabel };
       populateSection('department-grid', data.department.length ? data.department : (backendIsLive ? [emptyCard] : DEMO.department));
       populateSection('insights-grid',   data.insights.length   ? data.insights   : (backendIsLive ? [emptyCard] : DEMO.insights));
+      populateResearch(data);
       populateSection('stories-grid',    data.stories.length    ? data.stories    : (backendIsLive ? [emptyCard] : DEMO.stories));
     }
 

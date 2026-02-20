@@ -32,13 +32,17 @@ class RSSFeedScraper(BaseScraper):
         super().__init__("RSS Feed", "rss")
 
     def _parse_date(self, date_str: str) -> Optional[datetime]:
-        """Try common RSS/Atom date formats."""
+        """Try common RSS/Atom date formats (incl. IST/Indian feeds)."""
         if not date_str:
             return None
         date_str = date_str.strip()
+        # Normalize "GMT" / "IST" to offset for strptime
+        date_str = date_str.replace(" GMT", " +0000").replace(" IST", " +0530")
         formats = [
             "%a, %d %b %Y %H:%M:%S %z",
             "%a, %d %b %Y %H:%M:%S %Z",
+            "%d %b %Y %H:%M:%S %z",
+            "%Y-%m-%dT%H:%M:%S.%f%z",
             "%Y-%m-%dT%H:%M:%S%z",
             "%Y-%m-%dT%H:%M:%SZ",
             "%Y-%m-%d %H:%M:%S",
@@ -51,7 +55,7 @@ class RSSFeedScraper(BaseScraper):
                 continue
         return None
 
-    def _extract_text(self, html: str, max_length: int = 500) -> str:
+    def _extract_text(self, html: str, max_length: int = 800) -> str:
         """Strip HTML tags and return plain text."""
         if not html:
             return ""

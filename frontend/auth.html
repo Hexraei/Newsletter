@@ -328,6 +328,26 @@
       color: var(--ink-900);
     }
 
+    /* Select field — floating label stays up when value is selected */
+    select.input-field:valid + .input-label,
+    select.input-field:focus + .input-label {
+      top: 8px;
+      height: 16px;
+      font-size: var(--text-xs);
+      color: var(--ink-600);
+    }
+    select.input-field:focus + .input-label {
+      color: var(--ink-900);
+    }
+    select.input-field {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23888'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+    }
+
     /* Password toggle */
     .pw-toggle {
       position: absolute;
@@ -849,6 +869,24 @@
               <span class="input-error" id="register-confirm-error">Passwords do not match</span>
             </div>
 
+            <div class="input-group" id="register-dept-group">
+              <select class="input-field" id="register-dept" name="department" required style="cursor:pointer">
+                <option value="" disabled selected hidden></option>
+                <option value="CSE">Computer Science & Engineering</option>
+                <option value="IT">Information Technology</option>
+                <option value="AIDS">AI & Data Science</option>
+                <option value="ECE">Electronics & Communication</option>
+                <option value="EEE">Electrical & Electronics</option>
+                <option value="ME">Mechanical Engineering</option>
+                <option value="CE">Civil Engineering</option>
+                <option value="BT">Biotechnology</option>
+                <option value="CH">Chemical Engineering</option>
+                <option value="AE">Aeronautical / Aerospace</option>
+              </select>
+              <label class="input-label" for="register-dept">Department</label>
+              <span class="input-error" id="register-dept-error">Please select your department</span>
+            </div>
+
             <button type="submit" class="submit-btn" id="btn-register">
               <span class="btn-text">Create account</span>
               <span class="spinner"></span>
@@ -1095,6 +1133,7 @@
       const email = $('register-email').value.trim();
       const password = $('register-password').value;
       const confirm = $('register-confirm').value;
+      const dept = $('register-dept').value;
       let hasError = false;
 
       if (!name) {
@@ -1117,6 +1156,11 @@
         hasError = true;
       }
 
+      if (!dept) {
+        showFieldError('register-dept', true);
+        hasError = true;
+      }
+
       if (hasError) return;
 
       const btn = $('btn-register');
@@ -1126,8 +1170,11 @@
         const data = await supabasePost('/signup', {
           email,
           password,
-          data: { full_name: name },
+          data: { full_name: name, department: dept },
         });
+
+        // Save department preference to localStorage
+        if (dept) localStorage.setItem('newsday_dept', dept);
 
         if (data.access_token) {
           saveSession(data);

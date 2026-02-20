@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Department News — NEWS DAY</title>
+  <title>Research Papers — NEWS DAY</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
@@ -23,7 +23,7 @@
       --gray-900: #1a1918;
       --card-bg: #e8e5e0;
       --page-margin: 33px;
-      --accent: #1a6b3c;
+      --accent: #1a3d6b;
     }
 
     html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
@@ -383,7 +383,7 @@
     .feed-item.loading .feed-item-title { width: 80%; height: 18px; }
     .feed-item.loading .feed-item-meta { width: 50%; }
 
-    /* ===== STORY MODAL (copied from index) ===== */
+    /* ===== STORY MODAL ===== */
     .story-modal {
       position: fixed;
       inset: 0;
@@ -596,9 +596,9 @@
           <div class="dept-dropdown-item" data-key="AE"><span class="dept-abbr">AE</span> Aeronautical / Aerospace</div>
         </div>
       </div>
-      <a href="department.html" class="active">Department news</a>
+      <a href="department.html">Department news</a>
       <a href="insights.html">Industrial insights</a>
-      <a href="research.html">Research Papers</a>
+      <a href="research.html" class="active">Research Papers</a>
       <a href="stories.html">Student Stories</a>
       <a href="auth.html">Log In</a>
     </div>
@@ -607,8 +607,8 @@
   <!-- PAGE HEADER -->
   <div class="page-header">
     <div class="page-header-left">
-      <h1 id="dept-page-title">Department News</h1>
-      <p id="dept-page-desc">Core updates for your department.</p>
+      <h1>Research Papers</h1>
+      <p>Recently published and groundbreaking research relevant to your department — curated for students and early-career professionals.</p>
     </div>
     <a class="see-more-btn" href="index.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
@@ -621,7 +621,6 @@
 
     <!-- LEFT: Article Feed -->
     <div class="article-feed" id="article-feed">
-      <!-- Shimmer loading placeholders -->
       <div class="feed-item loading">
         <div class="feed-item-thumb shimmer"></div>
         <div class="feed-item-body">
@@ -656,7 +655,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input type="text" id="search-input" placeholder="Search department news...">
+        <input type="text" id="search-input" placeholder="Search research papers...">
         <div class="search-results-count" id="search-count"></div>
       </div>
 
@@ -665,18 +664,19 @@
         <div class="sidebar-section-title">Topics</div>
         <div class="tag-cloud" id="tag-cloud">
           <button class="tag-pill active" data-tag="all">All</button>
-          <button class="tag-pill" data-tag="ai">AI</button>
-          <button class="tag-pill" data-tag="security">Security</button>
-          <button class="tag-pill" data-tag="web">Web Dev</button>
-          <button class="tag-pill" data-tag="devops">DevOps</button>
-          <button class="tag-pill" data-tag="open-source">Open Source</button>
-          <button class="tag-pill" data-tag="career">Career</button>
+          <button class="tag-pill" data-tag="ai-ml">AI & ML</button>
+          <button class="tag-pill" data-tag="systems">Systems</button>
+          <button class="tag-pill" data-tag="materials">Materials</button>
+          <button class="tag-pill" data-tag="biomedical">Biomedical</button>
+          <button class="tag-pill" data-tag="energy">Energy</button>
+          <button class="tag-pill" data-tag="algorithms">Algorithms</button>
+          <button class="tag-pill" data-tag="robotics">Robotics</button>
         </div>
       </div>
 
       <!-- Related / Recommended News -->
       <div class="sidebar-section">
-        <div class="sidebar-section-title">Recommended</div>
+        <div class="sidebar-section-title">Related News</div>
         <div id="sidebar-recommended">
           <!-- populated by JS -->
         </div>
@@ -684,7 +684,7 @@
 
       <!-- Trending -->
       <div class="sidebar-section">
-        <div class="sidebar-section-title">Trending Now</div>
+        <div class="sidebar-section-title">Breaking Now</div>
         <div id="sidebar-trending">
           <!-- populated by JS -->
         </div>
@@ -710,11 +710,11 @@
     <div>
       <div class="footer-col-title">Sources</div>
       <ul class="footer-links">
-        <li><a href="https://news.ycombinator.com" target="_blank">Hacker News</a></li>
-        <li><a href="https://reddit.com/r/technology" target="_blank">Reddit</a></li>
-        <li><a href="https://github.com/trending" target="_blank">GitHub</a></li>
-        <li><a href="https://medium.com" target="_blank">Medium</a></li>
-        <li><a href="https://producthunt.com" target="_blank">Product Hunt</a></li>
+        <li><a href="https://scholar.google.com" target="_blank">Google Scholar</a></li>
+        <li><a href="https://arxiv.org" target="_blank">arXiv</a></li>
+        <li><a href="https://www.semanticscholar.org" target="_blank">Semantic Scholar</a></li>
+        <li><a href="https://pubmed.ncbi.nlm.nih.gov" target="_blank">PubMed</a></li>
+        <li><a href="https://openalex.org" target="_blank">OpenAlex</a></li>
       </ul>
     </div>
     <div>
@@ -775,68 +775,15 @@
     ================================================================ */
     const API = window.location.origin;
 
-    /* Department selector helpers */
-    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};
-    const DEPT_DESCRIPTIONS = {
-      CSE: 'Core updates for computer science students: AI, systems, software engineering, security, and open-source tools.',
-      IT: 'IT infrastructure, cloud computing, networking, cybersecurity, and DevOps updates.',
-      AIDS: 'Machine learning, deep learning, NLP, computer vision, and data analytics news.',
-      ECE: 'Embedded systems, VLSI, signal processing, IoT, and telecommunications updates.',
-      EEE: 'Power systems, renewable energy, control systems, and electrical machines news.',
-      ME: 'Thermodynamics, manufacturing, CAD/CAM, robotics, and automotive engineering updates.',
-      CE: 'Structural, geotechnical, transportation, environmental, and construction news.',
-      BT: 'Genetic engineering, bioinformatics, pharmaceuticals, and molecular biology updates.',
-      CH: 'Process engineering, petrochemicals, polymers, and industrial chemistry news.',
-      AE: 'Aerodynamics, propulsion, avionics, space systems, and flight mechanics updates.',
-    };
-    const DEPT_NAMES = {
-      CSE:'Computer Science & Engineering', IT:'Information Technology',
-      AIDS:'Artificial Intelligence & Data Science', ECE:'Electronics & Communication',
-      EEE:'Electrical & Electronics', ME:'Mechanical Engineering',
-      CE:'Civil Engineering', BT:'Biotechnology', CH:'Chemical Engineering',
-      AE:'Aeronautical / Aerospace Engineering'
-    };
-    function getSelectedDept() { return localStorage.getItem('newsday_dept') || 'CSE'; }
-    function setSelectedDept(key) { localStorage.setItem('newsday_dept', key); }
-    function initDeptSelector() {
-      const btn = document.getElementById('dept-btn');
-      const dropdown = document.getElementById('dept-dropdown');
-      if (!btn || !dropdown) return;
-      const current = getSelectedDept();
-      btn.textContent = DEPT_LABELS[current] || current;
-
-      // Update page title and description
-      const pageTitle = document.getElementById('dept-page-title');
-      const pageDesc = document.getElementById('dept-page-desc');
-      if (pageTitle) pageTitle.textContent = (DEPT_NAMES[current] || current) + ' News';
-      if (pageDesc) pageDesc.textContent = DEPT_DESCRIPTIONS[current] || '';
-
-      btn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
-      dropdown.querySelectorAll('.dept-dropdown-item').forEach(item => {
-        if (item.dataset.key === current) item.classList.add('active');
-        else item.classList.remove('active');
-        item.addEventListener('click', () => {
-          const key = item.dataset.key;
-          setSelectedDept(key);
-          btn.textContent = DEPT_LABELS[key] || key;
-          dropdown.querySelectorAll('.dept-dropdown-item').forEach(i => i.classList.remove('active'));
-          item.classList.add('active');
-          dropdown.classList.remove('open');
-          location.reload();
-        });
-      });
-      document.addEventListener('click', () => dropdown.classList.remove('open'));
-    }
-
-    const PAGE_SECTION = 'department'; // which section this page is for
+    const PAGE_SECTION = 'research';
 
     /* ================================================================
        STATE
     ================================================================ */
-    let allFeedItems = [];       // all department items from backend
-    let relatedItems = [];       // cross-section items for sidebar
-    let trendingItems = [];      // trending items for sidebar
-    let filteredItems = [];      // currently visible (after search/filter)
+    let allFeedItems = [];
+    let relatedItems = [];
+    let breakingItems = [];
+    let filteredItems = [];
     let activeTag = 'all';
     let searchQuery = '';
     let storySeq = 0;
@@ -857,7 +804,6 @@
     const $sidebarRecommended = $('sidebar-recommended');
     const $sidebarTrending = $('sidebar-trending');
 
-    // Modal refs
     const $storyModal = $('story-modal');
     const $storyModalTitle = $('story-modal-title');
     const $storyModalMeta = $('story-modal-meta');
@@ -871,7 +817,7 @@
     const $storyModalClose = $('story-modal-close');
 
     /* ================================================================
-       UTILS (shared with index.html)
+       UTILS
     ================================================================ */
     function fetchWithTimeout(url, options = {}, timeout = 8000) {
       const controller = new AbortController();
@@ -986,15 +932,16 @@
     }
 
     /* ================================================================
-       CATEGORY INFERENCE
+       CATEGORY INFERENCE (Industry-focused)
     ================================================================ */
     const TAG_KEYWORDS = {
-      ai: ['ai', 'artificial intelligence', 'machine learning', 'llm', 'neural', 'gpt', 'openai', 'anthropic', 'model', 'deep learning'],
-      security: ['security', 'breach', 'hack', 'attack', 'privacy', 'zero-day', 'vulnerability', 'cyber', 'encryption'],
-      web: ['web', 'javascript', 'typescript', 'react', 'frontend', 'html', 'css', 'browser', 'webassembly', 'nextjs'],
-      devops: ['devops', 'kubernetes', 'docker', 'cloud', 'aws', 'deploy', 'infrastructure', 'ci/cd', 'terraform'],
-      'open-source': ['open source', 'open-source', 'github', 'oss', 'repository', 'fork', 'contributor', 'linux'],
-      career: ['career', 'hiring', 'interview', 'salary', 'intern', 'job', 'remote', 'layoff', 'leetcode']
+      'ai-ml': ['ai', 'artificial intelligence', 'machine learning', 'deep learning', 'neural', 'llm', 'transformer', 'attention', 'classification', 'reinforcement learning', 'natural language', 'computer vision', 'generative'],
+      systems: ['distributed', 'cloud', 'network', 'operating system', 'database', 'microservice', 'container', 'parallel', 'compiler', 'embedded', 'iot', 'edge computing', 'server', 'virtualization'],
+      materials: ['material', 'composite', 'polymer', 'alloy', 'concrete', 'steel', 'ceramic', 'nanoparticle', 'thin film', 'crystal', 'corrosion', 'coating', 'biomaterial'],
+      biomedical: ['biomedical', 'drug', 'genomic', 'protein', 'crispr', 'clinical', 'medical', 'cell', 'tissue', 'pharmaceutical', 'gene', 'pathogen', 'diagnostic', 'therapy'],
+      energy: ['energy', 'solar', 'battery', 'fuel cell', 'wind', 'renewable', 'photovoltaic', 'hydrogen', 'supercapacitor', 'thermal', 'power grid', 'smart grid', 'nuclear'],
+      algorithms: ['algorithm', 'optimization', 'complexity', 'graph', 'scheduling', 'heuristic', 'cryptograph', 'security', 'encryption', 'protocol', 'data structure'],
+      robotics: ['robot', 'autonomous', 'uav', 'drone', 'control system', 'actuator', 'sensor', 'lidar', 'slam', 'kinematics', 'manipulator', 'aerospace', 'aerodynamic']
     };
 
     function inferTags(item) {
@@ -1014,7 +961,7 @@
     }
 
     /* ================================================================
-       STORY MODAL (reused from index)
+       STORY MODAL
     ================================================================ */
     function registerStory(item) {
       storySeq += 1;
@@ -1022,7 +969,7 @@
       const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
         title: item.title || '',
-        source: item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk'),
+        source: item.source || 'CS Desk',
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
@@ -1033,20 +980,20 @@
 
     function defaultWhyImportant(item) {
       const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|breach|attack|privacy|zero-day/.test(text))
-        return 'Security and privacy changes can directly affect your projects, data, and internship work.';
-      if (/market|industry|funding|policy|regulation|ban|lawsuit/.test(text))
-        return 'Industry and policy shifts influence hiring trends, salaries, and the tools companies adopt.';
-      return 'This topic reflects a shift in the technical landscape that CS students should actively track.';
+      if (/security|privacy|vulnerability|attack/.test(text))
+        return 'Understanding security research helps students build more robust and trustworthy systems.';
+      if (/machine learning|deep learning|neural|llm|transformer/.test(text))
+        return 'Staying current with ML research is critical for students entering AI/ML careers.';
+      return 'This research reflects an active area of investigation that students should be aware of for coursework and career preparation.';
     }
 
     function defaultImpact(item) {
       const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|breach|attack|privacy|zero-day/.test(text))
-        return 'For students: prioritize secure coding, dependency hygiene, and threat-aware design in coursework and projects.';
-      if (/ai|machine learning|llm|neural/.test(text))
-        return 'For students: hands-on AI literacy and practical model tooling are becoming important for internships and interviews.';
-      return 'For students: align projects and learning plans with this signal to stay relevant and market-ready.';
+      if (/machine learning|deep learning|neural|llm/.test(text))
+        return 'For students: study the methodology and consider replicating key experiments in your projects.';
+      if (/material|composite|alloy|polymer/.test(text))
+        return 'For students: explore how these findings connect to industry applications and potential thesis topics.';
+      return 'For students: read the abstract and methodology to understand the research approach and identify potential project ideas.';
     }
 
     function titleAnchoredQuick(item) {
@@ -1169,12 +1116,11 @@
         return result;
       }
       const text = item.content || item.summary || item.title || '';
-      const category = /market|policy|industry|regulation/i.test(item.category || item.title || text) ? 'industrial-insight' : 'computer-science';
       try {
         const res = await fetchWithTimeout(API + '/api/v1/ai/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: item.title || '', content: text, category }),
+          body: JSON.stringify({ title: item.title || '', content: text, category: 'industrial-insight' }),
         }, 10000);
         if (!res.ok) throw new Error('AI fail');
         const payload = await res.json();
@@ -1196,7 +1142,7 @@
     async function openStoryModal(item) {
       if (!item) return;
       $storyModalTitle.textContent = item.title || 'Story';
-      $storyModalMeta.textContent = `${(item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk')).toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+      $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
       $storyQuickSummary.textContent = 'Preparing summary...';
       $storyWhyImportant.textContent = 'Preparing context...';
       $storyImpact.textContent = 'Preparing student impact...';
@@ -1225,7 +1171,6 @@
       $storyToggleArticle.setAttribute('aria-expanded', 'false');
     }
 
-    // Modal events
     $storyModalClose.addEventListener('click', closeStoryModal);
     $storyToggleArticle.addEventListener('click', () => {
       const opening = $storyFullArticleBlock.hidden;
@@ -1245,15 +1190,17 @@
       const storyId = registerStory(item);
       const category = formatCategory(item);
       const ago = timeAgo(item.published_at);
-      const meta = stripSourcePrefix(shortText(item.summary || item.content || item.meta || '', 140));
-      const source = item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk');
+      const source = item.venue || item.source || 'Research';
+      const metaLine = item.meta_line || source;
+      const abstract = shortText(item.summary || '', 160);
 
-      return `<a class="feed-item" href="#" data-story-id="${storyId}">
-        <div class="feed-item-thumb"></div>
+      return `<a class="feed-item" href="${item.url || '#'}" ${item.url && item.url !== '#' ? 'target="_blank" rel="noopener"' : ''} data-story-id="${storyId}">
+        <div class="feed-item-thumb" style="background:#f4f0ff"></div>
         <div class="feed-item-body">
           <div class="feed-item-category">${category}</div>
           <div class="feed-item-title">${item.title || ''}</div>
-          <div class="feed-item-meta">${source}${ago ? ' <span>-</span> ' + ago : ''}</div>
+          <div class="feed-item-meta">${metaLine}${ago ? ' <span>-</span> ' + ago : ''}</div>
+          ${abstract ? '<div class="feed-item-meta" style="margin-top:4px;color:#555">' + abstract + '</div>' : ''}
         </div>
       </a>`;
     }
@@ -1283,7 +1230,7 @@
           <div class="sidebar-item-body">
             <div class="sidebar-item-cat">${cat}</div>
             <div class="sidebar-item-title">${item.title || ''}</div>
-            <div class="sidebar-item-meta">${item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk')}${ago ? ' - ' + ago : ''}</div>
+            <div class="sidebar-item-meta">${item.source || 'CS Desk'}${ago ? ' - ' + ago : ''}</div>
           </div>
         </a>`;
       }).join('');
@@ -1295,12 +1242,10 @@
     function applyFilters() {
       const query = searchQuery.toLowerCase().trim();
       filteredItems = allFeedItems.filter(item => {
-        // Tag filter
         if (activeTag !== 'all') {
           const tags = inferTags(item);
           if (!tags.includes(activeTag)) return false;
         }
-        // Search filter
         if (query) {
           const haystack = normalizeText([item.title, item.summary, item.content, item.category, item.source].filter(Boolean).join(' '));
           if (!haystack.includes(query)) return false;
@@ -1310,7 +1255,6 @@
 
       renderFeed(filteredItems);
 
-      // Update search count
       if (query || activeTag !== 'all') {
         $searchCount.textContent = `${filteredItems.length} result${filteredItems.length !== 1 ? 's' : ''} found`;
         $searchCount.classList.add('visible');
@@ -1319,7 +1263,6 @@
       }
     }
 
-    // Search input debounce
     let searchTimer = null;
     $searchInput.addEventListener('input', e => {
       clearTimeout(searchTimer);
@@ -1329,7 +1272,6 @@
       }, 250);
     });
 
-    // Tag cloud clicks
     $tagCloud.addEventListener('click', e => {
       const pill = e.target.closest('.tag-pill');
       if (!pill) return;
@@ -1338,7 +1280,6 @@
       applyFilters();
     });
 
-    // Feed item clicks -> modal
     document.addEventListener('click', e => {
       if (!(e.target instanceof Element)) return;
       const item = e.target.closest('[data-story-id]');
@@ -1349,25 +1290,17 @@
     });
 
     /* ================================================================
-       DEMO DATA (fallback)
+       DEMO DATA
     ================================================================ */
-    const DEMO_DEPARTMENT = [
-      { title: 'Running My Own XMPP Server with Prosody and STUN/TURN', source: 'Hacker News', summary: 'A deep dive into self-hosting communication infrastructure for learning.', url: '#', category: 'infra', published_at: new Date(Date.now() - 6*36e5).toISOString() },
-      { title: 'Show HN: Open-source tool for real-time database replication', source: 'Hacker News', summary: 'New OSS project for syncing PostgreSQL across distributed systems.', url: '#', category: 'tools', published_at: new Date(Date.now() - 8*36e5).toISOString() },
-      { title: 'The State of WebAssembly in 2026: What Changed', source: 'Medium', summary: 'WebAssembly adoption across browsers and server-side runtimes.', url: '#', category: 'web', published_at: new Date(Date.now() - 11*36e5).toISOString() },
-      { title: 'After all the hype, some AI experts think LLMs have plateaued', source: 'Reddit', summary: 'Industry experts debate whether large language models have hit diminishing returns.', url: '#', category: 'ai', published_at: new Date(Date.now() - 12*36e5).toISOString() },
-      { title: 'Zero-day vulnerability found in popular npm package', source: 'GitHub', summary: 'Critical security flaw affects thousands of Node.js projects.', url: '#', category: 'security', published_at: new Date(Date.now() - 14*36e5).toISOString() },
-      { title: 'Kubernetes 1.33 released with major networking changes', source: 'Hacker News', summary: 'New release simplifies service mesh configuration and improves pod scheduling.', url: '#', category: 'devops', published_at: new Date(Date.now() - 18*36e5).toISOString() },
-      { title: 'How one student landed a FAANG internship with open-source contributions', source: 'Medium', summary: 'A practical guide to building your resume through OSS work.', url: '#', category: 'career', published_at: new Date(Date.now() - 24*36e5).toISOString() },
-      { title: 'Rust vs Go in 2026: Which should CS students learn?', source: 'Reddit', summary: 'Community debate on systems programming language choices for new grads.', url: '#', category: 'general', published_at: new Date(Date.now() - 30*36e5).toISOString() },
+    const DEMO_INSIGHTS = [
+      { title: 'Attention Is All You Need: Revisited With Efficient Sparse Architectures', source: 'arXiv', summary: 'Sparse attention mechanisms reduce compute costs by 60% while maintaining accuracy across NLP benchmarks.', url: '#', category: 'ai-ml', published_at: new Date(Date.now() - 5*36e5).toISOString() },
+      { title: 'A Survey on Large Language Models for Code Generation', source: 'Semantic Scholar', summary: 'Comprehensive review of LLM-based code generation covering 120+ models from 2023-2026.', url: '#', category: 'ai-ml', published_at: new Date(Date.now() - 10*36e5).toISOString() },
+      { title: 'Novel CRISPR-Cas13 System for Rapid Pathogen Detection', source: 'PubMed', summary: 'Point-of-care diagnostics achieving 98% sensitivity for multiple respiratory pathogens.', url: '#', category: 'biomedical', published_at: new Date(Date.now() - 15*36e5).toISOString() },
     ];
 
-    const DEMO_TRENDING = [
-      { title: 'A Stock Market Doom Loop Is Hitting Everything That Isn\'t AI', source: 'Reddit', summary: 'Finance sector turbulence affecting tech company valuations.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
-      { title: 'PS6 Could Be Delayed While Switch 2 Might Launch Early', source: 'Reddit', summary: 'Console wars heating up in the gaming industry.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 7*36e5).toISOString() },
-      { title: 'Japan Creates World\'s First Zero-Emission Hydrogen Engine', source: 'Reddit', summary: 'Breakthrough in green energy technology.', url: '#', category: 'science', published_at: new Date(Date.now() - 9*36e5).toISOString() },
-      { title: 'Hard Drives Already Sold Out for the Entire Year Due to AI', source: 'Reddit', summary: 'AI demand creating supply chain shortages.', url: '#', category: 'supply', published_at: new Date(Date.now() - 13*36e5).toISOString() },
-      { title: 'California\'s Billionaires Pour Cash Into Local Elections', source: 'Reddit', summary: 'Tech wealth influencing civic processes.', url: '#', category: 'civic', published_at: new Date(Date.now() - 16*36e5).toISOString() },
+    const DEMO_DEPARTMENT = [
+      { title: 'Federated Learning at Scale: Privacy-Preserving ML on Mobile Devices', source: 'OpenAlex', summary: 'Practical federated learning across 10M+ devices with differential privacy guarantees.', url: '#', category: 'ai-ml', published_at: new Date(Date.now() - 8*36e5).toISOString() },
+      { title: 'High-Entropy Alloys for Next-Generation Structural Materials', source: 'Crossref', summary: 'Multi-principal element alloys showing superior strength and corrosion resistance.', url: '#', category: 'materials', published_at: new Date(Date.now() - 12*36e5).toISOString() },
     ];
 
     /* ================================================================
@@ -1376,18 +1309,24 @@
     function normalizeBackendItem(item) {
       const blocks = item.content_blocks || {};
       const summary = item.summary || blocks.why_it_matters || blocks.hook || '';
+      const authors = item.authors || '';
+      const venue = item.venue || '';
+      const citations = item.citations || 0;
+      const metaParts = [authors, venue].filter(Boolean);
+      if (citations) metaParts.push(citations + ' citations');
       return {
         title: item.title || '',
         url: item.original_url || item.url || '#',
-        source: item.source || item.source_name || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk'),
+        source: venue || item.source || 'Research',
         summary,
         content: summary || item.title || '',
         category: item.category || '',
         published_at: item.published_at || null,
-        is_breaking: Boolean(item.is_breaking),
-        final_score: Number(item.final_score || 0),
-        engagement_score: Number(item.engagement_score || 0),
-        recency_score: Number(item.recency_score || 0),
+        is_breaking: false,
+        authors,
+        venue,
+        citations,
+        meta_line: metaParts.join(' · '),
       };
     }
 
@@ -1401,58 +1340,49 @@
 
       if (backendOk) {
         try {
-          // Load department items (up to 30)
           const dept = getSelectedDept();
-          const [deptRes, trendRes] = await Promise.allSettled([
-            fetchWithTimeout(API + '/api/v1/feed/department?limit=30&department=' + encodeURIComponent(dept), {}, 6000),
-            fetchWithTimeout(API + '/api/v1/feed/trending?limit=10&department=' + encodeURIComponent(dept), {}, 6000),
-          ]);
+          const allRes = await fetchWithTimeout(
+            API + '/api/v1/feed/all-sections?department=' + encodeURIComponent(dept),
+            {}, 6000
+          );
+          if (allRes.ok) {
+            const data = await allRes.json();
+            const payload = data.data || {};
+            const rp = payload.research_papers || {};
+            const featured = Array.isArray(rp.featured) ? rp.featured : [];
+            const papers = Array.isArray(rp.papers) ? rp.papers : [];
+            const combined = [...featured, ...papers].map(normalizeBackendItem);
+            if (combined.length) allFeedItems = combined;
 
-          if (deptRes.status === 'fulfilled' && deptRes.value.ok) {
-            const deptData = await deptRes.value.json();
-            const items = (deptData.data?.items || []).map(normalizeBackendItem);
-            if (items.length) allFeedItems = items;
+            // Use breaking/trending for sidebar
+            const breaking = Array.isArray(payload.breaking) ? payload.breaking : [];
+            const dept_items = Array.isArray(payload.department) ? payload.department : [];
+            if (breaking.length) breakingItems = breaking.map(normalizeBackendItem);
+            if (dept_items.length) relatedItems = dept_items.map(normalizeBackendItem);
           }
-
-          if (trendRes.status === 'fulfilled' && trendRes.value.ok) {
-            const trendData = await trendRes.value.json();
-            const items = (trendData.data?.items || []).map(normalizeBackendItem);
-            if (items.length) trendingItems = items;
-          }
-
-          // Also load student stories for "recommended" sidebar
-          try {
-            const storiesRes = await fetchWithTimeout(API + '/api/v1/feed/student-stories?limit=5', {}, 6000);
-            if (storiesRes.ok) {
-              const storiesData = await storiesRes.json();
-              const items = (storiesData.data?.items || []).map(normalizeBackendItem);
-              if (items.length) relatedItems = items;
-            }
-          } catch {}
         } catch {}
       }
 
-      // Fallback to demo data
-      if (!allFeedItems.length) allFeedItems = DEMO_DEPARTMENT;
-      if (!trendingItems.length) trendingItems = DEMO_TRENDING;
-      if (!relatedItems.length) relatedItems = trendingItems.slice(0, 5);
+      // Fallback
+      if (!allFeedItems.length) allFeedItems = DEMO_INSIGHTS;
+      if (!relatedItems.length) relatedItems = DEMO_DEPARTMENT;
+      if (!breakingItems.length) breakingItems = allFeedItems.slice(0, 5);
     }
 
     /* ================================================================
        INIT
     ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
-      initDeptSelector();
       loadPersistedStoryCache();
       await loadData();
 
       filteredItems = allFeedItems;
       renderFeed(filteredItems);
       renderSidebarItems($sidebarRecommended, relatedItems, 5);
-      renderSidebarItems($sidebarTrending, trendingItems, 5);
+      renderSidebarItems($sidebarTrending, breakingItems, 5);
 
-      // Pre-warm AI insights for visible items
-      const warmPool = [...allFeedItems.slice(0, 5), ...relatedItems.slice(0, 3), ...trendingItems.slice(0, 3)];
+      // Pre-warm AI insights
+      const warmPool = [...allFeedItems.slice(0, 5), ...relatedItems.slice(0, 3), ...breakingItems.slice(0, 3)];
       const seen = new Set();
       const uniqueWarm = warmPool.filter(item => {
         const key = `${item.title}|${item.url}`.toLowerCase();
@@ -1462,6 +1392,27 @@
       });
       Promise.allSettled(uniqueWarm.map(item => getStoryInsights(item)));
     });
+
+    // Department selector
+    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};
+    function getSelectedDept() { return localStorage.getItem('newsday_dept') || 'CSE'; }
+    function setSelectedDept(key) { localStorage.setItem('newsday_dept', key); }
+    (function initDeptSelector() {
+      const btn = document.getElementById('dept-btn');
+      const dropdown = document.getElementById('dept-dropdown');
+      if (!btn || !dropdown) return;
+      btn.textContent = DEPT_LABELS[getSelectedDept()] || getSelectedDept();
+      btn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+      dropdown.querySelectorAll('.dept-dropdown-item').forEach(item => {
+        if (item.dataset.key === getSelectedDept()) item.classList.add('active');
+        else item.classList.remove('active');
+        item.addEventListener('click', () => {
+          setSelectedDept(item.dataset.key);
+          location.reload();
+        });
+      });
+      document.addEventListener('click', () => dropdown.classList.remove('open'));
+    })();
   </script>
 </body>
 </html>
