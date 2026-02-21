@@ -34,6 +34,9 @@ click-plugins==1.1.1
 click-repl==0.3.0
 prompt-toolkit==3.0.43
 
+# Rate Limiting
+slowapi==0.1.9
+
 # Utilities
 python-dateutil==2.8.2
 httpx==0.26.0
