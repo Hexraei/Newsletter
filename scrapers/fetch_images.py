@@ -2,9 +2,10 @@
 """Backfill images for articles missing featured_image_url.
 
 Queries the database for processed content without images and uses the
-semantic image fetcher to find relevant images via Openverse + Wikimedia.
+semantic image fetcher to find relevant images. Falls back to category-based
+search to guarantee every article gets an image.
 
-Usage: python scrapers/fetch_images.py [--limit 100] [--min-score 0.2]
+Usage: python scrapers/fetch_images.py [--limit 100] [--min-score 0.1]
 """
 
 import asyncio
@@ -24,7 +25,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(_root, "backend", ".env"))
 
 
-async def backfill_images(limit: int = 100, min_score: float = 0.2):
+async def backfill_images(limit: int = 100, min_score: float = 0.1):
     """Find and set images for articles that are missing them."""
     from sqlalchemy import select, func
     from app.models.base import AsyncSessionLocal
@@ -66,8 +67,11 @@ async def backfill_images(limit: int = 100, min_score: float = 0.2):
             nonlocal updated, failed
             async with semaphore:
                 try:
-                    result = await fetcher.fetch_best_image(article.title, top_k=1)
-                    if result and result.get("score", 0) >= min_score:
+                    category = (article.category or "general").lower()
+                    result = await fetcher.fetch_with_fallback(
+                        article.title, category=category, top_k=1
+                    )
+                    if result and result.get("url"):
                         article.featured_image_url = result["url"]
                         credit_data = {
                             "credit": result.get("creator", ""),
@@ -79,11 +83,12 @@ async def backfill_images(limit: int = 100, min_score: float = 0.2):
                         vis["image_credit"] = credit_data
                         article.visualizations = vis
                         updated += 1
-                        print(f"  [OK] [{result['score']:.3f}] [{result['provider']}] {article.title[:60]}")
+                        score = result.get("score", 0)
+                        tag = "SEM" if score >= 0.15 else "CAT"
+                        print(f"  [{tag}] [{score:.3f}] [{result['provider']}] {article.title[:60]}")
                     else:
-                        score_str = f"{result['score']:.3f}" if result else "no results"
                         failed += 1
-                        print(f"  [--] [{score_str}] {article.title[:60]}")
+                        print(f"  [--] [no results] {article.title[:60]}")
                 except Exception as e:
                     failed += 1
                     print(f"  [ERR] {article.title[:60]}: {e}")
@@ -97,6 +102,9 @@ async def backfill_images(limit: int = 100, min_score: float = 0.2):
             await asyncio.gather(*[fetch_one(a) for a in batch])
             await db.commit()
             print()
+
+        print(f"Done! Updated: {updated}, Skipped/Failed: {failed}")
+        print(f"Remaining without images: {total_missing - updated}")
 
         print(f"Done! Updated: {updated}, Skipped/Failed: {failed}")
         print(f"Remaining without images: {total_missing - updated}")

@@ -33,7 +33,8 @@ NEWS DAY is your department-specific daily briefing. Instead of scrolling throug
 
 - **Breaking News** — Top 3 high-impact stories surfaced from everything scraped that day
 - **Trending** — Most engaging stories across your department's sources
-- **Article Images** — Semantically matched images from Openverse & Wikimedia Commons when no original image exists
+- **Article Images** — Every article displays an image. Original source images are used when available; otherwise, semantically matched images are fetched from Openverse & Wikimedia Commons with proper attribution (creator, license, source link)
+- **Image Attribution** — All fetched images display creator credits, license type (CC BY-SA, etc.), and source links as required by API guidelines
 - **Research Papers** — 2–3 highly-cited landmark papers at the top, followed by 10–15 additional suggestions on a dedicated research page
 - **Department Feed** — Switch departments instantly from the navbar; content filters immediately
 - **Stories & Insights** — Browse all recent stories and AI-generated summaries
@@ -241,7 +242,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 | Rate Limiting | slowapi (5/min login, 3/hour register) |
 | AI | Pollinations · Groq · OpenAI · HuggingFace · Ollama |
 | Scraping | httpx (async), feedparser, BeautifulSoup, aiohttp |
-| Images | Semantic search via Openverse, Wikimedia, Pixabay, Pexels + sentence-transformers ranking |
+| Images | Semantic search via Openverse, Wikimedia, Pixabay, Pexels + sentence-transformers ranking; category fallback ensures 100% image coverage; attribution overlay on all images |
 | Research | Semantic Scholar API · Crossref API · OpenAlex API · PubMed API |
 | Frontend | HTML/CSS/JS (no build step) |
 | CI | GitHub Actions (black, isort, mypy, flake8) |

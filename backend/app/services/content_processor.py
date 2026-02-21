@@ -206,7 +206,7 @@ class ContentProcessor:
         featured_image_url = self._extract_featured_image(raw)
         image_credit = None
         if not featured_image_url:
-            img_result = await self._fetch_semantic_image(raw.original_title)
+            img_result = await self._fetch_semantic_image(raw.original_title, category=self._detect_category(raw))
             if img_result:
                 featured_image_url = img_result["url"]
                 image_credit = {
@@ -311,7 +311,7 @@ class ContentProcessor:
         featured_image_url = self._extract_featured_image(raw)
         image_credit = None
         if not featured_image_url:
-            img_result = await self._fetch_semantic_image(title)
+            img_result = await self._fetch_semantic_image(title, category=self._detect_category(raw))
             if img_result:
                 featured_image_url = img_result["url"]
                 image_credit = {
@@ -519,9 +519,10 @@ class ContentProcessor:
         
         return None
 
-    async def _fetch_semantic_image(self, title: Optional[str]) -> Optional[dict]:
+    async def _fetch_semantic_image(self, title: Optional[str], category: str = "general") -> Optional[dict]:
         """Fetch a semantically relevant image for the article title.
         
+        Uses semantic search first, then falls back to category-based search.
         Returns dict with 'url' and 'credit' keys, or None.
         """
         if not title or len(title.strip()) < 5:
@@ -529,8 +530,8 @@ class ContentProcessor:
         try:
             from app.services.image_fetcher import ImageFetcher
             fetcher = ImageFetcher(sources=["openverse", "wikimedia"])
-            result = await fetcher.fetch_best_image(title, top_k=1)
-            if result and result.get("score", 0) >= 0.2:
+            result = await fetcher.fetch_with_fallback(title, category=category, top_k=1)
+            if result and result.get("url"):
                 # Build attribution credit line
                 creator = result.get("creator", "").strip()
                 provider = result.get("provider", "").strip()

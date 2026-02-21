@@ -170,10 +170,16 @@
       width: 200px;
       min-width: 200px;
       height: 134px;
-      background: var(--card-bg);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       overflow: hidden;
       flex-shrink: 0;
       position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .feed-item-thumb.has-image { background: var(--card-bg); }
+    .feed-item-thumb .placeholder-icon {
+      font-size: 36px; opacity: 0.3; color: #fff;
+      font-family: 'DM Sans', sans-serif; font-weight: 700;
     }
     .feed-item-thumb img {
       width: 100%;
@@ -1261,10 +1267,13 @@
       const meta = stripSourcePrefix(shortText(item.summary || item.content || item.meta || '', 140));
       const source = item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk');
 
-      const imgStyle = (item.featured_image_url || item.image) ? `style="background-image:url('${escapeHtml(item.featured_image_url || item.image)}');background-size:cover;background-position:center;"` : '';
+      const hasImg = !!(item.featured_image_url || item.image);
+      const imgStyle = hasImg ? `style="background-image:url('${escapeHtml(item.featured_image_url || item.image)}');background-size:cover;background-position:center;"` : '';
+      const imgClass = hasImg ? ' has-image' : '';
+      const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
       const credit = item.image_credit ? `<div class="image-credit">${escapeHtml(item.image_credit.credit || '')}</div>` : '';
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
-        <div class="feed-item-thumb" ${imgStyle}>${credit}</div>
+        <div class="feed-item-thumb${imgClass}" ${imgStyle}>${placeholder}${credit}</div>
         <div class="feed-item-body">
           <div class="feed-item-category">${escapeHtml(category)}</div>
           <div class="feed-item-title">${escapeHtml(item.title)}</div>

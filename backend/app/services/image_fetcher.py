@@ -102,6 +102,63 @@ class ImageFetcher:
             "license": best.get("license", ""),
         }
 
+    # Category keyword mapping for fallback searches
+    CATEGORY_KEYWORDS = {
+        "technology": "technology computer software",
+        "tech": "technology computer software",
+        "ai": "artificial intelligence robot",
+        "artificial_intelligence": "artificial intelligence robot",
+        "machine_learning": "machine learning data science",
+        "programming": "programming code developer",
+        "cybersecurity": "cybersecurity digital security",
+        "security": "cybersecurity digital lock",
+        "science": "science laboratory research",
+        "engineering": "engineering circuit board",
+        "robotics": "robotics automation machine",
+        "data_science": "data analytics visualization",
+        "web_development": "web development website",
+        "mobile": "mobile phone smartphone app",
+        "cloud": "cloud computing server data",
+        "blockchain": "blockchain cryptocurrency digital",
+        "gaming": "gaming video game controller",
+        "space": "space exploration astronomy",
+        "electronics": "electronics circuit board components",
+        "business": "business office corporate",
+        "education": "education university students",
+        "research": "research laboratory science paper",
+        "health": "health medical technology",
+        "environment": "environment sustainability green",
+        "startup": "startup business innovation",
+        "career": "career professional office",
+        "general": "technology digital innovation",
+    }
+
+    async def fetch_with_fallback(
+        self, title: str, category: str = "general", top_k: int = 1
+    ) -> Optional[dict[str, Any]]:
+        """Try semantic search first, then fall back to category-based search."""
+        # 1. Try semantic search with title
+        result = await self.fetch_best_image(title, top_k=top_k)
+        if result and result.get("score", 0) >= 0.15:
+            return result
+
+        # 2. Fallback: search by category keywords (broader, almost always returns results)
+        cat_key = (category or "general").lower().replace(" ", "_")
+        cat_query = self.CATEGORY_KEYWORDS.get(cat_key, self.CATEGORY_KEYWORDS["general"])
+        candidates = await self._search_all(cat_query)
+        if candidates:
+            # Pick the first good-sized image (no ranking needed for generic category images)
+            c = candidates[0]
+            return {
+                "url": c.url,
+                "source_url": c.source_url,
+                "score": 0.10,  # low score indicates category fallback
+                "provider": c.provider,
+                "creator": c.creator,
+                "license": c.license,
+            }
+        return None
+
     @staticmethod
     def _simplify_query(text: str) -> str:
         """Extract key terms from a title for better image search results."""
