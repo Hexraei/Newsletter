@@ -211,7 +211,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 ### API Reference
 
 **Auth** (`/api/v1/auth`)  
-`POST /register` · `POST /login` · `POST /refresh` · `GET /me` · `PUT /me` · `POST /change-password`
+`POST /register` (3/hour) · `POST /login` (5/min) · `POST /refresh` · `GET /me` · `PUT /me` · `POST /change-password`
 
 **Feed** (`/api/v1/feed`)  
 `GET /all-sections` — main feed endpoint (cache-first, returns breaking + trending + research per dept)  
@@ -236,11 +236,24 @@ The system auto-selects the best available provider at runtime with automatic fa
 | Backend | FastAPI, SQLAlchemy 2.0 (async), Alembic |
 | Database | PostgreSQL 15 |
 | Auth | JWT (python-jose), bcrypt |
+| Rate Limiting | slowapi (5/min login, 3/hour register) |
 | AI | Pollinations · Groq · OpenAI · HuggingFace · Ollama |
 | Scraping | httpx (async), feedparser, BeautifulSoup, aiohttp |
 | Research | Semantic Scholar API · Crossref API · OpenAlex API · PubMed API |
 | Frontend | HTML/CSS/JS (no build step) |
-| CI | GitHub Actions |
+| CI | GitHub Actions (black, isort, mypy, flake8) |
+
+### Security
+
+- **No hardcoded secrets** — all keys/passwords loaded from environment variables; app warns at startup if using placeholder defaults
+- **XSS protection** — all user-facing content escaped via `escapeHtml()` before DOM insertion across all frontend pages
+- **Rate limiting** — login (5/min), register (3/hour), global (60/min) via slowapi
+- **CORS** — explicit origin allowlist only, no wildcard even in debug mode
+- **SQL injection** — SQLAlchemy ORM with parameterized queries throughout
+- **Password hashing** — bcrypt, no plain-text storage
+- **Structured logging** — Python `logging` module (no `print()` in production paths)
+- **Docker hardened** — secrets via `${VAR:?}` required env vars, `DEBUG=false`, no `--reload`, Alembic migrations run before app startup
+- **CI enforced** — black, isort, mypy, flake8 checks block on failure
 
 ### Key Files
 
