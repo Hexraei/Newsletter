@@ -33,6 +33,7 @@ NEWS DAY is your department-specific daily briefing. Instead of scrolling throug
 
 - **Breaking News** — Top 3 high-impact stories surfaced from everything scraped that day
 - **Trending** — Most engaging stories across your department's sources
+- **Article Images** — Semantically matched images from Openverse & Wikimedia Commons when no original image exists
 - **Research Papers** — 2–3 highly-cited landmark papers at the top, followed by 10–15 additional suggestions on a dedicated research page
 - **Department Feed** — Switch departments instantly from the navbar; content filters immediately
 - **Stories & Insights** — Browse all recent stories and AI-generated summaries
@@ -194,6 +195,7 @@ python scrapers/run_rss.py         # RSS only (parallel, semaphore=5)
 python scrapers/run_research.py    # Research papers only
 python scrapers/run_general.py     # HN, Reddit, GitHub, Medium, ProductHunt
 python scrapers/refresh_cache.py   # Rebuild cached_feeds (run after any scrape)
+python scrapers/fetch_images.py    # Backfill images for articles missing them
 ```
 
 ### AI Provider Configuration
@@ -239,6 +241,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 | Rate Limiting | slowapi (5/min login, 3/hour register) |
 | AI | Pollinations · Groq · OpenAI · HuggingFace · Ollama |
 | Scraping | httpx (async), feedparser, BeautifulSoup, aiohttp |
+| Images | Semantic search via Openverse, Wikimedia, Pixabay, Pexels + sentence-transformers ranking |
 | Research | Semantic Scholar API · Crossref API · OpenAlex API · PubMed API |
 | Frontend | HTML/CSS/JS (no build step) |
 | CI | GitHub Actions (black, isort, mypy, flake8) |
@@ -265,6 +268,8 @@ The system auto-selects the best available provider at runtime with automatic fa
 | `backend/app/api/v1/feed.py` | `/all-sections` endpoint — cache-first with research_papers |
 | `scrapers/run_rss.py` | Parallel RSS scraper with `asyncio.gather` + `Semaphore(5)` |
 | `scrapers/run_research.py` | Research paper fetcher (4 APIs, dept-specific queries) |
+| `backend/app/services/image_fetcher.py` | Semantic image search (Openverse, Wikimedia, cosine ranking) |
+| `scrapers/fetch_images.py` | Backfill images for articles missing `featured_image_url` |
 | `scrapers/refresh_cache.py` | Writes one JSONB row per department to `cached_feeds` |
 | `scraper_platform/src/scrapers/rss_scraper.py` | RSS/Atom parser with IST timezone handling |
 
