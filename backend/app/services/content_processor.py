@@ -204,8 +204,17 @@ class ContentProcessor:
         
         # Extract featured image from metadata, fallback to semantic search
         featured_image_url = self._extract_featured_image(raw)
+        image_credit = None
         if not featured_image_url:
-            featured_image_url = await self._fetch_semantic_image(raw.original_title)
+            img_result = await self._fetch_semantic_image(raw.original_title)
+            if img_result:
+                featured_image_url = img_result["url"]
+                image_credit = {
+                    "credit": img_result["credit"],
+                    "source_url": img_result["source_url"],
+                    "provider": img_result["provider"],
+                    "license": img_result["license"],
+                }
         
         # Determine content type
         content_type = self._detect_content_type(raw, source)
@@ -233,7 +242,8 @@ class ContentProcessor:
             is_breaking=is_breaking,
             breaking_score=breaking_score,
             breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
-            featured_image_url=featured_image_url
+            featured_image_url=featured_image_url,
+            visualizations={"image_credit": image_credit} if image_credit else {},
         )
         
         self.db.add(processed)
@@ -298,6 +308,19 @@ class ContentProcessor:
             abstract = (raw.original_content or "")[:300]
             summary = f"{meta_line}. {abstract}" if meta_line else abstract
 
+        featured_image_url = self._extract_featured_image(raw)
+        image_credit = None
+        if not featured_image_url:
+            img_result = await self._fetch_semantic_image(title)
+            if img_result:
+                featured_image_url = img_result["url"]
+                image_credit = {
+                    "credit": img_result["credit"],
+                    "source_url": img_result["source_url"],
+                    "provider": img_result["provider"],
+                    "license": img_result["license"],
+                }
+
         processed = ProcessedContent(
             raw_content_id=raw.id,
             title=title,
@@ -319,7 +342,8 @@ class ContentProcessor:
             is_breaking=is_breaking,
             breaking_score=breaking_score,
             breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
-            featured_image_url=self._extract_featured_image(raw) or await self._fetch_semantic_image(title),
+            featured_image_url=featured_image_url,
+            visualizations={"image_credit": image_credit} if image_credit else {},
         )
         
         self.db.add(processed)
@@ -495,8 +519,11 @@ class ContentProcessor:
         
         return None
 
-    async def _fetch_semantic_image(self, title: Optional[str]) -> Optional[str]:
-        """Fetch a semantically relevant image for the article title."""
+    async def _fetch_semantic_image(self, title: Optional[str]) -> Optional[dict]:
+        """Fetch a semantically relevant image for the article title.
+        
+        Returns dict with 'url' and 'credit' keys, or None.
+        """
         if not title or len(title.strip()) < 5:
             return None
         try:
@@ -504,7 +531,26 @@ class ContentProcessor:
             fetcher = ImageFetcher(sources=["openverse", "wikimedia"])
             result = await fetcher.fetch_best_image(title, top_k=1)
             if result and result.get("score", 0) >= 0.2:
-                return result["url"]
+                # Build attribution credit line
+                creator = result.get("creator", "").strip()
+                provider = result.get("provider", "").strip()
+                lic = result.get("license", "").strip()
+                source_url = result.get("source_url", "").strip()
+                parts = []
+                if creator:
+                    parts.append(creator)
+                if provider:
+                    parts.append(provider.title())
+                credit = " / ".join(parts) if parts else provider
+                if lic:
+                    credit += f" ({lic})"
+                return {
+                    "url": result["url"],
+                    "credit": credit,
+                    "source_url": source_url,
+                    "provider": provider,
+                    "license": lic,
+                }
         except Exception:
             logger.debug("Semantic image fetch failed for: %s", title, exc_info=True)
         return None

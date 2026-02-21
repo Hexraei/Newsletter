@@ -69,6 +69,15 @@ async def backfill_images(limit: int = 100, min_score: float = 0.2):
                     result = await fetcher.fetch_best_image(article.title, top_k=1)
                     if result and result.get("score", 0) >= min_score:
                         article.featured_image_url = result["url"]
+                        credit_data = {
+                            "credit": result.get("creator", ""),
+                            "source_url": result.get("source_url", ""),
+                            "provider": result.get("provider", ""),
+                            "license": result.get("license", ""),
+                        }
+                        vis = article.visualizations or {}
+                        vis["image_credit"] = credit_data
+                        article.visualizations = vis
                         updated += 1
                         print(f"  [OK] [{result['score']:.3f}] [{result['provider']}] {article.title[:60]}")
                     else:

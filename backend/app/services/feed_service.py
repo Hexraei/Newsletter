@@ -85,6 +85,7 @@ class FeedService:
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "is_breaking": item.is_breaking,
                 "featured_image_url": item.featured_image_url,
+                "image_credit": (item.visualizations or {}).get("image_credit"),
                 "original_url": url_map.get(str(item.raw_content_id), None)
             })
         
@@ -142,6 +143,7 @@ class FeedService:
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "content_blocks": item.content_blocks,
                 "featured_image_url": item.featured_image_url,
+                "image_credit": (item.visualizations or {}).get("image_credit"),
                 "original_url": url_map.get(str(item.raw_content_id), None)
             }
             for item in items
@@ -254,6 +256,7 @@ class FeedService:
                 "is_breaking": item.is_breaking,
                 "breaking_score": item.breaking_score,
                 "featured_image_url": item.featured_image_url,
+                "image_credit": (item.visualizations or {}).get("image_credit"),
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "detected_at": item.breaking_detected_at.isoformat() if item.breaking_detected_at else None,
                 "original_url": url_map.get(str(item.raw_content_id), None),

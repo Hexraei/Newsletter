@@ -42,10 +42,11 @@ def _get_model():
 class ImageCandidate:
     """A candidate image with metadata for ranking."""
 
-    __slots__ = ("url", "source_url", "title", "tags", "description", "creator", "provider")
+    __slots__ = ("url", "source_url", "title", "tags", "description", "creator", "provider", "license")
 
     def __init__(self, url: str, source_url: str = "", title: str = "",
-                 tags: str = "", description: str = "", creator: str = "", provider: str = ""):
+                 tags: str = "", description: str = "", creator: str = "",
+                 provider: str = "", license: str = ""):
         self.url = url
         self.source_url = source_url
         self.title = title
@@ -53,6 +54,7 @@ class ImageCandidate:
         self.description = description
         self.creator = creator
         self.provider = provider
+        self.license = license
 
     def profile(self) -> str:
         """Build a text profile for embedding comparison."""
@@ -96,6 +98,8 @@ class ImageFetcher:
             "source_url": best["source_url"],
             "score": best["score"],
             "provider": best["provider"],
+            "creator": best.get("creator", ""),
+            "license": best.get("license", ""),
         }
 
     @staticmethod
@@ -139,7 +143,7 @@ class ImageFetcher:
         if not non_empty:
             # No profiles — return first candidate as-is
             c = candidates[0]
-            return [{"url": c.url, "source_url": c.source_url, "score": 0.0, "provider": c.provider}]
+            return [{"url": c.url, "source_url": c.source_url, "score": 0.0, "provider": c.provider, "creator": c.creator, "license": c.license}]
 
         model = _get_model()
         indices, texts = zip(*non_empty)
@@ -159,6 +163,8 @@ class ImageFetcher:
                 "source_url": c.source_url,
                 "score": float(similarities[ri]),
                 "provider": c.provider,
+                "creator": c.creator,
+                "license": c.license,
             })
         return results
 
@@ -260,6 +266,7 @@ class ImageFetcher:
                     description="",
                     creator=item.get("creator", ""),
                     provider="openverse",
+                    license=item.get("license", ""),
                 ))
             return results
 
@@ -298,6 +305,7 @@ class ImageFetcher:
                 desc = ext.get("ImageDescription", {}).get("value", "")
                 cats = ext.get("Categories", {}).get("value", "")
                 author = ext.get("Artist", {}).get("value", "")
+                lic = ext.get("LicenseShortName", {}).get("value", "")
                 # Strip HTML tags from metadata
                 import re
                 desc = re.sub(r"<[^>]+>", " ", desc).strip()
@@ -311,6 +319,7 @@ class ImageFetcher:
                     description=desc[:200],
                     creator=author[:100],
                     provider="wikimedia",
+                    license=lic,
                 ))
             return results
 
@@ -340,6 +349,7 @@ class ImageFetcher:
                     description="",
                     creator=hit.get("user", ""),
                     provider="pixabay",
+                    license="Pixabay License",
                 ))
             return results
 
@@ -370,5 +380,6 @@ class ImageFetcher:
                     description=photo.get("alt", ""),
                     creator=photo.get("photographer", ""),
                     provider="pexels",
+                    license="Pexels License",
                 ))
             return results

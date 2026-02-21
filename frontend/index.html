@@ -507,6 +507,15 @@
       object-fit: cover;
     }
 
+    .image-credit {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      font-size: 9px; color: rgba(255,255,255,0.85);
+      background: linear-gradient(transparent, rgba(0,0,0,0.55));
+      padding: 12px 6px 4px; line-height: 1.3;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .image-credit a { color: inherit; text-decoration: underline; }
+
     .article-card-title {
       font-family: 'DM Sans', sans-serif;
       font-weight: 600;
@@ -1359,6 +1368,7 @@
         is_breaking: true,
         content: item.content || item.summary || item.title || '',
         image: item.featured_image_url || item.image || '',
+        image_credit: item.image_credit || null,
       };
     }
 
@@ -1372,6 +1382,7 @@
         content: item.content || item.summary || item.title || '',
         meta: shortText(item.summary || item.content || `${source} update for CS students.`, 120),
         image: item.featured_image_url || item.image || '',
+        image_credit: item.image_credit || null,
       };
     }
 
@@ -1924,8 +1935,9 @@
       const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
 
       const imgStyle = item.image ? `background-image:url('${escapeHtml(item.image)}');background-size:cover;background-position:center;` : '';
+      const credit = item.image_credit ? `<div class="image-credit">${escapeHtml(item.image_credit.credit || '')}${item.image_credit.source_url ? ' <a href="' + escapeHtml(item.image_credit.source_url) + '" target="_blank" rel="noopener">source</a>' : ''}</div>` : '';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
-        <div class="article-card-visual" style="${imgStyle}"></div>
+        <div class="article-card-visual" style="${imgStyle}">${credit}</div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
       </a>`;
