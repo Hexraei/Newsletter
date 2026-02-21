@@ -1201,8 +1201,9 @@
       const meta = stripSourcePrefix(shortText(item.summary || item.content || item.meta || '', 140));
       const source = item.source || 'CS Desk';
 
+      const imgStyle = (item.featured_image_url || item.image) ? `style="background-image:url('${escapeHtml(item.featured_image_url || item.image)}');background-size:cover;background-position:center;"` : '';
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
-        <div class="feed-item-thumb"></div>
+        <div class="feed-item-thumb" ${imgStyle}></div>
         <div class="feed-item-body">
           <div class="feed-item-category">${escapeHtml(category)}</div>
           <div class="feed-item-title">${escapeHtml(item.title)}</div>

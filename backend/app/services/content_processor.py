@@ -1,5 +1,6 @@
 """Content processing service for transforming raw to processed content."""
 
+import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai_provider import AIProvider
 from app.models import ProcessedContent, RawContent, Source
+
+logger = logging.getLogger(__name__)
 
 
 class ContentProcessor:
@@ -199,8 +202,10 @@ class ContentProcessor:
             _log.getLogger(__name__).warning("Headline generation failed, using original title", exc_info=True)
             headline = raw.original_title
         
-        # Extract featured image from metadata
+        # Extract featured image from metadata, fallback to semantic search
         featured_image_url = self._extract_featured_image(raw)
+        if not featured_image_url:
+            featured_image_url = await self._fetch_semantic_image(raw.original_title)
         
         # Determine content type
         content_type = self._detect_content_type(raw, source)
@@ -314,7 +319,7 @@ class ContentProcessor:
             is_breaking=is_breaking,
             breaking_score=breaking_score,
             breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
-            featured_image_url=self._extract_featured_image(raw),
+            featured_image_url=self._extract_featured_image(raw) or await self._fetch_semantic_image(title),
         )
         
         self.db.add(processed)
@@ -488,6 +493,20 @@ class ContentProcessor:
             # YouTube videos - could extract thumbnail if needed
             pass
         
+        return None
+
+    async def _fetch_semantic_image(self, title: Optional[str]) -> Optional[str]:
+        """Fetch a semantically relevant image for the article title."""
+        if not title or len(title.strip()) < 5:
+            return None
+        try:
+            from app.services.image_fetcher import ImageFetcher
+            fetcher = ImageFetcher(sources=["openverse", "wikimedia"])
+            result = await fetcher.fetch_best_image(title, top_k=1)
+            if result and result.get("score", 0) >= 0.2:
+                return result["url"]
+        except Exception:
+            logger.debug("Semantic image fetch failed for: %s", title, exc_info=True)
         return None
     
     async def get_processing_stats(self) -> Dict:

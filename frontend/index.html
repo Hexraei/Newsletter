@@ -1358,6 +1358,7 @@
         url: item.url || '#',
         is_breaking: true,
         content: item.content || item.summary || item.title || '',
+        image: item.featured_image_url || item.image || '',
       };
     }
 
@@ -1370,6 +1371,7 @@
         category: normalizeCategory(item.category, fallbackCategory),
         content: item.content || item.summary || item.title || '',
         meta: shortText(item.summary || item.content || `${source} update for CS students.`, 120),
+        image: item.featured_image_url || item.image || '',
       };
     }
 
@@ -1921,8 +1923,9 @@
       const storyId = registerStory(item);
       const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
 
+      const imgStyle = item.image ? `background-image:url('${escapeHtml(item.image)}');background-size:cover;background-position:center;` : '';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
-        <div class="article-card-visual"></div>
+        <div class="article-card-visual" style="${imgStyle}"></div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
       </a>`;
@@ -1949,8 +1952,9 @@
       const storyId = registerStory(paper);
       const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
       const cite = paper.citations ? paper.citations + ' citations' : '';
+      const imgStyle = paper.featured_image_url ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
-        <div class="article-card-visual" style="background:#f4f0ff"></div>
+        <div class="article-card-visual" style="${imgStyle}"></div>
         <div class="article-card-title">${escapeHtml(paper.title)}</div>
         <div class="article-card-meta">${escapeHtml(meta)}${cite ? ' · ' + escapeHtml(cite) : ''}</div>
       </a>`;
@@ -2146,6 +2150,18 @@
         $btn.href = '#';
         $btn.dataset.storyId = heroStoryId;
         $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
+
+        // Hero image
+        const $visual = $('hero-visual');
+        if ($visual) {
+          if (slide.image) {
+            $visual.style.backgroundImage = `url('${slide.image}')`;
+            $visual.style.backgroundSize = 'cover';
+            $visual.style.backgroundPosition = 'center';
+          } else {
+            $visual.style.backgroundImage = '';
+          }
+        }
 
         // Update typographic fill
         $typeLabel.textContent = (slide.source || 'NEWS').toUpperCase().split(' - ')[0];

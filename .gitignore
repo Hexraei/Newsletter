@@ -30,6 +30,7 @@ env/
 .env
 .env.local
 .env.*.local
+.openverse_creds.json
 supabase.md
 **/supabase.md
 groq.md

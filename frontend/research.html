@@ -1198,8 +1198,9 @@
       const metaLine = item.meta_line || source;
       const abstract = shortText(item.summary || '', 160);
 
+      const imgStyle = (item.featured_image_url || item.image) ? `background-image:url('${escapeHtml(item.featured_image_url || item.image)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
       return `<a class="feed-item" href="${escapeHtml(item.url || '#')}" ${item.url && item.url !== '#' ? 'target="_blank" rel="noopener"' : ''} data-story-id="${storyId}">
-        <div class="feed-item-thumb" style="background:#f4f0ff"></div>
+        <div class="feed-item-thumb" style="${imgStyle}"></div>
         <div class="feed-item-body">
           <div class="feed-item-category">${escapeHtml(category)}</div>
           <div class="feed-item-title">${escapeHtml(item.title)}</div>
