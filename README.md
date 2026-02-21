@@ -38,6 +38,7 @@ NEWS DAY is your department-specific daily briefing. Instead of scrolling throug
 - **Research Papers** — 2–3 highly-cited landmark papers at the top, followed by 10–15 additional suggestions on a dedicated research page
 - **Department Feed** — Switch departments instantly from the navbar; content filters immediately
 - **Stories & Insights** — Browse all recent stories and AI-generated summaries
+- **Teacher Guidance Suggestions** — AI summaries now include classroom instruction hints based on topic keywords (example: if news is about 3D CAD, teachers are prompted to assign a hands-on CAD modeling activity)
 - **Account** — Sign up with your department, log in to personalise your feed
 
 ---
@@ -187,6 +188,8 @@ python start_server.py
 # → http://localhost:8000/docs  (Swagger UI)
 ```
 
+Install both requirements files before running any AI summarization or scraping workflows.
+
 ### Scraping Pipeline
 
 ```bash
@@ -224,7 +227,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 `GET /` · `GET /{key}`
 
 **AI** (`/api/v1/ai`)  
-`GET /status` · `GET /providers` · `POST /summarize` · `POST /headline`
+`GET /status` · `GET /providers` · `POST /summarize` (summary + teacher guidance suggestions) · `POST /headline`
 
 **Pipeline** (`/api/v1/pipeline`)  
 `POST /run` · `GET /status` · `POST /process`
