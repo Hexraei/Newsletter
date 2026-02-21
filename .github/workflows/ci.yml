@@ -63,14 +63,14 @@ jobs:
       working-directory: ./backend
       run: |
         pip install black isort
-        black --check app/ || true
-        isort --check-only app/ || true
+        black --check app/
+        isort --check-only app/
     
     - name: Type checking
       working-directory: ./backend
       run: |
         pip install mypy
-        mypy app/ --ignore-missing-imports || true
+        mypy app/ --ignore-missing-imports
 
   lint:
     runs-on: ubuntu-latest
@@ -90,5 +90,5 @@ jobs:
     - name: Lint with flake8
       working-directory: ./backend
       run: |
-        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
-        flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics || true
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app/ --count --max-complexity=10 --max-line-length=127 --statistics

@@ -7,7 +7,7 @@ services:
     container_name: newsletter-postgres
     environment:
       POSTGRES_USER: newsletter
-      POSTGRES_PASSWORD: newsletter123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: newsletter
     ports:
       - "5432:5432"
@@ -40,21 +40,19 @@ services:
       dockerfile: docker/Dockerfile
     container_name: newsletter-api
     environment:
-      - DEBUG=true
-      - DATABASE_URL=postgresql+asyncpg://newsletter:newsletter123@postgres:5432/newsletter
+      - DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://newsletter:${POSTGRES_PASSWORD}@postgres:5432/newsletter
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=dev-secret-key-change-in-production
-      - JWT_SECRET_KEY=dev-jwt-secret-key-change-in-production
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app/app
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 volumes:
   postgres_data:

@@ -826,6 +826,10 @@
         .finally(() => clearTimeout(timer));
     }
 
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     function shortText(value, max = 110) {
       const text = String(value || '').replace(/\s+/g, ' ').trim();
       if (!text) return '';
@@ -1194,13 +1198,13 @@
       const metaLine = item.meta_line || source;
       const abstract = shortText(item.summary || '', 160);
 
-      return `<a class="feed-item" href="${item.url || '#'}" ${item.url && item.url !== '#' ? 'target="_blank" rel="noopener"' : ''} data-story-id="${storyId}">
+      return `<a class="feed-item" href="${escapeHtml(item.url || '#')}" ${item.url && item.url !== '#' ? 'target="_blank" rel="noopener"' : ''} data-story-id="${storyId}">
         <div class="feed-item-thumb" style="background:#f4f0ff"></div>
         <div class="feed-item-body">
-          <div class="feed-item-category">${category}</div>
-          <div class="feed-item-title">${item.title || ''}</div>
-          <div class="feed-item-meta">${metaLine}${ago ? ' <span>-</span> ' + ago : ''}</div>
-          ${abstract ? '<div class="feed-item-meta" style="margin-top:4px;color:#555">' + abstract + '</div>' : ''}
+          <div class="feed-item-category">${escapeHtml(category)}</div>
+          <div class="feed-item-title">${escapeHtml(item.title)}</div>
+          <div class="feed-item-meta">${escapeHtml(metaLine)}${ago ? ' <span>-</span> ' + escapeHtml(ago) : ''}</div>
+          ${abstract ? '<div class="feed-item-meta" style="margin-top:4px;color:#555">' + escapeHtml(abstract) + '</div>' : ''}
         </div>
       </a>`;
     }

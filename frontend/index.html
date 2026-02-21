@@ -1186,6 +1186,10 @@
       return String(value || '').toLowerCase();
     }
 
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     function shortText(value, max = 110) {
       const text = String(value || '').replace(/\s+/g, ' ').trim();
       if (!text) return '';
@@ -1919,8 +1923,8 @@
 
       return `<a class="article-card" href="#" data-story-id="${storyId}">
         <div class="article-card-visual"></div>
-        <div class="article-card-title">${item.title || ''}</div>
-        <div class="article-card-meta">${cardMeta || item.source || ''}</div>
+        <div class="article-card-title">${escapeHtml(item.title)}</div>
+        <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
       </a>`;
     }
 
@@ -1947,8 +1951,8 @@
       const cite = paper.citations ? paper.citations + ' citations' : '';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
         <div class="article-card-visual" style="background:#f4f0ff"></div>
-        <div class="article-card-title">${paper.title || ''}</div>
-        <div class="article-card-meta">${meta}${cite ? ' · ' + cite : ''}</div>
+        <div class="article-card-title">${escapeHtml(paper.title)}</div>
+        <div class="article-card-meta">${escapeHtml(meta)}${cite ? ' · ' + escapeHtml(cite) : ''}</div>
       </a>`;
     }
 
@@ -1957,11 +1961,11 @@
       const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
       const cite = paper.citations ? `<span class="research-cite-badge">${paper.citations} citations</span>` : '';
       const abstract = shortText(paper.summary || paper.meta || '', 180);
-      return `<a class="research-row" href="${url}" target="_blank" rel="noopener">
+      return `<a class="research-row" href="${escapeHtml(url)}" target="_blank" rel="noopener">
         <div class="research-row-body">
-          <div class="research-row-title">${paper.title || ''}</div>
-          <div class="research-row-meta">${meta}</div>
-          ${abstract ? '<div class="research-row-abstract">' + abstract + '</div>' : ''}
+          <div class="research-row-title">${escapeHtml(paper.title)}</div>
+          <div class="research-row-meta">${escapeHtml(meta)}</div>
+          ${abstract ? '<div class="research-row-abstract">' + escapeHtml(abstract) + '</div>' : ''}
         </div>
         ${cite}
       </a>`;

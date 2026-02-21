@@ -827,6 +827,10 @@
         .finally(() => clearTimeout(timer));
     }
 
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     function shortText(value, max = 110) {
       const text = String(value || '').replace(/\s+/g, ' ').trim();
       if (!text) return '';
@@ -1200,9 +1204,9 @@
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
         <div class="feed-item-thumb"></div>
         <div class="feed-item-body">
-          <div class="feed-item-category">${category}</div>
-          <div class="feed-item-title">${item.title || ''}</div>
-          <div class="feed-item-meta">${source}${ago ? ' <span>-</span> ' + ago : ''}</div>
+          <div class="feed-item-category">${escapeHtml(category)}</div>
+          <div class="feed-item-title">${escapeHtml(item.title)}</div>
+          <div class="feed-item-meta">${escapeHtml(source)}${ago ? ' <span>-</span> ' + escapeHtml(ago) : ''}</div>
         </div>
       </a>`;
     }
@@ -1230,9 +1234,9 @@
         return `<a class="sidebar-item" href="#" data-story-id="${storyId}">
           <div class="sidebar-item-num">${String(i + 1).padStart(2, '0')}</div>
           <div class="sidebar-item-body">
-            <div class="sidebar-item-cat">${cat}</div>
-            <div class="sidebar-item-title">${item.title || ''}</div>
-            <div class="sidebar-item-meta">${item.source || 'CS Desk'}${ago ? ' - ' + ago : ''}</div>
+            <div class="sidebar-item-cat">${escapeHtml(cat)}</div>
+            <div class="sidebar-item-title">${escapeHtml(item.title)}</div>
+            <div class="sidebar-item-meta">${escapeHtml(item.source || 'CS Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
           </div>
         </a>`;
       }).join('');

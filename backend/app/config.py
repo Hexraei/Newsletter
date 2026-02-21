@@ -1,9 +1,16 @@
 """Application configuration using Pydantic Settings."""
 
+import secrets
 from functools import lru_cache
 from typing import List, Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
+
+_INSECURE_DEFAULTS = {
+    "your-secret-key-change-in-production",
+    "jwt-secret-key-change-in-production",
+}
 
 
 class Settings(BaseSettings):
@@ -15,12 +22,26 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
     
-    # Security
+    # Security — no defaults; must be set via .env or environment
     SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_SECRET_KEY: str = "jwt-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    @field_validator("SECRET_KEY", "JWT_SECRET_KEY")
+    @classmethod
+    def validate_secrets(cls, v: str, info) -> str:
+        if v in _INSECURE_DEFAULTS:
+            import warnings
+            warnings.warn(
+                f"{info.field_name} is using an insecure placeholder value. "
+                "Set a strong random secret in backend/.env before deploying.",
+                stacklevel=2,
+            )
+        if len(v) < 16:
+            raise ValueError(f"{info.field_name} must be at least 16 characters")
+        return v
     
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/newsletter"
@@ -30,8 +51,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_POOL_SIZE: int = 50
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:8000", "null"]
+    # CORS — explicit allowlist only
+    CORS_ORIGINS: List[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
     
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100

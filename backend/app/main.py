@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import logging
 import sys
 from pathlib import Path
 # Add scraper_platform to Python path
@@ -18,19 +19,19 @@ from app.api import router
 from app.config import settings
 from app.models import init_db
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup
-    print("Starting up...")
+    logger.info("Starting up...")
     await init_db()
-    print("Database initialized")
+    logger.info("Database initialized")
     
     yield
     
-    # Shutdown
-    print("Shutting down...")
+    logger.info("Shutting down...")
 
 
 app = FastAPI(
@@ -41,10 +42,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware — always use explicit allowlist, never wildcard
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else settings.CORS_ORIGINS,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +59,6 @@ async def health_check():
     return {
         "status": "healthy",
         "version": settings.VERSION,
-        "debug": settings.DEBUG
     }
 
 
@@ -76,15 +76,16 @@ app.include_router(router)
 frontend_path = Path(__file__).parent.parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
-    print(f"Static files mounted from: {frontend_path}")
+    logger.info(f"Static files mounted from: {frontend_path}")
 else:
-    print(f"Warning: Frontend path not found: {frontend_path}")
+    logger.warning(f"Frontend path not found: {frontend_path}")
 
 
 # Exception handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler."""
+    logger.exception("Unhandled exception on %s %s", request.method, request.url)
     return JSONResponse(
         status_code=500,
         content={

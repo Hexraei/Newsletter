@@ -208,7 +208,8 @@ async def get_by_category(
 @router.post("/{content_id}/read")
 async def record_read(
     content_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """Record that content was read."""
     

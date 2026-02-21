@@ -120,4 +120,6 @@ async def get_optional_current_user(
             return user
         return None
     except Exception:
+        import logging as _log
+        _log.getLogger(__name__).debug("Token decode failed", exc_info=True)
         return None

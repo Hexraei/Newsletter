@@ -164,7 +164,8 @@ class ContentProcessor:
             )
         except Exception as e:
             # Fallback to basic if AI fails
-            print(f"AI summarization failed: {e}, using basic")
+            import logging as _log
+            _log.getLogger(__name__).warning("AI summarization failed: %s, using basic", e)
             return await self._process_basic(raw, score)
         
         # Get source info for department tags
@@ -194,6 +195,8 @@ class ContentProcessor:
                     content=raw.original_content or ""
                 )
         except Exception:
+            import logging as _log
+            _log.getLogger(__name__).warning("Headline generation failed, using original title", exc_info=True)
             headline = raw.original_title
         
         # Extract featured image from metadata

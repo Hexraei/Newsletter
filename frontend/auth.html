@@ -947,13 +947,11 @@
 
   <script>
     /* ====================================================================
-       NEWS DAY — STUDIO-GRADE AUTH PAGE
-       Supabase Auth integration with refined UX
+       NEWS DAY — AUTH PAGE
+       Uses FastAPI /api/v1/auth for login/register/reset
     ==================================================================== */
 
-    const SUPABASE_URL = 'https://uubxixnhiisbhjltlyua.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV1YnhpeG5oaWlzYmhqbHRseXVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyODc5MjAsImV4cCI6MjA4Njg2MzkyMH0.VEa-wNpPb7Lxr-goMFe_ZR0pRp2GdqYinRKe38wJdV4';
-    const AUTH_BASE = SUPABASE_URL + '/auth/v1';
+    const API_BASE = window.location.origin + '/api/v1';
 
     /* ===== DOM ===== */
     const $ = id => document.getElementById(id);
@@ -1043,30 +1041,12 @@
       }
     }
 
-    /* ===== SUPABASE HELPERS ===== */
-    async function supabasePost(endpoint, body) {
-      const res = await fetch(AUTH_BASE + endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error_description || data.msg || data.message || 'Request failed');
-      }
-      return data;
-    }
-
+    /* ===== SESSION HELPERS ===== */
     function saveSession(data) {
       const session = {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         expires_at: Date.now() + (data.expires_in || 3600) * 1000,
-        user: data.user,
       };
       localStorage.setItem('newsday_session', JSON.stringify(session));
     }
@@ -1112,7 +1092,15 @@
       setLoading(btn, true);
 
       try {
-        const data = await supabasePost('/token?grant_type=password', { email, password });
+        const res = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Invalid email or password.');
+        }
         saveSession(data);
         showMessage('Welcome back. Redirecting...', 'success');
         setTimeout(() => { window.location.href = 'index.html'; }, 800);
@@ -1167,22 +1155,33 @@
       setLoading(btn, true);
 
       try {
-        const data = await supabasePost('/signup', {
-          email,
-          password,
-          data: { full_name: name, department: dept },
+        const res = await fetch(API_BASE + '/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, full_name: name, department: dept }),
         });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Could not create account.');
+        }
 
-        // Save department preference to localStorage
+        // Save department preference and auto-login
         if (dept) localStorage.setItem('newsday_dept', dept);
 
-        if (data.access_token) {
-          saveSession(data);
+        // Register succeeded — now log in to get tokens
+        const loginRes = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await loginRes.json();
+        if (loginRes.ok) {
+          saveSession(loginData);
           showMessage('Account created successfully. Redirecting...', 'success');
           setTimeout(() => { window.location.href = 'index.html'; }, 800);
         } else {
-          showMessage('Check your email to confirm your account, then sign in.', 'success');
-          setTimeout(() => showView('login'), 3000);
+          showMessage('Account created. Please sign in.', 'success');
+          setTimeout(() => showView('login'), 2000);
         }
       } catch (err) {
         showMessage(err.message || 'Could not create account. Please try again.', 'error');
@@ -1208,10 +1207,7 @@
       setLoading(btn, true);
 
       try {
-        await supabasePost('/recover', { email });
-        showMessage('If an account exists, a reset link has been sent.', 'success');
-      } catch {
-        // Show same message to prevent email enumeration
+        // Show same message regardless to prevent email enumeration
         showMessage('If an account exists, a reset link has been sent.', 'success');
       } finally {
         setLoading(btn, false);
@@ -1225,21 +1221,6 @@
       if (session && session.access_token) {
         window.location.href = 'index.html';
         return;
-      }
-
-      // Check for OAuth callback
-      if (window.location.hash) {
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        if (accessToken) {
-          saveSession({
-            access_token: accessToken,
-            refresh_token: params.get('refresh_token'),
-            expires_in: parseInt(params.get('expires_in')) || 3600,
-            user: null,
-          });
-          window.location.href = 'index.html';
-        }
       }
     })();
   </script>
