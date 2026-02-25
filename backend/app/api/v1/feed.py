@@ -86,7 +86,9 @@ async def search_content(
 ):
     """Search content by title, summary, or tags."""
     
-    search_term = f"%{q.lower()}%"
+    # Escape LIKE wildcards to prevent wildcard abuse/DoS
+    safe_q = q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    search_term = f"%{safe_q}%"
     
     result = await db.execute(
         select(ProcessedContent)

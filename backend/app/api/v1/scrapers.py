@@ -226,11 +226,12 @@ async def get_celery_queue_status(
 
 @router.api_route("/dev/refresh", methods=["GET", "POST"])
 async def dev_refresh_content(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
-    """Dev-only: Reset, re-scrape HN, and process all content. No auth required."""
+    """Dev-only: Reset, re-scrape HN, and process all content. Requires admin auth."""
     from app.config import settings
-    if not getattr(settings, 'DEBUG', True):
+    if not settings.DEBUG:
         raise HTTPException(status_code=403, detail="Only available in debug mode")
 
     from app.models import ProcessedContent as PC

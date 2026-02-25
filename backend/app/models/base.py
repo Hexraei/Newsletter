@@ -47,7 +47,9 @@ class Base(AsyncAttrs, DeclarativeBase):
 engine = create_async_engine(
     settings.DATABASE_URL,
     pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=0,
+    max_overflow=10,
+    pool_timeout=10,
+    pool_recycle=1800,
     echo=settings.DEBUG
 )
 

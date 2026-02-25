@@ -256,11 +256,20 @@ The system auto-selects the best available provider at runtime with automatic fa
 - **XSS protection** — all user-facing content escaped via `escapeHtml()` before DOM insertion across all frontend pages
 - **Rate limiting** — login (5/min), register (3/hour), global (60/min) via slowapi
 - **CORS** — explicit origin allowlist only, no wildcard even in debug mode
-- **SQL injection** — SQLAlchemy ORM with parameterized queries throughout
+- **SQL injection** — SQLAlchemy ORM with parameterized queries throughout; LIKE wildcards escaped in search
 - **Password hashing** — bcrypt, no plain-text storage
+- **Mass assignment protection** — user profile updates use an explicit field whitelist; `is_admin`, `is_active`, and `hashed_password` cannot be set via API
+- **SSRF protection** — image fetcher validates all external URLs against private IPs, loopback, link-local, and cloud metadata endpoints before fetching
+- **Admin-only dev endpoints** — `/dev/refresh` requires admin authentication; DEBUG defaults to `false`
+- **Atomic DB operations** — read counts use SQL-level increments; content dedup uses unique constraint instead of SELECT-then-INSERT
+- **Celery task resilience** — failed tasks retry up to 3× with exponential backoff instead of silently swallowing errors
+- **Health check** — `/health` endpoint validates DB connectivity with `SELECT 1`; returns 503 if database is unreachable
+- **Connection pool safety** — DB pool allows overflow with timeouts to prevent deadlocks under load
 - **Structured logging** — Python `logging` module (no `print()` in production paths)
 - **Docker hardened** — secrets via `${VAR:?}` required env vars, `DEBUG=false`, no `--reload`, Alembic migrations run before app startup
 - **CI enforced** — black, isort, mypy, flake8 checks block on failure
+
+> For full details on the 11 security/reliability fixes applied, see [SECURITY_FIXES_REPORT.md](SECURITY_FIXES_REPORT.md).
 
 ### Key Files
 

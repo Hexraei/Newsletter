@@ -1,11 +1,14 @@
 """Celery tasks for running scrapers."""
 
+import logging
 from celery import Celery
 from celery.schedules import crontab
 
 from app.config import settings
 from app.models.base import AsyncSessionLocal
 from app.services.scraper_service import ScraperService
+
+logger = logging.getLogger(__name__)
 
 # Create Celery app
 celery_app = Celery(
@@ -191,9 +194,9 @@ def scrape_all(self):
     return asyncio.run(_scrape_all())
 
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def process_pending_content(self):
-    """Process pending raw content."""
+    """Process pending raw content with retry on failure."""
     import asyncio
     
     async def _process():
@@ -207,7 +210,8 @@ def process_pending_content(self):
     try:
         return asyncio.run(_process())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error("process_pending_content failed (attempt %d): %s", self.request.retries + 1, e)
+        raise self.retry(exc=e)
 
 
 # Manual trigger endpoint helpers

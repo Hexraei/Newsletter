@@ -76,7 +76,11 @@ class AuthService:
     
     async def update_user(self, user: User, user_data: UserUpdate) -> User:
         """Update user information."""
+        ALLOWED_FIELDS = {"full_name", "department", "year_of_study", "college_name", "password"}
         update_data = user_data.model_dump(exclude_unset=True)
+        
+        # Filter to only allowed fields — block is_admin, is_active, etc.
+        update_data = {k: v for k, v in update_data.items() if k in ALLOWED_FIELDS}
         
         # Handle password separately
         if "password" in update_data:

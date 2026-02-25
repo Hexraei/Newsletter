@@ -326,13 +326,6 @@ class ScraperService:
         content_str = f"{item['title']}{item['url']}{item.get('author', '')}"
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()[:32]
         
-        # Check for duplicates
-        result = await self.db.execute(
-            select(RawContent).where(RawContent.content_hash == content_hash)
-        )
-        if result.scalar_one_or_none():
-            return False  # Duplicate
-        
         # Create raw content entry
         metadata = item.get("metadata", {})
         # Merge engagement data into metadata so scoring can use it
@@ -352,9 +345,14 @@ class ScraperService:
             status="pending"
         )
         
-        self.db.add(raw)
-        await self.db.flush()
-        return True
+        try:
+            self.db.add(raw)
+            await self.db.flush()
+            return True
+        except Exception:
+            # Duplicate content_hash — rollback and skip
+            await self.db.rollback()
+            return False
     
     async def run_all_scrapers(self) -> Dict:
         """Run all scrapers."""

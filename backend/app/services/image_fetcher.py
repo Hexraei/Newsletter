@@ -65,11 +65,47 @@ class ImageCandidate:
 class ImageFetcher:
     """Multi-source semantic image search with embedding-based ranking."""
 
+    _shared_client: httpx.AsyncClient | None = None
+
     def __init__(self, sources: list[str] | None = None, timeout: float = 10.0):
         all_sources = ["openverse", "wikimedia", "pixabay", "pexels"]
         self.sources = sources or all_sources
         self.timeout = timeout
         self._openverse_token: str | None = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create a shared httpx client with connection pooling."""
+        if ImageFetcher._shared_client is None or ImageFetcher._shared_client.is_closed:
+            ImageFetcher._shared_client = httpx.AsyncClient(
+                timeout=self.timeout,
+                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+                headers={"User-Agent": "NewsDay/1.0 (https://github.com/newsday; newsday@localhost) python-httpx"},
+            )
+        return ImageFetcher._shared_client
+
+    @staticmethod
+    def _is_safe_url(url: str) -> bool:
+        """Validate image URL is safe (no SSRF). Must be https and not a private IP."""
+        if not url:
+            return False
+        from urllib.parse import urlparse
+        import ipaddress
+        parsed = urlparse(url)
+        if parsed.scheme not in ("https", "http"):
+            return False
+        hostname = parsed.hostname or ""
+        # Block private/internal IPs
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        except ValueError:
+            pass  # hostname is a domain name, not IP — OK
+        # Block cloud metadata endpoints
+        blocked = {"169.254.169.254", "metadata.google.internal", "localhost", "127.0.0.1", "0.0.0.0"}
+        if hostname in blocked:
+            return False
+        return True
 
     async def fetch_best_image(
         self, text: str, top_k: int = 1
@@ -183,6 +219,8 @@ class ImageFetcher:
         for result in results:
             if isinstance(result, list):
                 candidates.extend(result)
+        # Filter out unsafe URLs (SSRF protection)
+        candidates = [c for c in candidates if self._is_safe_url(c.url)]
         return candidates
 
     async def _safe_search(self, method, query: str) -> list[ImageCandidate]:
@@ -295,90 +333,89 @@ class ImageFetcher:
             logger.warning("Could not save Openverse credentials: %s", e)
 
     async def _search_openverse(self, query: str) -> list[ImageCandidate]:
-        async with httpx.AsyncClient() as client:
-            token = await self._get_openverse_token(client)
-            headers = {}
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
+        client = await self._get_client()
+        token = await self._get_openverse_token(client)
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
 
-            resp = await client.get(
-                "https://api.openverse.org/v1/images/",
-                params={"q": query, "page_size": 10, "mature": "false"},
-                headers=headers,
-                timeout=self.timeout,
-            )
-            if resp.status_code != 200:
-                return []
+        resp = await client.get(
+            "https://api.openverse.org/v1/images/",
+            params={"q": query, "page_size": 10, "mature": "false"},
+            headers=headers,
+            timeout=self.timeout,
+        )
+        if resp.status_code != 200:
+            return []
 
-            results = []
-            for item in resp.json().get("results", []):
-                url = item.get("url", "")
-                if not url:
-                    continue
-                results.append(ImageCandidate(
-                    url=url,
-                    source_url=item.get("foreign_landing_url", ""),
-                    title=item.get("title", ""),
-                    tags=" ".join(t.get("name", "") for t in (item.get("tags") or [])),
-                    description="",
-                    creator=item.get("creator", ""),
-                    provider="openverse",
-                    license=item.get("license", ""),
-                ))
-            return results
+        results = []
+        for item in resp.json().get("results", []):
+            url = item.get("url", "")
+            if not url:
+                continue
+            results.append(ImageCandidate(
+                url=url,
+                source_url=item.get("foreign_landing_url", ""),
+                title=item.get("title", ""),
+                tags=" ".join(t.get("name", "") for t in (item.get("tags") or [])),
+                description="",
+                creator=item.get("creator", ""),
+                provider="openverse",
+                license=item.get("license", ""),
+            ))
+        return results
 
     # ── Wikimedia Commons ──────────────────────────────────────
 
     async def _search_wikimedia(self, query: str) -> list[ImageCandidate]:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://commons.wikimedia.org/w/api.php",
-                params={
-                    "action": "query",
-                    "generator": "search",
-                    "gsrsearch": query,
-                    "gsrnamespace": 6,  # File namespace
-                    "gsrlimit": 10,
-                    "prop": "imageinfo",
-                    "iiprop": "url|extmetadata|size",
-                    "iiurlwidth": 800,
-                    "format": "json",
-                },
-                headers={"User-Agent": "NewsDay/1.0 (https://github.com/newsday; newsday@localhost) python-httpx"},
-                timeout=self.timeout,
-            )
-            if resp.status_code != 200:
-                return []
+        client = await self._get_client()
+        resp = await client.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={
+                "action": "query",
+                "generator": "search",
+                "gsrsearch": query,
+                "gsrnamespace": 6,  # File namespace
+                "gsrlimit": 10,
+                "prop": "imageinfo",
+                "iiprop": "url|extmetadata|size",
+                "iiurlwidth": 800,
+                "format": "json",
+            },
+            timeout=self.timeout,
+        )
+        if resp.status_code != 200:
+            return []
 
-            pages = resp.json().get("query", {}).get("pages", {})
-            results = []
-            for page in pages.values():
-                imageinfo = (page.get("imageinfo") or [{}])[0]
-                url = imageinfo.get("thumburl") or imageinfo.get("url", "")
-                if not url:
-                    continue
+        pages = resp.json().get("query", {}).get("pages", {})
+        results = []
+        for page in pages.values():
+            imageinfo = (page.get("imageinfo") or [{}])[0]
+            url = imageinfo.get("thumburl") or imageinfo.get("url", "")
+            if not url:
+                continue
 
-                ext = imageinfo.get("extmetadata", {})
-                desc = ext.get("ImageDescription", {}).get("value", "")
-                cats = ext.get("Categories", {}).get("value", "")
-                author = ext.get("Artist", {}).get("value", "")
-                lic = ext.get("LicenseShortName", {}).get("value", "")
-                # Strip HTML tags from metadata
-                import re
-                desc = re.sub(r"<[^>]+>", " ", desc).strip()
-                author = re.sub(r"<[^>]+>", " ", author).strip()
+            ext = imageinfo.get("extmetadata", {})
+            desc = ext.get("ImageDescription", {}).get("value", "")
+            cats = ext.get("Categories", {}).get("value", "")
+            author = ext.get("Artist", {}).get("value", "")
+            lic = ext.get("LicenseShortName", {}).get("value", "")
+            # Strip HTML tags from metadata
+            import re
+            desc = re.sub(r"<[^>]+>", " ", desc).strip()
+            author = re.sub(r"<[^>]+>", " ", author).strip()
 
-                results.append(ImageCandidate(
-                    url=url,
-                    source_url=f"https://commons.wikimedia.org/wiki/{page.get('title', '')}",
-                    title=page.get("title", "").replace("File:", "").rsplit(".", 1)[0],
-                    tags=cats,
-                    description=desc[:200],
-                    creator=author[:100],
-                    provider="wikimedia",
-                    license=lic,
-                ))
-            return results
+            results.append(ImageCandidate(
+                url=url,
+                source_url=f"https://commons.wikimedia.org/wiki/{page.get('title', '')}",
+                title=page.get("title", "").replace("File:", "").rsplit(".", 1)[0],
+                tags=cats,
+                description=desc[:200],
+                creator=author[:100],
+                provider="wikimedia",
+                license=lic,
+            ))
+        return results
 
     # ── Pixabay ────────────────────────────────────────────────
 
@@ -387,28 +424,28 @@ class ImageFetcher:
         if not api_key:
             return []
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://pixabay.com/api/",
-                params={"key": api_key, "q": query, "per_page": 10, "safesearch": "true"},
-                timeout=self.timeout,
-            )
-            if resp.status_code != 200:
-                return []
+        client = await self._get_client()
+        resp = await client.get(
+            "https://pixabay.com/api/",
+            params={"key": api_key, "q": query, "per_page": 10, "safesearch": "true"},
+            timeout=self.timeout,
+        )
+        if resp.status_code != 200:
+            return []
 
-            results = []
-            for hit in resp.json().get("hits", []):
-                results.append(ImageCandidate(
-                    url=hit.get("webformatURL", ""),
-                    source_url=hit.get("pageURL", ""),
-                    title=hit.get("tags", ""),
-                    tags=hit.get("tags", ""),
-                    description="",
-                    creator=hit.get("user", ""),
-                    provider="pixabay",
-                    license="Pixabay License",
-                ))
-            return results
+        results = []
+        for hit in resp.json().get("hits", []):
+            results.append(ImageCandidate(
+                url=hit.get("webformatURL", ""),
+                source_url=hit.get("pageURL", ""),
+                title=hit.get("tags", ""),
+                tags=hit.get("tags", ""),
+                description="",
+                creator=hit.get("user", ""),
+                provider="pixabay",
+                license="Pixabay License",
+            ))
+        return results
 
     # ── Pexels ─────────────────────────────────────────────────
 
@@ -417,26 +454,26 @@ class ImageFetcher:
         if not api_key:
             return []
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://api.pexels.com/v1/search",
-                params={"query": query, "per_page": 10},
-                headers={"Authorization": api_key},
-                timeout=self.timeout,
-            )
-            if resp.status_code != 200:
-                return []
+        client = await self._get_client()
+        resp = await client.get(
+            "https://api.pexels.com/v1/search",
+            params={"query": query, "per_page": 10},
+            headers={"Authorization": api_key},
+            timeout=self.timeout,
+        )
+        if resp.status_code != 200:
+            return []
 
-            results = []
-            for photo in resp.json().get("photos", []):
-                results.append(ImageCandidate(
-                    url=photo.get("src", {}).get("medium", ""),
-                    source_url=photo.get("url", ""),
-                    title=photo.get("alt", ""),
-                    tags="",
-                    description=photo.get("alt", ""),
-                    creator=photo.get("photographer", ""),
-                    provider="pexels",
-                    license="Pexels License",
-                ))
-            return results
+        results = []
+        for photo in resp.json().get("photos", []):
+            results.append(ImageCandidate(
+                url=photo.get("src", {}).get("medium", ""),
+                source_url=photo.get("url", ""),
+                title=photo.get("alt", ""),
+                tags="",
+                description=photo.get("alt", ""),
+                creator=photo.get("photographer", ""),
+                provider="pexels",
+                license="Pexels License",
+            ))
+        return results

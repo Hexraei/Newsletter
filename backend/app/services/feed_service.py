@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProcessedContent, RawContent, Source
@@ -150,18 +150,55 @@ class FeedService:
         ]
     
     async def get_breaking_news(self, limit: int = 5, department: str = None) -> List[dict]:
-        """Get breaking news alerts.
+        """Get breaking news alerts with SQL-level ranking.
 
-        Ranking is based on:
-        - breaking_score/attractiveness_score
-        - recency boost (newer is better)
-        - explicit is_breaking flag bonus
-        This prevents noisy but old high-score posts from dominating breaking alerts.
+        Scoring done entirely in SQL:
+        - base = COALESCE(breaking_score, attractiveness_score, 0)
+        - recency boost: +20 (<=2h), +15 (<=6h), +10 (<=12h), +5 (<=24h)
+        - is_breaking bonus: +10
+        - urgent term bonus: +6 if title/summary contains breaking/outage/security/etc.
         """
 
-        recent_window = datetime.now(timezone.utc) - timedelta(hours=48)
+        now = datetime.now(timezone.utc)
+        recent_window = now - timedelta(hours=48)
+
+        age_hours = func.extract('epoch', literal(now) - ProcessedContent.published_at) / 3600.0
+
+        recency_boost = case(
+            (age_hours <= 2, 20),
+            (age_hours <= 6, 15),
+            (age_hours <= 12, 10),
+            (age_hours <= 24, 5),
+            else_=0,
+        )
+
+        breaking_bonus = case(
+            (ProcessedContent.is_breaking == True, 10),
+            else_=0,
+        )
+
+        text_col = func.lower(func.coalesce(ProcessedContent.title, '') + ' ' + func.coalesce(ProcessedContent.summary, ''))
+        urgent_bonus = case(
+            (
+                text_col.like('%breaking%') |
+                text_col.like('%outage%') |
+                text_col.like('%security%') |
+                text_col.like('%breach%') |
+                text_col.like('%launch%') |
+                text_col.like('%acquires%') |
+                text_col.like('%ban%') |
+                text_col.like('%announces%') |
+                text_col.like('%critical%'),
+                6,
+            ),
+            else_=0,
+        )
+
+        base_score = func.coalesce(ProcessedContent.breaking_score, ProcessedContent.attractiveness_score, literal(0))
+        total_score = (base_score + recency_boost + breaking_bonus + urgent_bonus).label('rank_score')
+
         query = (
-            select(ProcessedContent)
+            select(ProcessedContent, total_score)
             .where(ProcessedContent.status == "published")
             .where(ProcessedContent.published_at >= recent_window)
         )
@@ -169,69 +206,39 @@ class FeedService:
             query = query.where(
                 ProcessedContent.department_tags.contains([department])
             )
-        query = query.order_by(ProcessedContent.published_at.desc()).limit(200)
-        result = await self.db.execute(query)
-        candidates = result.scalars().all()
+        # Primary: high scoring breaking candidates (score >= 55)
+        primary_query = (
+            query
+            .where(total_score >= 55)
+            .order_by(total_score.desc())
+            .limit(limit)
+        )
+        result = await self.db.execute(primary_query)
+        rows = result.all()
+        items = [row[0] for row in rows]
 
-        def rank(item: ProcessedContent) -> float:
-            base = float(item.breaking_score or item.attractiveness_score or 0)
-
-            # Recency boost
-            age_hours = 999.0
-            if item.published_at:
-                dt = item.published_at
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                age_hours = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds() / 3600)
-
-            if age_hours <= 2:
-                base += 20
-            elif age_hours <= 6:
-                base += 15
-            elif age_hours <= 12:
-                base += 10
-            elif age_hours <= 24:
-                base += 5
-
-            if item.is_breaking:
-                base += 10
-
-            text = f"{item.title or ''} {item.summary or ''}".lower()
-            urgent_terms = [
-                "breaking",
-                "outage",
-                "security",
-                "breach",
-                "launch",
-                "acquires",
-                "ban",
-                "announces",
-                "critical",
-            ]
-            if any(t in text for t in urgent_terms):
-                base += 6
-
-            return base
-
-        ranked = []
-        for item in candidates:
-            score = rank(item)
-            # Keep only strong breaking candidates
-            if score >= 55:
-                ranked.append((score, item))
-
-        ranked.sort(key=lambda x: x[0], reverse=True)
-        items = [item for _, item in ranked[:limit]]
-
-        # Fallback: if not enough breaking candidates, include top recent by attractiveness
+        # Fallback: if not enough, fill with top recent by attractiveness
         if len(items) < limit:
-            existing_ids = {item.id for item in items}
-            fillers = [
-                c for c in candidates
-                if c.id not in existing_ids and (c.attractiveness_score or 0) >= 35
-            ]
-            fillers.sort(key=lambda i: float(i.attractiveness_score or 0), reverse=True)
-            items.extend(fillers[: max(0, limit - len(items))])
+            existing_ids = [item.id for item in items]
+            fallback_query = (
+                select(ProcessedContent)
+                .where(ProcessedContent.status == "published")
+                .where(ProcessedContent.published_at >= recent_window)
+                .where(ProcessedContent.attractiveness_score >= 35)
+            )
+            if department:
+                fallback_query = fallback_query.where(
+                    ProcessedContent.department_tags.contains([department])
+                )
+            if existing_ids:
+                fallback_query = fallback_query.where(
+                    ProcessedContent.id.not_in(existing_ids)
+                )
+            fallback_query = fallback_query.order_by(
+                ProcessedContent.attractiveness_score.desc()
+            ).limit(limit - len(items))
+            fb_result = await self.db.execute(fallback_query)
+            items.extend(fb_result.scalars().all())
 
         # Fetch original URLs
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
@@ -417,18 +424,16 @@ class FeedService:
         }
     
     async def record_read(self, content_id: str) -> bool:
-        """Record that content was read."""
+        """Record that content was read (atomic DB-level increment)."""
+        from sqlalchemy import update as sa_update
         
         result = await self.db.execute(
-            select(ProcessedContent).where(ProcessedContent.id == content_id)
+            sa_update(ProcessedContent)
+            .where(ProcessedContent.id == content_id)
+            .values(read_count=ProcessedContent.read_count + 1)
         )
-        content = result.scalar_one_or_none()
-        
-        if content:
-            content.read_count += 1
-            await self.db.commit()
-            return True
-        return False
+        await self.db.commit()
+        return result.rowcount > 0
     
     async def get_feed_stats(self) -> Dict:
         """Get feed statistics."""

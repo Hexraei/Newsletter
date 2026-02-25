@@ -64,10 +64,22 @@ app.add_middleware(
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint — validates DB connectivity."""
+    from sqlalchemy import text
+    from app.models.base import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "version": settings.VERSION, "database": f"error: {e}"}
+        )
     return {
         "status": "healthy",
         "version": settings.VERSION,
+        "database": db_status,
     }
 
 
