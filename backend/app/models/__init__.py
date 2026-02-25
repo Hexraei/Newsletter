@@ -10,6 +10,7 @@ from app.models.content import (
     VectorEmbedding,
     VelocityMetrics,
 )
+from app.models.skills import SkillRanking
 from app.models.user import User, UserFeedback, UserReads, UserSaves
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "HooklineQueue",
     "BreakingAlert",
     "VelocityMetrics",
+    "SkillRanking",
 ]

@@ -36,6 +36,7 @@ NEWS DAY is your department-specific daily briefing. Instead of scrolling throug
 - **Article Images** — Every article displays an image. Original source images are used when available; otherwise, semantically matched images are fetched from Openverse & Wikimedia Commons with proper attribution (creator, license, source link)
 - **Image Attribution** — All fetched images display creator credits, license type (CC BY-SA, etc.), and source links as required by API guidelines
 - **Research Papers** — 2–3 highly-cited landmark papers at the top, followed by 10–15 additional suggestions on a dedicated research page
+- **Best Skills for Placements** — Ranked, department-specific placement skills with ratings, evidence, learning resources (NPTEL + Coursera/Udemy), project ideas, and time estimates. 10–15 skills per department across 10 branches. Filter by category (core/tool/soft), sort by rating or name.
 - **Department Feed** — Switch departments instantly from the navbar; content filters immediately
 - **Stories & Insights** — Browse all recent stories and AI-generated summaries
 - **Teacher Guidance Suggestions** — AI summaries now include classroom instruction hints based on topic keywords (example: if news is about 3D CAD, teachers are prompted to assign a hands-on CAD modeling activity)
@@ -235,6 +236,12 @@ The system auto-selects the best available provider at runtime with automatic fa
 **Scrapers** (`/api/v1/scrapers`)  
 `GET /status` · `POST /run/{name}` · `POST /run-all` · `POST /process-pending`
 
+**Skills** (`/api/v1/skills`)  
+`GET /departments` — list departments with skill data  
+`GET /{department}` — ranked skills with evidence, resources, project ideas  
+`POST /track` · `DELETE /track` — user skill tracking  
+`GET /tracking/me` — get tracked skills
+
 ### Tech Stack
 
 | Layer | Technology |
@@ -285,6 +292,9 @@ The system auto-selects the best available provider at runtime with automatic fa
 | `scrapers/fetch_images.py` | Backfill images for articles missing `featured_image_url` |
 | `scrapers/refresh_cache.py` | Writes one JSONB row per department to `cached_feeds` |
 | `scraper_platform/src/scrapers/rss_scraper.py` | RSS/Atom parser with IST timezone handling |
+| `backend/app/services/skills_service.py` | Placement skills service — cache-first with baseline fallback |
+| `backend/app/data/skill_baselines.py` | Pre-seeded skill data for all 10 departments (120+ skills) |
+| `frontend/skills.html` | Skills for Placements page — ranked cards, filters, expand/collapse |
 
 ### Adding a New Source
 
