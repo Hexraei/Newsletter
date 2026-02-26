@@ -10,7 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -61,11 +60,11 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Alembic
-alembic/versions/*.py
-!alembic/versions/001_initial_migration.py
-!alembic/versions/789a10644274_fix_user_model_foreign_keys.py
-!alembic/versions/779d1e6be265_add_skill_rankings_table.py
+# Alembic auto-generated migration files (keep manually-reviewed ones)
+**/alembic/versions/*.py
+!**/alembic/versions/001_initial_migration.py
+!**/alembic/versions/789a10644274_fix_user_model_foreign_keys.py
+!**/alembic/versions/779d1e6be265_add_skill_rankings_table.py
 
 # Data
 data/
