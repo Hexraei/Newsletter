@@ -6,7 +6,7 @@ import os
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_root, "backend"))
-sys.path.insert(0, os.path.join(_root, "scraper_platform"))
+sys.path.insert(0, _root)  # for scrapers.lib imports
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(_root, "backend", ".env"))
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from app.models.base import AsyncSessionLocal
 from app.models.content import Source, RawContent
-from src.scrapers.rss_scraper import RSSFeedScraper
+from scrapers.lib.scrapers.rss_scraper import RSSFeedScraper
 
 # Max concurrent feed fetches (avoid overwhelming targets)
 CONCURRENCY = 5

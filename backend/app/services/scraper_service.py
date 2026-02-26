@@ -12,17 +12,17 @@ from app.models import ProcessedContent, RawContent, Source
 import sys
 import os
 
-# Add scraper_platform to path
-scraper_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'scraper_platform')
-if scraper_path not in sys.path:
-    sys.path.insert(0, scraper_path)
+# Add project root to path for scrapers.lib imports
+root_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
 
-from src.scrapers.github_scraper import GitHubScraper
-from src.scrapers.hackernews_scraper import HackerNewsScraper
-from src.scrapers.medium_scraper import MediumScraper
-from src.scrapers.producthunt_scraper import ProductHuntScraper
-from src.scrapers.reddit_scraper import RedditScraper
-from src.scrapers.twitter_scraper import TwitterScraper
+from scrapers.lib.scrapers.github_scraper import GitHubScraper
+from scrapers.lib.scrapers.hackernews_scraper import HackerNewsScraper
+from scrapers.lib.scrapers.medium_scraper import MediumScraper
+from scrapers.lib.scrapers.producthunt_scraper import ProductHuntScraper
+from scrapers.lib.scrapers.reddit_scraper import RedditScraper
+from scrapers.lib.scrapers.twitter_scraper import TwitterScraper
 
 
 class ScraperService:

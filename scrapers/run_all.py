@@ -10,7 +10,7 @@ import os
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_root, "backend"))
-sys.path.insert(0, os.path.join(_root, "scraper_platform"))
+sys.path.insert(0, _root)  # for scrapers.lib imports
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(_root, "backend", ".env"))
