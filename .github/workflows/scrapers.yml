@@ -1,0 +1,94 @@
+name: Run Scrapers
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # RSS + general scrapers — every 6 hours
+    - cron: '0 2 * * *'     # Research papers — daily at 2 AM UTC
+  workflow_dispatch:         # Manual trigger from Actions tab
+
+env:
+  PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend:${{ github.workspace }}/scraper_platform
+
+jobs:
+  scrape-rss:
+    name: RSS Feeds
+    if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            scraper_platform/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install -r scraper_platform/requirements.txt
+          pip install python-dotenv feedparser beautifulsoup4 aiohttp
+
+      - name: Run RSS scrapers
+        run: python run_rss_scrapers.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  scrape-general:
+    name: General Scrapers
+    if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            scraper_platform/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install -r scraper_platform/requirements.txt
+          pip install python-dotenv feedparser beautifulsoup4 aiohttp
+
+      - name: Run general scrapers
+        run: python run_scrapers.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  scrape-research:
+    name: Research Papers
+    if: github.event.schedule == '0 2 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            scraper_platform/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install -r scraper_platform/requirements.txt
+          pip install python-dotenv feedparser beautifulsoup4 aiohttp
+
+      - name: Run research scrapers
+        run: python run_research_scraper.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

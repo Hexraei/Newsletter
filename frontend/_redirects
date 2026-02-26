@@ -1,0 +1,3 @@
+# Proxy API requests to Railway backend
+/api/*  RAILWAY_BACKEND_URL/api/:splat  200
+/health RAILWAY_BACKEND_URL/health       200

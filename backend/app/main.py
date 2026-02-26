@@ -83,11 +83,18 @@ async def health_check():
     }
 
 
-# Root endpoint - redirect to frontend
+# Root endpoint
 @app.get("/", tags=["Root"])
 async def root():
-    """Redirect to frontend."""
-    return RedirectResponse(url="/static/index.html")
+    """Redirect to frontend if available, else show API info."""
+    frontend_dir = Path(__file__).parent.parent.parent / "frontend"
+    if frontend_dir.exists():
+        return RedirectResponse(url="/static/index.html")
+    return {
+        "app": "NEWS DAY API",
+        "docs": "/docs",
+        "health": "/health",
+    }
 
 
 # Include API router

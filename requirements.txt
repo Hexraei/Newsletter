@@ -1,0 +1,7 @@
+# Root requirements — installs backend + scraper deps for Railway/Actions
+-r backend/requirements.txt
+-r scraper_platform/requirements.txt
+python-dotenv>=1.0.0
+feedparser>=6.0.0
+beautifulsoup4>=4.12.0
+aiohttp>=3.9.0

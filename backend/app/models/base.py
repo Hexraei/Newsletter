@@ -1,5 +1,6 @@
 """SQLAlchemy base configuration."""
 
+import ssl
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -43,14 +44,27 @@ class Base(AsyncAttrs, DeclarativeBase):
         return result
 
 
+# Build connect_args for SSL when connecting to cloud Postgres (e.g. Supabase)
+_connect_args: dict = {}
+_db_url = settings.DATABASE_URL
+if "ssl=require" in _db_url or "sslmode=require" in _db_url:
+    _ssl_ctx = ssl.create_default_context()
+    _ssl_ctx.check_hostname = False
+    _ssl_ctx.verify_mode = ssl.CERT_NONE
+    _connect_args["ssl"] = _ssl_ctx
+    # Strip ssl param from URL — asyncpg handles it via connect_args
+    _db_url = _db_url.replace("?ssl=require", "").replace("&ssl=require", "")
+    _db_url = _db_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _db_url,
     pool_size=settings.DATABASE_POOL_SIZE,
     max_overflow=10,
     pool_timeout=10,
     pool_recycle=1800,
-    echo=settings.DEBUG
+    echo=settings.DEBUG,
+    connect_args=_connect_args,
 )
 
 # Create async session factory
