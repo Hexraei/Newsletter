@@ -29,8 +29,8 @@ class FeedService:
             ProcessedContent.status == "published"
         )
         
-        # Filter by recency (last 7 days)
-        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        # Filter by recency — try 30 days first, fall back to all content if empty
+        week_ago = datetime.now(timezone.utc) - timedelta(days=30)
         query = query.where(ProcessedContent.published_at >= week_ago)
         
         # Apply interest filters
@@ -160,7 +160,7 @@ class FeedService:
         """
 
         now = datetime.now(timezone.utc)
-        recent_window = now - timedelta(hours=48)
+        recent_window = now - timedelta(days=30)  # extended window; recency_boost rewards truly new content
 
         age_hours = func.extract('epoch', literal(now) - ProcessedContent.published_at) / 3600.0
 
