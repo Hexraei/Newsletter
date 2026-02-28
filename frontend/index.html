@@ -494,14 +494,16 @@
 
     .article-card-visual {
       width: 100%;
-      aspect-ratio: 4 / 5;
+      height: 180px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-size: cover;
+      background-position: center;
       overflow: hidden;
       position: relative;
       margin-bottom: 20px;
       display: flex; align-items: center; justify-content: center;
     }
-    .article-card-visual.has-image { background: #e8e5e0; }
+    .article-card-visual.has-image { background-color: #e8e5e0; }
     .article-card-visual .placeholder-icon {
       font-size: 48px; opacity: 0.3; color: #fff;
       font-family: 'DM Sans', sans-serif; font-weight: 700;
@@ -1944,7 +1946,12 @@
       const storyId = registerStory(item);
       const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
 
+      const hasImg = !!(item.image);
+      const imgStyle = hasImg ? `background-image:url('${escapeHtml(item.image)}');` : '';
+      const imgClass = hasImg ? ' has-image' : '';
+      const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
       return `<a class="article-card" href="#" data-story-id="${storyId}">
+        <div class="article-card-visual${imgClass}" style="${imgStyle}">${placeholder}</div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
       </a>`;
@@ -1971,7 +1978,7 @@
       const storyId = registerStory(paper);
       const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
       const cite = paper.citations ? paper.citations + ' citations' : '';
-      const imgStyle = 'background:#f4f0ff';
+      const imgStyle = paper.featured_image_url ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
         <div class="article-card-visual" style="${imgStyle}"></div>
         <div class="article-card-title">${escapeHtml(paper.title)}</div>
@@ -2170,10 +2177,16 @@
         $btn.dataset.storyId = heroStoryId;
         $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
 
-        // Hero image - clear always (not used)
+        // Hero image
         const $visual = $('hero-visual');
         if ($visual) {
-          $visual.style.backgroundImage = '';
+          if (slide.image) {
+            $visual.style.backgroundImage = `url('${slide.image}')`;
+            $visual.style.backgroundSize = 'cover';
+            $visual.style.backgroundPosition = 'center';
+          } else {
+            $visual.style.backgroundImage = '';
+          }
         }
 
         // Update typographic fill

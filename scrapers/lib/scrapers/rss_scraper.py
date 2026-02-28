@@ -89,7 +89,45 @@ class RSSFeedScraper(BaseScraper):
 
         return items
 
-    def _parse_rss(
+    _IMG_TAG_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+
+    def _extract_image_from_entry(self, entry) -> str:
+        """Extract image URL from RSS entry via media:content, enclosure, or img tag."""
+        # media:content (most common in modern feeds)
+        media_content = entry.find("media:content", namespaces=self.NS)
+        if media_content is not None:
+            url = media_content.get("url", "")
+            if url and not url.endswith(".svg"):
+                return url
+
+        # media:thumbnail
+        media_thumb = entry.find("media:thumbnail", namespaces=self.NS)
+        if media_thumb is not None:
+            url = media_thumb.get("url", "")
+            if url and not url.endswith(".svg"):
+                return url
+
+        # enclosure (podcasts + some news feeds)
+        enclosure = entry.find("enclosure")
+        if enclosure is not None:
+            enc_type = enclosure.get("type", "")
+            if enc_type.startswith("image/"):
+                url = enclosure.get("url", "")
+                if url:
+                    return url
+
+        # img tag inside description or content:encoded
+        for tag in ("description", "content:encoded"):
+            ns = self.NS if tag == "content:encoded" else None
+            text = (entry.findtext(tag, namespaces=ns) if ns else entry.findtext(tag)) or ""
+            m = self._IMG_TAG_RE.search(text)
+            if m:
+                url = m.group(1)
+                if url.startswith("http") and not url.endswith(".svg"):
+                    return url
+
+        return ""
+
         self, root, feed_name, feed_type, limit, department_tags
     ) -> List[ScrapedItem]:
         """Parse RSS 2.0 format."""
@@ -115,6 +153,11 @@ class RSSFeedScraper(BaseScraper):
 
             pub_date = self._parse_date(entry.findtext("pubDate") or entry.findtext("dc:date", namespaces=self.NS) or "")
 
+            image_url = self._extract_image_from_entry(entry)
+            metadata = {"feed_name": feed_name, "feed_type": feed_type}
+            if image_url:
+                metadata["og_image"] = image_url
+
             items.append(
                 ScrapedItem(
                     source=f"RSS - {feed_name}",
@@ -125,14 +168,10 @@ class RSSFeedScraper(BaseScraper):
                     author=author,
                     published_at=pub_date,
                     engagement={},
-                    metadata={"feed_name": feed_name, "feed_type": feed_type},
+                    metadata=metadata,
                     department_tags=department_tags or [],
                 )
             )
-
-        return items
-
-    def _parse_atom(
         self, root, feed_name, feed_type, limit, department_tags
     ) -> List[ScrapedItem]:
         """Parse Atom format."""
@@ -172,6 +211,11 @@ class RSSFeedScraper(BaseScraper):
             )
             pub_date = self._parse_date(updated)
 
+            image_url = self._extract_image_from_entry(entry)
+            metadata = {"feed_name": feed_name, "feed_type": feed_type}
+            if image_url:
+                metadata["og_image"] = image_url
+
             items.append(
                 ScrapedItem(
                     source=f"RSS - {feed_name}",
@@ -182,7 +226,7 @@ class RSSFeedScraper(BaseScraper):
                     author=author,
                     published_at=pub_date,
                     engagement={},
-                    metadata={"feed_name": feed_name, "feed_type": feed_type},
+                    metadata=metadata,
                     department_tags=department_tags or [],
                 )
             )

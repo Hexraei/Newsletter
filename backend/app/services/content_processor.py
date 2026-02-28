@@ -202,19 +202,9 @@ class ContentProcessor:
             _log.getLogger(__name__).warning("Headline generation failed, using original title", exc_info=True)
             headline = raw.original_title
         
-        # Extract featured image from metadata, fallback to semantic search
+        # Extract featured image from metadata (og:image from feed or scraper)
         featured_image_url = self._extract_featured_image(raw)
         image_credit = None
-        if not featured_image_url:
-            img_result = await self._fetch_semantic_image(raw.original_title, category=self._detect_category(raw))
-            if img_result:
-                featured_image_url = img_result["url"]
-                image_credit = {
-                    "credit": img_result["credit"],
-                    "source_url": img_result["source_url"],
-                    "provider": img_result["provider"],
-                    "license": img_result["license"],
-                }
         
         # Determine content type
         content_type = self._detect_content_type(raw, source)
@@ -310,16 +300,6 @@ class ContentProcessor:
 
         featured_image_url = self._extract_featured_image(raw)
         image_credit = None
-        if not featured_image_url:
-            img_result = await self._fetch_semantic_image(title, category=self._detect_category(raw))
-            if img_result:
-                featured_image_url = img_result["url"]
-                image_credit = {
-                    "credit": img_result["credit"],
-                    "source_url": img_result["source_url"],
-                    "provider": img_result["provider"],
-                    "license": img_result["license"],
-                }
 
         processed = ProcessedContent(
             raw_content_id=raw.id,
