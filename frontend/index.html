@@ -1944,13 +1944,7 @@
       const storyId = registerStory(item);
       const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
 
-      const hasImg = !!(item.image);
-      const imgStyle = hasImg ? `background-image:url('${escapeHtml(item.image)}');background-size:cover;background-position:center;` : '';
-      const imgClass = hasImg ? ' has-image' : '';
-      const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-      const credit = item.image_credit ? `<div class="image-credit">${escapeHtml(item.image_credit.credit || '')}${item.image_credit.source_url ? ' <a href="' + escapeHtml(item.image_credit.source_url) + '" target="_blank" rel="noopener">source</a>' : ''}</div>` : '';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
-        <div class="article-card-visual${imgClass}" style="${imgStyle}">${placeholder}${credit}</div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
       </a>`;
@@ -1977,7 +1971,7 @@
       const storyId = registerStory(paper);
       const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
       const cite = paper.citations ? paper.citations + ' citations' : '';
-      const imgStyle = paper.featured_image_url ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
+      const imgStyle = 'background:#f4f0ff';
       return `<a class="article-card" href="#" data-story-id="${storyId}">
         <div class="article-card-visual" style="${imgStyle}"></div>
         <div class="article-card-title">${escapeHtml(paper.title)}</div>
@@ -2176,16 +2170,10 @@
         $btn.dataset.storyId = heroStoryId;
         $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
 
-        // Hero image
+        // Hero image - clear always (not used)
         const $visual = $('hero-visual');
         if ($visual) {
-          if (slide.image) {
-            $visual.style.backgroundImage = `url('${slide.image}')`;
-            $visual.style.backgroundSize = 'cover';
-            $visual.style.backgroundPosition = 'center';
-          } else {
-            $visual.style.backgroundImage = '';
-          }
+          $visual.style.backgroundImage = '';
         }
 
         // Update typographic fill
