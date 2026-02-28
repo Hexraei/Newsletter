@@ -1,6 +1,6 @@
 # NEWS DAY — Deployment Guide
 
-This guide covers deploying NEWS DAY to production using **Supabase** (database), **Railway** (backend), **Netlify** (frontend), and **GitHub Actions** (scrapers).
+This guide covers deploying NEWS DAY to production using **Supabase** (database), **Render** (backend), **Netlify** (frontend), and **GitHub Actions** (scrapers).
 
 ---
 
@@ -46,12 +46,15 @@ python seed_department_sources.py
 
 Skills data auto-seeds on first API request — no manual step needed.
 
-### Step 3: Railway — Deploy Backend
+### Step 3: Render — Deploy Backend
 
-1. Go to [railway.app](https://railway.app) and sign in with GitHub
-2. Click **New Project → Deploy from GitHub repo** → select your `newsletter` repo
-3. Railway auto-detects the `Procfile` — no config needed
-4. Go to the service **Variables** tab and add:
+1. Go to [render.com](https://render.com) and sign in with GitHub
+2. Click **New → Web Service** → select your `newsletter` repo
+3. Render auto-detects Python. Configure:
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type:** Free
+4. Go to **Environment** tab and add:
 
 | Variable | Value |
 |---|---|
@@ -61,11 +64,13 @@ Skills data auto-seeds on first API request — no manual step needed.
 | `CORS_ORIGINS` | `https://YOUR-SITE.netlify.app` (update after Netlify deploy) |
 | `DEBUG` | `false` |
 | `GROQ_API_KEY` | Your Groq API key |
-| `PORT` | `8000` (Railway sets this automatically, but set if needed) |
 
-5. Railway gives you a public URL like `https://newsday-production.up.railway.app`
-6. Test it: visit `https://YOUR-URL.up.railway.app/health` — should return `{"status": "healthy"}`
-7. Test API: visit `https://YOUR-URL.up.railway.app/api/v1/skills/CSE`
+5. Click **Create Web Service** — Render gives you a URL like `https://newsday-backend.onrender.com`
+6. Test it: visit `https://YOUR-URL.onrender.com/health` — should return `{"status": "healthy"}`
+7. Test API: visit `https://YOUR-URL.onrender.com/api/v1/skills/CSE`
+
+> ⚠️ Render free tier spins down after 15 min of inactivity. First request after sleep takes ~30s to wake up.
+> Alternatively, use the included `render.yaml` — click **New → Blueprint** in Render dashboard for one-click deploy.
 
 ### Step 4: Netlify — Deploy Frontend
 
@@ -79,9 +84,9 @@ Skills data auto-seeds on first API request — no manual step needed.
 5. After deploy, go to **Site settings → Domain management** to set up a custom domain (optional)
 6. Your site URL will be like `https://YOUR-SITE.netlify.app`
 
-### Step 5: Update CORS on Railway
+### Step 5: Update CORS on Render
 
-Now that you have the Netlify URL, go back to Railway and update:
+Now that you have the Netlify URL, go back to Render → your service → **Environment** and update:
 ```
 CORS_ORIGINS=https://YOUR-SITE.netlify.app
 ```
@@ -102,8 +107,8 @@ CORS_ORIGINS=https://YOUR-SITE.netlify.app
 
 ### Step 7: Verify Everything Works
 
-- [ ] `https://YOUR-RAILWAY-URL/health` returns `{"status": "healthy"}`
-- [ ] `https://YOUR-RAILWAY-URL/api/v1/skills/CSE` returns skill data
+- [ ] `https://YOUR-RENDER-URL/health` returns `{"status": "healthy"}`
+- [ ] `https://YOUR-RENDER-URL/api/v1/skills/CSE` returns skill data
 - [ ] `https://YOUR-NETLIFY-URL` loads the homepage
 - [ ] Clicking "Skills" in navbar loads the skills page with data
 - [ ] GitHub Actions scraper workflow runs successfully
@@ -115,12 +120,12 @@ CORS_ORIGINS=https://YOUR-SITE.netlify.app
 | Service | Free Tier Limits |
 |---|---|
 | **Supabase** | 500MB database, 2 projects, unlimited API requests |
-| **Railway** | $5 free credit/month (~500 hours of a small service) |
+| **Render** | 750 hours/month free (enough for 1 service), spins down after 15 min idle |
 | **Netlify** | 100GB bandwidth/month, unlimited deploys |
 | **GitHub Actions** | 2,000 minutes/month |
 | **Total** | **$0/month** for typical college project traffic |
 
-> ⚠️ Railway's free tier may require a credit card on file. If Railway budget runs out, the backend sleeps — it spins back up on next request (~5-10s cold start).
+> ⚠️ Render free tier spins down after 15 min of inactivity. First request after sleep takes ~30s to wake up. Use [UptimeRobot](https://uptimerobot.com) to ping `/health` every 14 min to keep it alive.
 
 ---
 
@@ -130,16 +135,16 @@ CORS_ORIGINS=https://YOUR-SITE.netlify.app
 Ensure `?ssl=require` is appended to your DATABASE_URL.
 
 ### CORS errors in browser console
-Update `CORS_ORIGINS` on Railway to match your exact Netlify URL (including `https://`).
+Update `CORS_ORIGINS` on Render to match your exact Netlify URL (including `https://`).
 
 ### Scrapers fail in GitHub Actions
 - Check the Actions logs for the specific error
 - Ensure `DATABASE_URL` secret uses the **direct** connection (port `5432`), not the pooler
 - `sentence-transformers` is large (~500MB) — the first run may be slow due to pip install
 
-### Railway deploy fails
-- Check build logs — ensure `requirements.txt` is being picked up
-- Railway looks for requirements.txt in the root by default. The `Procfile` handles the correct directory.
+### Render deploy fails
+- Check build logs — ensure `requirements.txt` is being picked up from the root
+- If the build times out due to `sentence-transformers`, Render free tier has a 15-min build limit
 
 ### Alembic migration fails
 - Make sure you're in the `backend/` directory when running `alembic upgrade head`
