@@ -898,15 +898,15 @@
     </div>
   </section>
 
-  <!-- INDUSTRIAL INSIGHTS -->
+  <!-- CAREER & OPPORTUNITIES -->
   <section class="content-section" id="insights">
     <div class="section-grid" id="insights-grid">
       <div class="section-label-card">
         <div>
-          <h2 class="section-label-title" id="insights-section-title">Industrial Insights</h2>
-          <p class="section-label-desc" id="insights-section-desc">Industry signals that affect careers: market shifts, policy changes, product launches, and tech adoption trends.</p>
+          <h2 class="section-label-title" id="insights-section-title">Career &amp; Opportunities</h2>
+          <p class="section-label-desc" id="insights-section-desc">Jobs, internships, startups, and industry moves — opportunity signals for your future.</p>
         </div>
-        <a class="section-label-btn" href="insights.html">Read More</a>
+        <a class="section-label-btn" href="stories.html">Read More</a>
       </div>
     </div>
   </section>
@@ -1062,15 +1062,15 @@
       // Update department section header
       const sTitle = document.getElementById('dept-section-title');
       const sDesc = document.getElementById('dept-section-desc');
+      const deptLabel = DEPT_LABELS[current] || current;
       if (sTitle) sTitle.textContent = (DEPT_NAMES[current] || current) + ' News';
       if (sDesc) sDesc.textContent = DEPT_DESCS[current] || 'Latest updates for your department.';
 
-      // Update insights section header
+      // Update insights section header — always career/opportunities, not dept-specific
       const iTitle = document.getElementById('insights-section-title');
       const iDesc = document.getElementById('insights-section-desc');
-      const deptLabel = DEPT_LABELS[current] || current;
-      if (iTitle) iTitle.textContent = deptLabel + ' Industrial Insights';
-      if (iDesc) iDesc.textContent = 'Industry signals for ' + (DEPT_NAMES[current] || current) + ': market shifts, policy changes, and trends.';
+      if (iTitle) iTitle.textContent = 'Career & Opportunities';
+      if (iDesc) iDesc.textContent = 'Jobs, internships, startups, and industry moves — opportunity signals for your future.';
 
       // Update research section header
       const rTitle = document.getElementById('research-section-title');
@@ -2086,6 +2086,7 @@
         const breaking = Array.isArray(payload.breaking) ? payload.breaking : [];
         const department = Array.isArray(payload.department) ? payload.department : [];
         const trending = Array.isArray(payload.trending) ? payload.trending : [];
+        const career = Array.isArray(payload.career) ? payload.career : [];
         const research_papers = payload.research_papers || { featured: [], papers: [] };
 
         if (!breaking.length && !department.length && !trending.length) {
@@ -2115,7 +2116,7 @@
         return {
           breaking: breaking.map(item => toBreakingSlide(normalizeBackendItem(item, true))),
           department: department.map(item => toSectionCard(normalizeBackendItem(item), deptLabel)),
-          insights: trending.map(item => toSectionCard(normalizeBackendItem(item), 'TREND')),
+          insights: (career.length ? career : trending).map(item => toSectionCard(normalizeBackendItem(item), 'CAREER')),
           stories: [],
           research_papers: research_papers,
         };

@@ -25,6 +25,7 @@ from app.departments import DEPARTMENTS
 BREAKING_LIMIT = 8
 TRENDING_LIMIT = 3
 DEPARTMENT_LIMIT = 3
+CAREER_LIMIT = 3
 RESEARCH_FEATURED = 3
 RESEARCH_GENERAL = 10
 
@@ -46,6 +47,7 @@ async def build_section(dept_key: str) -> dict:
         trending = await svc.get_trending_content(limit=TRENDING_LIMIT, department=dept_key)
         dept_feed = await svc.get_personalized_feed(department=dept_key, limit=DEPARTMENT_LIMIT)
         dept_items = dept_feed.get("items", [])
+        career = await svc.get_career_content(limit=CAREER_LIMIT)
         research = await svc.get_research_papers(
             department=dept_key, featured_limit=RESEARCH_FEATURED, general_limit=RESEARCH_GENERAL
         )
@@ -53,6 +55,7 @@ async def build_section(dept_key: str) -> dict:
         "breaking": breaking,
         "department": dept_items,
         "trending": trending,
+        "career": career,
         "research_papers": research,
     }
 
@@ -81,7 +84,8 @@ async def refresh_all():
             b = len(data["breaking"])
             t = len(data["trending"])
             d = len(data["department"])
-            print(f"  {key}: breaking={b} trending={t} department={d}")
+            c = len(data["career"])
+            print(f"  {key}: breaking={b} trending={t} department={d} career={c}")
         except Exception as e:
             print(f"  {key}: ERROR - {e}")
 

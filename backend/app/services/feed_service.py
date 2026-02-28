@@ -149,6 +149,51 @@ class FeedService:
             for item in items
         ]
     
+    async def get_career_content(self, limit: int = 3) -> List[dict]:
+        """Get career and opportunity news (category = career or startup), not department-filtered."""
+
+        query = (
+            select(ProcessedContent)
+            .where(ProcessedContent.status == "published")
+            .where(ProcessedContent.category.in_(["career", "startup"]))
+            .order_by(
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.published_at.desc(),
+            )
+            .limit(limit)
+        )
+        result = await self.db.execute(query)
+        items = result.scalars().all()
+
+        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        url_map = {}
+        if raw_ids:
+            raw_result = await self.db.execute(
+                select(RawContent.id, RawContent.original_url)
+                .where(RawContent.id.in_(raw_ids))
+            )
+            url_map = {str(row.id): row.original_url for row in raw_result.all()}
+
+        return [
+            {
+                "id": str(item.id),
+                "title": item.title,
+                "summary": item.summary,
+                "category": item.category,
+                "attractiveness_score": item.attractiveness_score,
+                "is_breaking": item.is_breaking,
+                "breaking_score": item.breaking_score,
+                "topic_tags": item.topic_tags,
+                "reading_time_minutes": item.reading_time_minutes,
+                "published_at": item.published_at.isoformat() if item.published_at else None,
+                "content_blocks": item.content_blocks,
+                "featured_image_url": item.featured_image_url,
+                "image_credit": (item.visualizations or {}).get("image_credit"),
+                "original_url": url_map.get(str(item.raw_content_id), None),
+            }
+            for item in items
+        ]
+
     async def get_breaking_news(self, limit: int = 5, department: str = None) -> List[dict]:
         """Get breaking news alerts with SQL-level ranking.
 
