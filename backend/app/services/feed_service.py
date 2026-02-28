@@ -227,12 +227,16 @@ class FeedService:
             (
                 text_col.like('%breaking%') |
                 text_col.like('%outage%') |
-                text_col.like('%security%') |
                 text_col.like('%breach%') |
-                text_col.like('%launch%') |
+                text_col.like('%zero-day%') |
+                text_col.like('%vulnerability%') |
+                text_col.like('%exploit%') |
                 text_col.like('%acquires%') |
+                text_col.like('%shutdown%') |
                 text_col.like('%ban%') |
-                text_col.like('%announces%') |
+                text_col.like('%lawsuit%') |
+                text_col.like('%emergency%') |
+                text_col.like('%offline%') |
                 text_col.like('%critical%'),
                 6,
             ),
@@ -262,14 +266,15 @@ class FeedService:
         rows = result.all()
         items = [row[0] for row in rows]
 
-        # Fallback: if not enough, fill with top recent by attractiveness
+        # Fallback: if not enough, fill with top recent by attractiveness (14-day window, not 30)
         if len(items) < limit:
+            fallback_window = now - timedelta(days=14)
             existing_ids = [item.id for item in items]
             fallback_query = (
                 select(ProcessedContent)
                 .where(ProcessedContent.status == "published")
-                .where(ProcessedContent.published_at >= recent_window)
-                .where(ProcessedContent.attractiveness_score >= 35)
+                .where(ProcessedContent.published_at >= fallback_window)
+                .where(ProcessedContent.attractiveness_score >= 40)
             )
             if department:
                 fallback_query = fallback_query.where(
@@ -280,7 +285,8 @@ class FeedService:
                     ProcessedContent.id.not_in(existing_ids)
                 )
             fallback_query = fallback_query.order_by(
-                ProcessedContent.attractiveness_score.desc()
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.published_at.desc(),
             ).limit(limit - len(items))
             fb_result = await self.db.execute(fallback_query)
             items.extend(fb_result.scalars().all())

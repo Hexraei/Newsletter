@@ -223,6 +223,7 @@ class RecencyScorer:
 
 
 class BreakingNewsScorer:
+    # Only specific, high-signal event terms — not generic words like "launch" or "security"
     KEYWORDS = (
         "breaking",
         "urgent",
@@ -233,12 +234,20 @@ class BreakingNewsScorer:
         "incident",
         "attack",
         "zero-day",
+        "vulnerability",
+        "exploit",
+        "hacked",
         "leak",
         "ban",
         "lawsuit",
         "shutdown",
-        "launch",
         "acquires",
+        "emergency",
+        "bankrupt",
+        "offline",
+        "indicted",
+        "fired ceo",
+        "data breach",
     )
 
     @classmethod
@@ -250,8 +259,9 @@ class BreakingNewsScorer:
             raw = _raw_engagement(candidate.item)
             age = _age_hours(candidate.item, now=current) or 12.0
             velocity = math.log1p(raw) / max(1.0, age)
-            keyword_score = min(1.0, 0.3 * keyword_hits)
-            velocity_score = min(1.0, velocity / 2.8)
+            # Velocity (engagement/age) is more objective — weight it more than keyword hits
+            keyword_score = min(1.0, 0.2 * keyword_hits)
+            velocity_score = min(1.0, velocity / 2.5)
             candidate.urgency_score = max(0.0, min(1.0, keyword_score + velocity_score))
 
 
@@ -264,10 +274,24 @@ class CategoryRelevanceScorer:
             "outage",
             "incident",
             "breach",
-            "security",
+            "data breach",
             "zero-day",
+            "vulnerability",
+            "exploit",
+            "hacked",
             "ban",
             "lawsuit",
+            "shutdown",
+            "acquires",
+            "acquisition",
+            "merger",
+            "emergency",
+            "offline",
+            "attack",
+            "recall",
+            "indicted",
+            "bankrupt",
+        ),
         ),
         "department": (
             "computer science",
@@ -402,6 +426,26 @@ class CategoryRelevanceScorer:
     # These boost relevance based on which subreddit the item came from,
     # giving each section a clear signal even when title keywords are ambiguous.
     SOURCE_HINTS = {
+        # Breaking: credible established news outlets get a strong boost
+        "breaking": {
+            "techcrunch": 0.22,
+            "the verge": 0.22,
+            "wired": 0.20,
+            "ars technica": 0.22,
+            "reuters": 0.26,
+            "bloomberg": 0.26,
+            "associated press": 0.24,
+            "bbc": 0.22,
+            "financial times": 0.22,
+            "wsj": 0.22,
+            "wall street journal": 0.22,
+            "mit technology review": 0.20,
+            "the guardian": 0.18,
+            "hacker news": 0.12,
+            "r/technology": 0.08,
+            "r/worldnews": 0.10,
+            "r/technews": 0.10,
+        },
         "department": {
             "hacker news": 0.14,
             "github": 0.16,
@@ -485,7 +529,8 @@ class SourceDiversityScorer:
 
 class WeightedCombiner:
     SECTION_WEIGHTS: dict[str, dict[str, float]] = {
-        "breaking": {"engagement": 0.20, "recency": 0.30, "urgency": 0.40, "relevance": 0.10},
+        # Breaking: engagement velocity + recency dominate (objective signals); less weight on keywords
+        "breaking": {"engagement": 0.35, "recency": 0.25, "urgency": 0.25, "relevance": 0.15},
         "department": {"engagement": 0.25, "recency": 0.15, "urgency": 0.05, "relevance": 0.55},
         "student_stories": {"engagement": 0.25, "recency": 0.15, "urgency": 0.05, "relevance": 0.55},
         "trending": {"engagement": 0.30, "recency": 0.20, "urgency": 0.05, "relevance": 0.45},

@@ -345,21 +345,26 @@ class ContentProcessor:
         return max(0.0, (now - dt).total_seconds() / 3600)
 
     def _has_urgent_keywords(self, raw: RawContent) -> bool:
-        """Detect urgent/breaking signals in text."""
+        """Detect urgent/breaking signals in text using specific, high-signal event terms."""
         text = f"{raw.original_title or ''} {raw.original_content or ''}".lower()
         keywords = [
             "breaking",
             "just announced",
             "outage",
-            "major",
             "urgent",
             "security flaw",
             "data breach",
+            "zero-day",
+            "vulnerability",
+            "exploit",
             "acquires",
-            "launches",
             "banned",
             "lawsuit",
             "recall",
+            "emergency",
+            "shutdown",
+            "offline",
+            "hacked",
         ]
         return any(k in text for k in keywords)
 
