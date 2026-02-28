@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -86,15 +86,43 @@ async def health_check():
 # Root endpoint
 @app.get("/", tags=["Root"])
 async def root():
-    """Redirect to frontend if available, else show API info."""
+    """Serve frontend index.html directly (no-cache) or show API info."""
     frontend_dir = Path(__file__).parent.parent.parent / "frontend"
-    if frontend_dir.exists():
-        return RedirectResponse(url="/static/index.html")
+    index_path = frontend_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(
+            str(index_path),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
     return {
         "app": "NEWS DAY API",
         "docs": "/docs",
         "health": "/health",
     }
+
+
+@app.get("/department.html", tags=["Root"])
+async def department_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "department.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/stories.html", tags=["Root"])
+async def stories_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "stories.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/research.html", tags=["Root"])
+async def research_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "research.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
 
 
 # Include API router
