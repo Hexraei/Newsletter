@@ -32,6 +32,11 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Seed sources
+        run: python scrapers/seed_sources.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
   scrape-rss:
     name: RSS Feeds
     needs: migrate
