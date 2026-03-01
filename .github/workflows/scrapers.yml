@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install python-dotenv feedparser beautifulsoup4 aiohttp
+          pip install python-dotenv feedparser beautifulsoup4 aiohttp fake-useragent
 
       - name: Run RSS scrapers
         run: python scrapers/run_rss.py
@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install python-dotenv feedparser beautifulsoup4 aiohttp
+          pip install python-dotenv feedparser beautifulsoup4 aiohttp fake-useragent
 
       - name: Run general scrapers
         run: python scrapers/run_general.py
@@ -80,7 +80,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r backend/requirements.txt
-          pip install python-dotenv feedparser beautifulsoup4 aiohttp
+          pip install python-dotenv feedparser beautifulsoup4 aiohttp fake-useragent
 
       - name: Run research scrapers
         run: python scrapers/run_research.py

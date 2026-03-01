@@ -128,6 +128,7 @@ class RSSFeedScraper(BaseScraper):
 
         return ""
 
+    def _parse_rss_20(
         self, root, feed_name, feed_type, limit, department_tags
     ) -> List[ScrapedItem]:
         """Parse RSS 2.0 format."""
@@ -172,9 +173,11 @@ class RSSFeedScraper(BaseScraper):
                     department_tags=department_tags or [],
                 )
             )
+        return items
+
+    def _parse_atom(
         self, root, feed_name, feed_type, limit, department_tags
     ) -> List[ScrapedItem]:
-        """Parse Atom format."""
         items = []
         ns = self.NS["atom"]
         entries = root.findall(f"{{{ns}}}entry") or root.findall("entry")

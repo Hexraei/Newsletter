@@ -5,6 +5,7 @@ python-dotenv>=1.0.0
 feedparser>=6.0.0
 beautifulsoup4>=4.12.0
 aiohttp>=3.9.0
+fake-useragent>=3.0.0
 # Semantic image ranking for the fetch_images backfill scraper (not needed on Render)
 sentence-transformers==3.3.1
 numpy>=1.24.0
