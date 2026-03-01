@@ -55,6 +55,7 @@ if "ssl=require" in _db_url or "sslmode=require" in _db_url:
     # Strip ssl param from URL — asyncpg handles it via connect_args
     _db_url = _db_url.replace("?ssl=require", "").replace("&ssl=require", "")
     _db_url = _db_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+    _db_url = _db_url.replace("?channel_binding=require", "").replace("&channel_binding=require", "")
 
 # Create async engine
 engine = create_async_engine(
