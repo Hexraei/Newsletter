@@ -128,7 +128,7 @@ class RSSFeedScraper(BaseScraper):
 
         return ""
 
-    def _parse_rss_20(
+    def _parse_rss(
         self, root, feed_name, feed_type, limit, department_tags
     ) -> List[ScrapedItem]:
         """Parse RSS 2.0 format."""
