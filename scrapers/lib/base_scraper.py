@@ -8,6 +8,7 @@ import asyncio
 import logging
 import hashlib
 import re
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -17,6 +18,7 @@ import json
 from html import unescape
 
 # Setup logging
+os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
