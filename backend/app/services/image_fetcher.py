@@ -27,15 +27,20 @@ _model = None
 
 
 def _get_model():
-    """Lazy-load the sentence-transformer model (cached after first call)."""
+    """Lazy-load the sentence-transformer model (cached after first call).
+    Returns None if sentence-transformers is not installed (e.g. production server).
+    """
     global _model
     if _model is None:
-        import torch
-        # Force CPU to avoid CUDA compatibility issues
-        device = "cpu"
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer("all-MiniLM-L6-v2", device=device)
-        logger.info("Loaded sentence-transformer model: all-MiniLM-L6-v2 (device=%s)", device)
+        try:
+            import torch  # noqa: F401
+            from sentence_transformers import SentenceTransformer
+            device = "cpu"
+            _model = SentenceTransformer("all-MiniLM-L6-v2", device=device)
+            logger.info("Loaded sentence-transformer model: all-MiniLM-L6-v2 (device=%s)", device)
+        except ImportError:
+            logger.warning("sentence-transformers not installed — semantic image ranking disabled, falling back to first result")
+            return None
     return _model
 
 
@@ -241,6 +246,10 @@ class ImageFetcher:
             return [{"url": c.url, "source_url": c.source_url, "score": 0.0, "provider": c.provider, "creator": c.creator, "license": c.license}]
 
         model = _get_model()
+        if model is None:
+            # sentence-transformers not available — return candidates sorted by profile length as proxy
+            c = candidates[0]
+            return [{"url": c.url, "source_url": c.source_url, "score": 0.0, "provider": c.provider, "creator": c.creator, "license": c.license}]
         indices, texts = zip(*non_empty)
 
         q_vec = model.encode([query], normalize_embeddings=True)
