@@ -68,6 +68,18 @@ DEPARTMENTS: List[Dict[str, Any]] = [
         "icon": "plane",
         "description": "Aerodynamics, propulsion, avionics, space systems, and flight mechanics.",
     },
+    {
+        "key": "RAE",
+        "name": "Robotics & Automation Engineering",
+        "icon": "robot",
+        "description": "Industrial robots, autonomous systems, ROS, control theory, machine vision, and smart manufacturing.",
+    },
+    {
+        "key": "PT",
+        "name": "Production Technology",
+        "icon": "industry",
+        "description": "CNC machining, lean manufacturing, Industry 4.0, quality control, additive manufacturing, and process optimization.",
+    },
 ]
 
 # Quick lookup helpers
@@ -336,10 +348,92 @@ DEPARTMENT_SOURCES: Dict[str, Dict[str, Any]] = {
         ],
         "github_languages": ["python", "cpp", "matlab"],
     },
+
+    # ── RAE ─────────────────────────────────────────────────────────────────
+    "RAE": {
+        "reddit": [
+            "robotics", "ROS", "SelfDrivingCars", "automation",
+            "ControlTheory", "PLC", "industrial_automation",
+            "ArtificialIntelligence", "MachineLearning",
+        ],
+        "medium": [
+            "towards-data-science", "geekculture",
+        ],
+        "youtube": [
+            "BostonDynamics", "Veritasium", "RealEngineering",
+            "Lesics", "StuffMadeHere", "MarkRober",
+        ],
+        "rss": [
+            # Global news / industry
+            {"name": "The Robot Report", "url": "https://www.therobotreport.com/feed/", "type": "news"},
+            {"name": "TechCrunch Robotics", "url": "https://techcrunch.com/category/robotics/feed/", "type": "news"},
+            {"name": "New Atlas Robotics", "url": "https://newatlas.com/robotics/index.rss", "type": "news"},
+            {"name": "Robotics Business Review", "url": "https://www.roboticsbusinessreview.com/feed/", "type": "news"},
+            {"name": "IEEE Spectrum", "url": "https://spectrum.ieee.org/feeds/feed.rss", "type": "academic"},
+            {"name": "Hackaday", "url": "https://hackaday.com/feed/", "type": "blog"},
+            # Major company newsrooms — product launches, job openings, workshops
+            {"name": "Boston Dynamics Blog", "url": "https://bostondynamics.com/blog/feed/", "type": "industry"},
+            {"name": "ABB Robotics News", "url": "https://new.abb.com/news/rss?category=robotics", "type": "industry"},
+            {"name": "Universal Robots Blog", "url": "https://www.universal-robots.com/blog/feed/", "type": "industry"},
+            {"name": "ROS Discourse", "url": "https://discourse.ros.org/latest.rss", "type": "community"},
+            {"name": "NVIDIA Robotics Blog", "url": "https://developer.nvidia.com/blog/feed/", "type": "industry"},
+            {"name": "Siemens Digital Industries", "url": "https://blogs.sw.siemens.com/feed/", "type": "industry"},
+            {"name": "FANUC News", "url": "https://www.fanucamerica.com/news-events/feed/rss", "type": "industry"},
+            {"name": "KUKA News", "url": "https://www.kuka.com/en-de/press/news/feed.rss", "type": "industry"},
+            # Research papers
+            {"name": "ArXiv Robotics", "url": "https://rss.arxiv.org/rss/cs.RO", "type": "academic"},
+            {"name": "ArXiv Systems & Control", "url": "https://rss.arxiv.org/rss/eess.SY", "type": "academic"},
+            {"name": "ArXiv Human-Robot Interaction", "url": "https://rss.arxiv.org/rss/cs.HC", "type": "academic"},
+            {"name": "Science Robotics", "url": "https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=scirobotics", "type": "academic"},
+        ],
+        "github_languages": ["python", "cpp", "ros"],
+    },
+
+    # ── PT ──────────────────────────────────────────────────────────────────
+    "PT": {
+        "reddit": [
+            "manufacturing", "Machinists", "PLC", "CNC", "3Dprinting",
+            "leanmanufacturing", "qualitycontrol", "industrialengineering",
+            "toolmakers", "OSHA", "MechanicalEngineering",
+        ],
+        "medium": [],
+        "youtube": [
+            "Lesics", "RealEngineering", "StuffMadeHere",
+            "PracticalEngineeringChannel", "FusionManufacturing",
+        ],
+        "rss": [
+            # Global news / industry
+            {"name": "Modern Machine Shop", "url": "https://www.mmsonline.com/rss/all", "type": "news"},
+            {"name": "Machine Design", "url": "https://www.machinedesign.com/rss", "type": "news"},
+            {"name": "Production Machining", "url": "https://www.productionmachining.com/rss/all", "type": "news"},
+            {"name": "Control Engineering", "url": "https://www.controleng.com/rss/all", "type": "news"},
+            {"name": "Industry Week", "url": "https://www.industryweek.com/rss/all", "type": "news"},
+            {"name": "Automation World", "url": "https://www.automationworld.com/rss/all", "type": "news"},
+            {"name": "Quality Magazine", "url": "https://www.qualitymag.com/rss/all", "type": "news"},
+            {"name": "3D Printing Industry", "url": "https://3dprintingindustry.com/feed/", "type": "news"},
+            {"name": "Engineering.com", "url": "https://www.engineering.com/feed", "type": "news"},
+            # Major company newsrooms — product launches, CNC, workshops
+            {"name": "Siemens Manufacturing Blog", "url": "https://blogs.sw.siemens.com/feed/", "type": "industry"},
+            {"name": "Bosch Stories", "url": "https://www.bosch.com/stories/rss/", "type": "industry"},
+            {"name": "Rockwell Automation Blog", "url": "https://www.rockwellautomation.com/en-us/company/news/blog/feed.rss", "type": "industry"},
+            {"name": "Haas Automation News", "url": "https://www.haascnc.com/news.rss.xml", "type": "industry"},
+            {"name": "Autodesk Manufacturing Blog", "url": "https://www.autodesk.com/blogs/manufacturing/feed/", "type": "industry"},
+            {"name": "Stratasys Blog", "url": "https://www.stratasys.com/en/blog/feed/", "type": "industry"},
+            {"name": "SAE International", "url": "https://www.sae.org/rss/news", "type": "academic"},
+            {"name": "Lean.org", "url": "https://www.lean.org/feed/", "type": "blog"},
+            # Research papers
+            {"name": "ArXiv Materials Science", "url": "https://rss.arxiv.org/rss/cond-mat.mtrl-sci", "type": "academic"},
+            {"name": "ArXiv Applied Physics", "url": "https://rss.arxiv.org/rss/physics.app-ph", "type": "academic"},
+            {"name": "Journal of Manufacturing Systems", "url": "https://rss.sciencedirect.com/publication/science/02786125", "type": "academic"},
+            {"name": "CIRP Annals", "url": "https://rss.sciencedirect.com/publication/science/00078506", "type": "academic"},
+            {"name": "ArXiv Systems & Control", "url": "https://rss.arxiv.org/rss/eess.SY", "type": "academic"},
+        ],
+        "github_languages": ["python", "cpp", "matlab"],
+    },
 }
 
 
-# ── INDIA-FOCUSED SOURCES ──────────────────────────────────────────────
+# ── INDIA-FOCUSED SOURCES──────────────────────────────────────────────
 # These are appended to every department so students get Indian industry,
 # career, and education signals alongside international sources.
 
@@ -417,6 +511,25 @@ INDIA_DEPT_RSS: Dict[str, List[Dict[str, str]]] = {
         {"name": "Livefist Defence", "url": "https://www.livefistdefence.com/feed/", "type": "india-defence"},
         {"name": "Indian Defence Review", "url": "https://www.indiandefencereview.com/feed/", "type": "india-defence"},
         {"name": "Defence Star", "url": "https://www.defencestar.in/feed/", "type": "india-defence"},
+    ],
+    "RAE": [
+        {"name": "ETAuto", "url": "https://auto.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "Manufacturing Today India", "url": "https://www.manufacturingtodayindia.com/feed", "type": "india-industry"},
+        {"name": "ET Manufacturing", "url": "https://economictimes.indiatimes.com/industry/indl-goods/svs/rssfeeds/9990025.cms", "type": "india-industry"},
+        {"name": "DST India", "url": "https://dst.gov.in/rss/latest-news/rss.xml", "type": "india-policy"},
+        {"name": "iCreate India", "url": "https://icreateindia.org/feed/", "type": "india-startup"},
+        {"name": "Techgig", "url": "https://www.techgig.com/feed/news", "type": "india-tech"},
+        {"name": "Automation India", "url": "https://www.automationindia.net/feed/", "type": "india-industry"},
+    ],
+    "PT": [
+        {"name": "Manufacturing Today India", "url": "https://www.manufacturingtodayindia.com/feed", "type": "india-industry"},
+        {"name": "ETAuto", "url": "https://auto.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "ET Manufacturing", "url": "https://economictimes.indiatimes.com/industry/indl-goods/svs/rssfeeds/9990025.cms", "type": "india-industry"},
+        {"name": "IMTMA News", "url": "https://www.imtma.in/feed/", "type": "india-industry"},
+        {"name": "CII News", "url": "https://www.cii.in/rss.aspx", "type": "india-policy"},
+        {"name": "Autocar Pro India", "url": "https://www.autocarpro.in/rss/feed", "type": "india-industry"},
+        {"name": "MSME Ministry", "url": "https://msme.gov.in/hi/rss.xml", "type": "india-policy"},
+        {"name": "ET Infra", "url": "https://infra.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
     ],
 }
 
