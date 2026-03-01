@@ -16,7 +16,7 @@ if (-not $isAdmin) {
 
 # PostgreSQL Configuration
 $pgVersion = "15"
-$pgPassword = "newsletter123"
+$pgPassword = "your_password"
 $dbName = "newsletter"
 $pgPath = "C:\Program Files\PostgreSQL\$pgVersion"
 

@@ -27,11 +27,11 @@ if %errorLevel% neq 0 (
 
 echo.
 echo [2/4] Installing PostgreSQL 15...
-choco install postgresql15 --params '/Password:newsletter123' -y
+choco install postgresql15 --params '/Password:your_password' -y
 if %errorLevel% neq 0 (
     echo Failed to install PostgreSQL. Retrying...
     timeout /t 5 /nobreak >nul
-    choco install postgresql15 --params '/Password:newsletter123' -y --force
+    choco install postgresql15 --params '/Password:your_password' -y --force
 )
 
 echo.
@@ -73,7 +73,7 @@ if %errorLevel% neq 0 (
 echo.
 echo Creating database 'newsletter'...
 set PGUSER=postgres
-set PGPASSWORD=newsletter123
+set PGPASSWORD=your_password
 "C:\Program Files\PostgreSQL\15\bin\createdb.exe" -U postgres newsletter 2>nul
 if %errorLevel% neq 0 (
     echo Database may already exist or needs manual creation
@@ -88,7 +88,7 @@ echo ============================================
 echo PostgreSQL: localhost:5432
 echo   Database: newsletter
 echo   Username: postgres
-echo   Password: newsletter123
+echo   Password: your_password
 echo.
 echo Redis: localhost:6379
 echo.

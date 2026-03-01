@@ -43,7 +43,7 @@ If automated scripts fail, follow these manual steps:
    - Download "PostgreSQL 15.x" installer
 
 2. **Run Installer**
-   - Password: `newsletter123`
+   - Password: `your_password`
    - Port: `5432`
    - Keep other defaults
 
@@ -136,11 +136,11 @@ redis-server --daemonize yes
 ### Database Connection Error
 Check credentials in `.env` file:
 ```
-DATABASE_URL=postgresql+asyncpg://postgres:newsletter123@localhost:5432/newsletter
+DATABASE_URL=postgresql+asyncpg://postgres:your_password@localhost:5432/newsletter
 ```
 
 ### Port Already in Use
 Change ports in `.env`:
 ```
-DATABASE_URL=postgresql+asyncpg://postgres:newsletter123@localhost:5433/newsletter
+DATABASE_URL=postgresql+asyncpg://postgres:your_password@localhost:5433/newsletter
 ```

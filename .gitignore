@@ -80,6 +80,11 @@ frontend/node_modules/
 *.tmp
 *.temp
 
+# Neon CLI local config
+.neon
+.agents/
+skills-lock.json
+
 # Extracted document content
 context/pdf_content.txt
 context/pdf_tables.json
