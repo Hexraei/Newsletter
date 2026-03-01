@@ -1,50 +1,45 @@
 # NEWS DAY — Deployment Guide
 
-This guide covers deploying NEWS DAY to production using **Supabase** (database), **Render** (backend), **Netlify** (frontend), and **GitHub Actions** (scrapers).
+This guide covers deploying NEWS DAY to production using **Neon** (database), **Render** (backend), **Netlify** (frontend), and **GitHub Actions** (scrapers).
 
 ---
 
 ## What YOU Need to Do (Manual Steps)
 
-### Step 1: Supabase Cloud — Create Database
+### Step 1: Neon — Create Database
 
-1. Go to [supabase.com](https://supabase.com) and sign in / create account
-2. Click **New Project** → choose a name (e.g. `newsday`) and region (**Mumbai `ap-south-1`** recommended)
-3. Set a **strong database password** — save it somewhere safe
-4. Wait for the project to provision (~2 minutes)
-5. Go to **Project Settings → Database → Connection string → URI**
-6. Copy TWO connection strings:
-   - **Direct connection** (port `5432`) — used for migrations
-   - **Transaction pooler** (port `6543`) — used by the app at runtime
+1. Go to [neon.tech](https://neon.tech) and sign in (free, no credit card)
+2. Click **New Project** → choose a name (e.g. `newsday`) → select region **Singapore `ap-southeast-1`** (closest to India)
+3. Wait ~10 seconds for provisioning
+4. Go to **Dashboard → Connection Details** and copy TWO connection strings:
+   - **Direct** (for migrations & scrapers)
+   - **Pooled** (for the backend app at runtime — uses built-in PgBouncer)
 
 Your URLs will look like:
 ```
-# Direct (for migrations & scrapers)
-postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+# Direct (for migrations & scrapers — use this with alembic)
+postgresql+asyncpg://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 
-# Pooler (for backend app)
-postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:6543/postgres
+# Pooled (for backend app — use this in Render env vars)
+postgresql+asyncpg://user:pass@ep-xxx-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 ```
+
+> ✅ Neon never pauses your project. The compute auto-suspends after 5 min idle but **wakes in <500ms** on the next query — transparent to the application.
+> ✅ Free tier: 512MB storage (~3+ years of this app's growth at current scraper rate).
 
 ### Step 2: Run Database Migrations (from your local machine)
 
 ```bash
-# Set your Supabase DIRECT connection URL (port 5432)
-# Convert to asyncpg format by changing postgresql:// to postgresql+asyncpg://
-# and appending ?ssl=require
-
+# Set your Neon DIRECT connection URL
 cd backend
-set DATABASE_URL=postgresql+asyncpg://postgres.[REF]:[PW]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?ssl=require
+set DATABASE_URL=postgresql+asyncpg://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 
-# Run migrations
+# Run migrations (creates all tables)
 alembic upgrade head
-
-# Seed department sources
-cd ..
-python seed_department_sources.py
 ```
 
 Skills data auto-seeds on first API request — no manual step needed.
+Article data is populated automatically by the GitHub Actions scrapers (Step 6).
 
 ### Step 3: Render — Deploy Backend
 
@@ -58,7 +53,7 @@ Skills data auto-seeds on first API request — no manual step needed.
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://postgres.[REF]:[PW]@...pooler.supabase.com:6543/postgres?ssl=require` |
+| `DATABASE_URL` | `postgresql+asyncpg://user:pass@ep-xxx-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require` (use **pooled** URL) |
 | `SECRET_KEY` | Generate: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `JWT_SECRET_KEY` | Generate another: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `CORS_ORIGINS` | `https://YOUR-SITE.netlify.app` (update after Netlify deploy) |
@@ -98,7 +93,7 @@ CORS_ORIGINS=https://YOUR-SITE.netlify.app
 
 | Secret Name | Value |
 |---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://postgres.[REF]:[PW]@...pooler.supabase.com:5432/postgres?ssl=require` (direct, port 5432) |
+| `DATABASE_URL` | `postgresql+asyncpg://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require` (use **direct** URL, not pooled) |
 | `GROQ_API_KEY` | Your Groq API key |
 
 3. Go to **Actions** tab → you should see the "Run Scrapers" workflow
@@ -119,7 +114,7 @@ CORS_ORIGINS=https://YOUR-SITE.netlify.app
 
 | Service | Free Tier Limits |
 |---|---|
-| **Supabase** | 500MB database, 2 projects, unlimited API requests |
+| **Neon** | 512MB storage, 1 project, free forever — never pauses |
 | **Render** | 750 hours/month free (enough for 1 service), spins down after 15 min idle |
 | **Netlify** | 100GB bandwidth/month, unlimited deploys |
 | **GitHub Actions** | 2,000 minutes/month |
@@ -132,7 +127,7 @@ CORS_ORIGINS=https://YOUR-SITE.netlify.app
 ## Troubleshooting
 
 ### "SSL connection required" errors
-Ensure `?ssl=require` is appended to your DATABASE_URL.
+Ensure `?sslmode=require` is appended to your DATABASE_URL (Neon uses `sslmode=require`, not `ssl=require`).
 
 ### CORS errors in browser console
 Update `CORS_ORIGINS` on Render to match your exact Netlify URL (including `https://`).
