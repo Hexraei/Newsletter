@@ -1021,15 +1021,175 @@
     const API = window.location.origin;
 
     /* ========================================================
-       DEPARTMENT SELECTOR
+       UNSPLASH IMAGE LOADER
+       - Client-side only (access key is public/safe per Unsplash docs)
+       - Guidelines compliant: attribution, download trigger, hotlink, UTM
+       - Rate-limited: max 40 req/hr via localStorage tracker (50/hr limit)
+       - 24hr localStorage cache per search keyword
     ======================================================== */
-    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};
+    const UNSPLASH_KEY = 'FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM';
+    const UNSPLASH_UTM = '?utm_source=newsday&utm_medium=referral';
+
+    const UnsplashImageLoader = (() => {
+      const CACHE_KEY  = 'newsday_unsplash_cache_v1';
+      const RATE_KEY   = 'newsday_unsplash_rate_v1';
+      const MAX_REQ_HR = 40;
+
+      // Persistent cache: keyword → {url, name, profile, download_location, ts}
+      function _loadCache() {
+        try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
+      }
+      function _saveCache(c) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
+      }
+
+      // Rate tracker: {count, windowStart}
+      function _rateOK() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) {
+            localStorage.setItem(RATE_KEY, JSON.stringify({count: 0, windowStart: now}));
+            return true;
+          }
+          return raw.count < MAX_REQ_HR;
+        } catch { return true; }
+      }
+      function _incrementRate() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) {
+            localStorage.setItem(RATE_KEY, JSON.stringify({count: 1, windowStart: now}));
+          } else {
+            localStorage.setItem(RATE_KEY, JSON.stringify({count: (raw.count || 0) + 1, windowStart: raw.windowStart}));
+          }
+        } catch {}
+      }
+
+      // Derive short keyword from article title (strip stopwords, take first 3 content words)
+      const STOP = new Set(['the','a','an','in','on','of','to','for','and','or','with','by','at','is','are','was','were','has','have','it','its','this','that','from','as','be','how','why','what','when','who','your','our','their','will','can','may','about','into','over','after','using','new','top','best']);
+      function _getQuery(title) {
+        return (title || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9 ]/g, ' ')
+          .split(/\s+/)
+          .filter(w => w.length > 2 && !STOP.has(w))
+          .slice(0, 3)
+          .join(' ') || 'technology';
+      }
+
+      // Trigger Unsplash download event (required by guidelines when image is shown)
+      function _triggerDownload(download_location) {
+        if (!download_location) return;
+        fetch(download_location + (download_location.includes('?') ? '&' : '?') + 'client_id=' + UNSPLASH_KEY)
+          .catch(() => {});
+      }
+
+      // Apply image to a card element
+      function _applyImage(cardEl, data) {
+        const visual = cardEl.querySelector('.article-card-visual');
+        if (!visual) return;
+        visual.style.backgroundImage = `url('${data.url}')`;
+        visual.style.backgroundSize = 'cover';
+        visual.style.backgroundPosition = 'center';
+        visual.classList.add('has-image');
+        // Remove placeholder letter if present
+        const ph = visual.querySelector('.placeholder-icon');
+        if (ph) ph.remove();
+        // Add attribution overlay (required by Unsplash guidelines)
+        if (!visual.querySelector('.image-credit')) {
+          const credit = document.createElement('div');
+          credit.className = 'image-credit';
+          credit.innerHTML = `Photo by <a href="https://unsplash.com/@${encodeURIComponent(data.username)}${UNSPLASH_UTM}" target="_blank" rel="noopener">${escapeHtml(data.name)}</a> on <a href="https://unsplash.com/${UNSPLASH_UTM}" target="_blank" rel="noopener">Unsplash</a>`;
+          visual.appendChild(credit);
+        }
+        _triggerDownload(data.download_location);
+      }
+
+      // Fetch from Unsplash API (with cache)
+      async function _fetchImage(query) {
+        const cache = _loadCache();
+        const now = Date.now();
+        // Cache hit (valid for 24hr)
+        if (cache[query] && (now - cache[query].ts) < 86400000) {
+          return cache[query];
+        }
+        // Rate check
+        if (!_rateOK()) return null;
+        _incrementRate();
+        try {
+          const res = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape&client_id=${UNSPLASH_KEY}`);
+          if (!res.ok) return null;
+          const json = await res.json();
+          const photo = json.results && json.results[0];
+          if (!photo) return null;
+          const data = {
+            url: photo.urls.small,
+            name: photo.user.name,
+            username: photo.user.username,
+            download_location: photo.links.download_location,
+            ts: now,
+          };
+          cache[query] = data;
+          _saveCache(cache);
+          return data;
+        } catch { return null; }
+      }
+
+      // IntersectionObserver — one shared instance
+      let _observer = null;
+      const _pending = new Map(); // cardEl → query
+
+      function _getObserver() {
+        if (_observer) return _observer;
+        _observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const cardEl = entry.target;
+            const query = _pending.get(cardEl);
+            if (!query) return;
+            _pending.delete(cardEl);
+            _observer.unobserve(cardEl);
+            _fetchImage(query).then(data => {
+              if (data) _applyImage(cardEl, data);
+            });
+          });
+        }, { rootMargin: '200px' }); // preload 200px before visible
+        return _observer;
+      }
+
+      // Public: observe a card element for lazy image loading
+      function observe(cardEl) {
+        if (!cardEl) return;
+        // Skip if card already has a real background image set inline (from item.image)
+        const visual = cardEl.querySelector('.article-card-visual');
+        if (!visual) return;
+        if (visual.classList.contains('has-image')) return;
+        const query = cardEl.dataset.unsplashQuery;
+        if (!query) return;
+        _pending.set(cardEl, query);
+        _getObserver().observe(cardEl);
+      }
+
+      // Public: observe all unimaged cards in a container
+      function observeAll(containerEl) {
+        if (!containerEl) return;
+        containerEl.querySelectorAll('.article-card[data-unsplash-query]').forEach(observe);
+      }
+
+      return { observe, observeAll, getQuery: _getQuery };
+    })();
+
+
+    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE',RAE:'RAE',PT:'PT'};
     const DEPT_NAMES = {
       CSE:'Computer Science & Engineering', IT:'Information Technology',
       AIDS:'Artificial Intelligence & Data Science', ECE:'Electronics & Communication',
       EEE:'Electrical & Electronics', ME:'Mechanical Engineering',
       CE:'Civil Engineering', BT:'Biotechnology', CH:'Chemical Engineering',
-      AE:'Aeronautical / Aerospace Engineering'
+      AE:'Aeronautical / Aerospace Engineering',
+      RAE:'Robotics & Automation Engineering', PT:'Production Technology'
     };
     const DEPT_DESCS = {
       CSE:'AI, systems, software engineering, security, and open-source tools.',
@@ -1041,7 +1201,9 @@
       CE:'Structural, geotechnical, transportation, and construction engineering.',
       BT:'Genetic engineering, bioinformatics, pharmaceuticals, and molecular biology.',
       CH:'Process engineering, petrochemicals, polymers, and industrial chemistry.',
-      AE:'Aerodynamics, propulsion, avionics, space systems, and flight mechanics.'
+      AE:'Aerodynamics, propulsion, avionics, space systems, and flight mechanics.',
+      RAE:'Industrial robots, autonomous systems, ROS, control theory, machine vision, and smart manufacturing.',
+      PT:'CNC machining, lean manufacturing, Industry 4.0, quality control, additive manufacturing, and process optimization.'
     };
 
     function getSelectedDept() {
@@ -1950,7 +2112,8 @@
       const imgStyle = hasImg ? `background-image:url('${escapeHtml(item.image)}');` : '';
       const imgClass = hasImg ? ' has-image' : '';
       const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-      return `<a class="article-card" href="#" data-story-id="${storyId}">
+      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(item.title))}"`;
+      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
         <div class="article-card-visual${imgClass}" style="${imgStyle}">${placeholder}</div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
@@ -1969,6 +2132,8 @@
       items.slice(0, 3).forEach(item => {
         grid.insertAdjacentHTML('beforeend', renderCard(item));
       });
+      // Lazy-load Unsplash images for cards without existing images
+      UnsplashImageLoader.observeAll(grid);
     }
 
     /* ========================================================
@@ -1978,8 +2143,10 @@
       const storyId = registerStory(paper);
       const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
       const cite = paper.citations ? paper.citations + ' citations' : '';
-      const imgStyle = paper.featured_image_url ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
-      return `<a class="article-card" href="#" data-story-id="${storyId}">
+      const hasImg = !!(paper.featured_image_url);
+      const imgStyle = hasImg ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
+      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(paper.title))}"`;
+      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
         <div class="article-card-visual" style="${imgStyle}"></div>
         <div class="article-card-title">${escapeHtml(paper.title)}</div>
         <div class="article-card-meta">${escapeHtml(meta)}${cite ? ' · ' + escapeHtml(cite) : ''}</div>
@@ -2011,6 +2178,7 @@
         grid.innerHTML = '';
         if (label) grid.appendChild(label);
         featured.forEach(p => grid.insertAdjacentHTML('beforeend', renderResearchCard(p)));
+        UnsplashImageLoader.observeAll(grid);
       }
       // Show/hide section
       const section = $('research');
