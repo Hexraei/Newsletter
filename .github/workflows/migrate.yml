@@ -1,0 +1,39 @@
+name: Run Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'run' to confirm running migrations"
+        required: true
+
+jobs:
+  migrate:
+    name: Alembic Upgrade Head
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run Alembic migrations
+        if: github.event.inputs.confirm == 'run'
+        working-directory: backend
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Verify migrations
+        if: github.event.inputs.confirm == 'run'
+        working-directory: backend
+        run: alembic current
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

@@ -1,6 +1,7 @@
 """Alembic environment configuration."""
 
 import asyncio
+import ssl
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -17,8 +18,22 @@ from app.models import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-# Override sqlalchemy.url with settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Strip SSL/channel_binding params from URL — asyncpg handles SSL via connect_args
+_db_url = settings.DATABASE_URL
+_connect_args: dict = {}
+_ssl_params = ["ssl=require", "sslmode=require", "channel_binding=require"]
+if any(p in _db_url for p in _ssl_params):
+    _ssl_ctx = ssl.create_default_context()
+    _ssl_ctx.check_hostname = False
+    _ssl_ctx.verify_mode = ssl.CERT_NONE
+    _connect_args["ssl"] = _ssl_ctx
+    for param in _ssl_params:
+        _db_url = _db_url.replace(f"?{param}", "").replace(f"&{param}", "")
+    # Clean up trailing ? or &
+    _db_url = _db_url.rstrip("?&")
+
+# Override sqlalchemy.url with cleaned URL
+config.set_main_option("sqlalchemy.url", _db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -76,6 +91,7 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_connect_args,
     )
 
     async with connectable.connect() as connection:
