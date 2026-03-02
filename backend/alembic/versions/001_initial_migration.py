@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "001"
@@ -22,7 +21,7 @@ def upgrade() -> None:
     # Create users table
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
         sa.Column("email", sa.String(255), nullable=False),
         sa.Column("password_hash", sa.String(255), nullable=False),
         sa.Column("full_name", sa.String(255), nullable=True),
@@ -31,14 +30,14 @@ def upgrade() -> None:
         sa.Column("year_of_study", sa.Integer(), nullable=True),
         sa.Column("graduation_year", sa.Integer(), nullable=True),
         sa.Column("college_name", sa.String(255), nullable=True),
-        sa.Column("interests", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
-        sa.Column("content_preferences", postgresql.JSONB(), server_default="{}", nullable=False),
-        sa.Column("notification_settings", postgresql.JSONB(), 
+        sa.Column("interests", sa.JSON(), server_default="{}", nullable=False),
+        sa.Column("content_preferences", sa.JSON(), server_default="{}", nullable=False),
+        sa.Column("notification_settings", sa.JSON(), 
                   server_default='{"email_digest": true, "breaking_news": true, "weekly_summary": true}',
                   nullable=False),
         sa.Column("streak_days", sa.Integer(), server_default="0", nullable=False),
         sa.Column("total_reads", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("skill_badges", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
+        sa.Column("skill_badges", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("weekly_goal", sa.Integer(), server_default="7", nullable=False),
         sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
         sa.Column("is_admin", sa.Boolean(), server_default="false", nullable=False),
@@ -59,7 +58,7 @@ def upgrade() -> None:
         sa.Column("source_type", sa.String(50), nullable=False),
         sa.Column("url", sa.Text(), nullable=False),
         sa.Column("platform", sa.String(50), nullable=True),
-        sa.Column("scrape_config", postgresql.JSONB(), server_default="{}", nullable=False),
+        sa.Column("scrape_config", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("schedule_cron", sa.String(50), nullable=True),
         sa.Column("rate_limit", sa.Integer(), server_default="60", nullable=False),
         sa.Column("proxy_tier", sa.String(20), server_default="standard", nullable=False),
@@ -68,8 +67,8 @@ def upgrade() -> None:
         sa.Column("last_success_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("success_rate", sa.Numeric(5, 2), server_default="100.0", nullable=False),
         sa.Column("failure_count", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("default_categories", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
-        sa.Column("default_tags", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
+        sa.Column("default_categories", sa.JSON(), server_default="{}", nullable=False),
+        sa.Column("default_tags", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id")
     )
@@ -77,14 +76,14 @@ def upgrade() -> None:
     # Create raw_content table
     op.create_table(
         "raw_content",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
         sa.Column("source_id", sa.Integer(), nullable=False),
         sa.Column("original_url", sa.Text(), nullable=False),
         sa.Column("original_title", sa.Text(), nullable=True),
         sa.Column("original_content", sa.Text(), nullable=True),
         sa.Column("original_author", sa.String(255), nullable=True),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("raw_metadata", postgresql.JSONB(), server_default="{}", nullable=False),
+        sa.Column("raw_metadata", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("content_hash", sa.String(64), nullable=False),
         sa.Column("status", sa.String(20), server_default="pending", nullable=False),
         sa.Column("processing_attempts", sa.Integer(), server_default="0", nullable=False),
@@ -101,15 +100,15 @@ def upgrade() -> None:
     # Create processed_content table
     op.create_table(
         "processed_content",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("raw_content_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("raw_content_id", sa.String(36), nullable=True),
         sa.Column("title", sa.String(500), nullable=False),
         sa.Column("summary", sa.Text(), nullable=True),
-        sa.Column("content_blocks", postgresql.JSONB(), nullable=True),
+        sa.Column("content_blocks", sa.JSON(), nullable=True),
         sa.Column("reading_time_minutes", sa.Integer(), nullable=True),
         sa.Column("category", sa.String(50), nullable=True),
-        sa.Column("department_tags", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
-        sa.Column("topic_tags", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
+        sa.Column("department_tags", sa.JSON(), server_default="{}", nullable=False),
+        sa.Column("topic_tags", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("difficulty_level", sa.String(20), nullable=True),
         sa.Column("quality_score", sa.Integer(), nullable=True),
         sa.Column("relevance_score", sa.Integer(), nullable=True),
@@ -119,7 +118,7 @@ def upgrade() -> None:
         sa.Column("breaking_score", sa.Integer(), nullable=True),
         sa.Column("breaking_detected_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("featured_image_url", sa.Text(), nullable=True),
-        sa.Column("visualizations", postgresql.JSONB(), server_default="{}", nullable=False),
+        sa.Column("visualizations", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("view_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("read_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("save_count", sa.Integer(), server_default="0", nullable=False),
@@ -144,9 +143,9 @@ def upgrade() -> None:
     # Create vector_embeddings table
     op.create_table(
         "vector_embeddings",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("content_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("embedding", postgresql.JSONB(), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("content_id", sa.String(36), nullable=False),
+        sa.Column("embedding", sa.JSON(), nullable=False),
         sa.Column("model_version", sa.String(50), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -156,8 +155,8 @@ def upgrade() -> None:
     # Create hookline_queue table
     op.create_table(
         "hookline_queue",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("content_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("content_id", sa.String(36), nullable=False),
         sa.Column("original_title", sa.String(500), nullable=False),
         sa.Column("generated_hook", sa.String(500), nullable=True),
         sa.Column("status", sa.String(20), server_default="pending", nullable=False),
@@ -172,14 +171,14 @@ def upgrade() -> None:
     # Create breaking_alerts table
     op.create_table(
         "breaking_alerts",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("content_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("content_id", sa.String(36), nullable=False),
         sa.Column("alert_level", sa.String(20), nullable=False),
         sa.Column("alert_score", sa.Integer(), nullable=False),
         sa.Column("title", sa.String(500), nullable=False),
         sa.Column("summary", sa.Text(), nullable=True),
         sa.Column("action_required", sa.Text(), nullable=True),
-        sa.Column("platforms_detected", postgresql.ARRAY(sa.String()), server_default="{}", nullable=False),
+        sa.Column("platforms_detected", sa.JSON(), server_default="{}", nullable=False),
         sa.Column("detection_confidence", sa.Numeric(3, 2), server_default="0.0", nullable=False),
         sa.Column("notifications_sent", sa.Integer(), server_default="0", nullable=False),
         sa.Column("notifications_opened", sa.Integer(), server_default="0", nullable=False),
@@ -192,7 +191,7 @@ def upgrade() -> None:
     # Create velocity_metrics table
     op.create_table(
         "velocity_metrics",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
         sa.Column("source_id", sa.Integer(), nullable=False),
         sa.Column("content_hash", sa.String(64), nullable=False),
         sa.Column("platform", sa.String(50), nullable=False),
@@ -208,9 +207,9 @@ def upgrade() -> None:
     # Create user_reads table
     op.create_table(
         "user_reads",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("content_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("user_id", sa.String(36), nullable=False),
+        sa.Column("content_id", sa.String(36), nullable=False),
         sa.Column("read_duration_seconds", sa.Integer(), nullable=True),
         sa.Column("completion_percentage", sa.Integer(), server_default="0", nullable=False),
         sa.Column("is_completed", sa.Boolean(), server_default="false", nullable=False),
@@ -224,9 +223,9 @@ def upgrade() -> None:
     # Create user_saves table
     op.create_table(
         "user_saves",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("content_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("user_id", sa.String(36), nullable=False),
+        sa.Column("content_id", sa.String(36), nullable=False),
         sa.Column("collection_name", sa.String(100), server_default="default", nullable=False),
         sa.Column("saved_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -238,9 +237,9 @@ def upgrade() -> None:
     # Create user_feedback table
     op.create_table(
         "user_feedback",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("content_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), nullable=False),
+        sa.Column("user_id", sa.String(36), nullable=False),
+        sa.Column("content_id", sa.String(36), nullable=False),
         sa.Column("feedback_type", sa.String(20), nullable=False),
         sa.Column("reason", sa.Text(), nullable=True),
         sa.Column("reported_issue", sa.String(50), nullable=True),

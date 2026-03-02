@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'a1b2c3d4e5f6'
@@ -28,9 +27,7 @@ def upgrade() -> None:
     ))
     if result.fetchone() is None:
         op.add_column('sources', sa.Column(
-            'department_tags',
-            postgresql.ARRAY(sa.String()),
-            server_default='{}',
+            'department_tags', sa.JSON(), server_default='{}',
             nullable=False
         ))
 
@@ -41,9 +38,7 @@ def upgrade() -> None:
     ))
     if result.fetchone() is None:
         op.add_column('raw_content', sa.Column(
-            'department_tags',
-            postgresql.ARRAY(sa.String()),
-            server_default='{}',
+            'department_tags', sa.JSON(), server_default='{}',
             nullable=False
         ))
 

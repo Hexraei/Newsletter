@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '789a10644274'
@@ -30,9 +29,9 @@ def upgrade() -> None:
     op.add_column('hookline_queue', sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
     op.add_column('hookline_queue', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False))
     op.alter_column('processed_content', 'visualizations',
-               existing_type=postgresql.JSONB(astext_type=sa.Text()),
+               existing_type=sa.JSON(),
                nullable=True,
-               existing_server_default=sa.text("'{}'::jsonb"))
+               existing_server_default=sa.text("'{}'"))
     op.drop_index(op.f('ix_processed_content_breaking'), table_name='processed_content')
     op.drop_index(op.f('ix_processed_content_category'), table_name='processed_content')
     op.drop_index(op.f('ix_processed_content_published'), table_name='processed_content')
@@ -88,20 +87,20 @@ def downgrade() -> None:
     op.drop_column('velocity_metrics', 'updated_at')
     op.drop_column('velocity_metrics', 'created_at')
     op.drop_column('vector_embeddings', 'updated_at')
-    op.create_unique_constraint(op.f('users_email_key'), 'users', ['email'], postgresql_nulls_not_distinct=False)
-    op.add_column('user_saves', sa.Column('saved_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=False))
+    op.create_unique_constraint(op.f('users_email_key'), 'users', ['email'])
+    op.add_column('user_saves', sa.Column('saved_at'.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=False))
     op.drop_constraint(None, 'user_saves', type_='foreignkey')
     op.drop_constraint(None, 'user_saves', type_='foreignkey')
     op.create_foreign_key(op.f('user_saves_content_id_fkey'), 'user_saves', 'processed_content', ['content_id'], ['id'])
     op.create_foreign_key(op.f('user_saves_user_id_fkey'), 'user_saves', 'users', ['user_id'], ['id'])
-    op.create_unique_constraint(op.f('user_saves_user_id_content_id_key'), 'user_saves', ['user_id', 'content_id'], postgresql_nulls_not_distinct=False)
+    op.create_unique_constraint(op.f('user_saves_user_id_content_id_key'), 'user_saves', ['user_id', 'content_id'])
     op.drop_column('user_saves', 'updated_at')
     op.drop_column('user_saves', 'created_at')
     op.drop_constraint(None, 'user_reads', type_='foreignkey')
     op.drop_constraint(None, 'user_reads', type_='foreignkey')
     op.create_foreign_key(op.f('user_reads_user_id_fkey'), 'user_reads', 'users', ['user_id'], ['id'])
     op.create_foreign_key(op.f('user_reads_content_id_fkey'), 'user_reads', 'processed_content', ['content_id'], ['id'])
-    op.create_unique_constraint(op.f('user_reads_user_id_content_id_key'), 'user_reads', ['user_id', 'content_id'], postgresql_nulls_not_distinct=False)
+    op.create_unique_constraint(op.f('user_reads_user_id_content_id_key'), 'user_reads', ['user_id', 'content_id'])
     op.drop_column('user_reads', 'updated_at')
     op.drop_constraint(None, 'user_feedback', type_='foreignkey')
     op.drop_constraint(None, 'user_feedback', type_='foreignkey')
@@ -114,7 +113,7 @@ def downgrade() -> None:
                existing_nullable=False,
                existing_server_default=sa.text('100.0'))
     op.drop_column('sources', 'updated_at')
-    op.create_unique_constraint(op.f('raw_content_content_hash_key'), 'raw_content', ['content_hash'], postgresql_nulls_not_distinct=False)
+    op.create_unique_constraint(op.f('raw_content_content_hash_key'), 'raw_content', ['content_hash'])
     op.create_index(op.f('ix_raw_content_status'), 'raw_content', ['status'], unique=False)
     op.drop_column('raw_content', 'updated_at')
     op.drop_column('raw_content', 'created_at')
@@ -123,9 +122,9 @@ def downgrade() -> None:
     op.create_index(op.f('ix_processed_content_category'), 'processed_content', ['category'], unique=False)
     op.create_index(op.f('ix_processed_content_breaking'), 'processed_content', ['is_breaking', 'breaking_score'], unique=False)
     op.alter_column('processed_content', 'visualizations',
-               existing_type=postgresql.JSONB(astext_type=sa.Text()),
+               existing_type=sa.JSON(),
                nullable=False,
-               existing_server_default=sa.text("'{}'::jsonb"))
+               existing_server_default=sa.text("'{}'"))
     op.drop_column('hookline_queue', 'updated_at')
     op.drop_column('hookline_queue', 'created_at')
     op.alter_column('breaking_alerts', 'detection_confidence',

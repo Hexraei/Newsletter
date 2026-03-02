@@ -21,16 +21,20 @@ config = context.config
 # Strip SSL/channel_binding params from URL — asyncpg handles SSL via connect_args
 _db_url = settings.DATABASE_URL
 _connect_args: dict = {}
+_is_sqlite = _db_url.startswith("sqlite")
 _ssl_params = ["ssl=require", "sslmode=require", "channel_binding=require"]
-if any(p in _db_url for p in _ssl_params):
+
+if not _is_sqlite and any(p in _db_url for p in _ssl_params):
     _ssl_ctx = ssl.create_default_context()
     _ssl_ctx.check_hostname = False
     _ssl_ctx.verify_mode = ssl.CERT_NONE
     _connect_args["ssl"] = _ssl_ctx
     for param in _ssl_params:
         _db_url = _db_url.replace(f"?{param}", "").replace(f"&{param}", "")
-    # Clean up trailing ? or &
     _db_url = _db_url.rstrip("?&")
+
+if _is_sqlite:
+    _connect_args["check_same_thread"] = False
 
 # Override sqlalchemy.url with cleaned URL
 config.set_main_option("sqlalchemy.url", _db_url)

@@ -330,13 +330,15 @@ async def get_all_sections(
 
     # Try cached data first (instant response)
     from sqlalchemy import text as sa_text
-    row = (await db.execute(
-        sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
-        {"d": dept_key},
-    )).first()
-
-    if row and row[0]:
-        return {"success": True, "data": row[0]}
+    try:
+        row = (await db.execute(
+            sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
+            {"d": dept_key},
+        )).first()
+        if row and row[0]:
+            return {"success": True, "data": row[0]}
+    except Exception:
+        pass  # cached_feeds table may not exist (e.g. SQLite local dev)
 
     # Cache miss — compute live
     service = FeedService(db)

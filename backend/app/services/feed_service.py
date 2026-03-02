@@ -1,5 +1,6 @@
 """Feed curation service for generating personalized newsletters."""
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -7,6 +8,19 @@ from sqlalchemy import select, func, case, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProcessedContent, RawContent, Source
+
+_IS_SQLITE = os.environ.get("DATABASE_URL", "").startswith("sqlite")
+
+
+def _dept_filter(department: str):
+    """Return a SQLAlchemy filter for department_tags containing *department*.
+
+    PostgreSQL uses the native ``@>`` (contains) operator on JSONB arrays.
+    SQLite stores JSON as TEXT, so we fall back to a LIKE match.
+    """
+    if _IS_SQLITE:
+        return ProcessedContent.department_tags.like(f'%"{department}"%')
+    return ProcessedContent.department_tags.contains([department])
 
 
 class FeedService:
@@ -43,9 +57,7 @@ class FeedService:
         
         # Apply department filter
         if department:
-            query = query.where(
-                ProcessedContent.department_tags.contains([department])
-            )
+            query = query.where(_dept_filter(department))
         
         # Order by attractiveness score and recency
         query = query.order_by(
@@ -108,9 +120,7 @@ class FeedService:
         )
         
         if department:
-            query = query.where(
-                ProcessedContent.department_tags.contains([department])
-            )
+            query = query.where(_dept_filter(department))
         
         query = query.order_by(
             ProcessedContent.attractiveness_score.desc(),
@@ -252,10 +262,7 @@ class FeedService:
             .where(ProcessedContent.published_at >= recent_window)
         )
         if department:
-            query = query.where(
-                ProcessedContent.department_tags.contains([department])
-            )
-        # Primary: high scoring breaking candidates (score >= 55)
+            query = query.where(_dept_filter(department))
         primary_query = (
             query
             .where(total_score >= 55)
@@ -277,9 +284,7 @@ class FeedService:
                 .where(ProcessedContent.attractiveness_score >= 40)
             )
             if department:
-                fallback_query = fallback_query.where(
-                    ProcessedContent.department_tags.contains([department])
-                )
+                fallback_query = fallback_query.where(_dept_filter(department))
             if existing_ids:
                 fallback_query = fallback_query.where(
                     ProcessedContent.id.not_in(existing_ids)
@@ -363,9 +368,7 @@ class FeedService:
             .where(ProcessedContent.attractiveness_score >= 50)
         )
         if department:
-            query = query.where(
-                ProcessedContent.department_tags.contains([department])
-            )
+            query = query.where(_dept_filter(department))
         query = query.order_by(ProcessedContent.attractiveness_score.desc()).limit(limit)
         
         result = await self.db.execute(query)
@@ -421,9 +424,7 @@ class FeedService:
         )
 
         if department:
-            query = query.where(
-                ProcessedContent.department_tags.contains([department])
-            )
+            query = query.where(_dept_filter(department))
 
         query = query.order_by(
             ProcessedContent.attractiveness_score.desc(),

@@ -6,7 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import DateTime, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -17,9 +17,9 @@ class Base(AsyncAttrs, DeclarativeBase):
     """Base class for all models."""
     
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=False),
         primary_key=True,
-        default=uuid4
+        default=lambda: str(uuid4())
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -44,10 +44,12 @@ class Base(AsyncAttrs, DeclarativeBase):
         return result
 
 
-# Build connect_args for SSL when connecting to cloud Postgres (e.g. Supabase)
+# Build connect_args and engine kwargs based on DB type
 _connect_args: dict = {}
 _db_url = settings.DATABASE_URL
-if "ssl=require" in _db_url or "sslmode=require" in _db_url:
+_is_sqlite = _db_url.startswith("sqlite")
+
+if not _is_sqlite and ("ssl=require" in _db_url or "sslmode=require" in _db_url):
     _ssl_ctx = ssl.create_default_context()
     _ssl_ctx.check_hostname = False
     _ssl_ctx.verify_mode = ssl.CERT_NONE
@@ -57,16 +59,25 @@ if "ssl=require" in _db_url or "sslmode=require" in _db_url:
     _db_url = _db_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
     _db_url = _db_url.replace("?channel_binding=require", "").replace("&channel_binding=require", "")
 
-# Create async engine
-engine = create_async_engine(
-    _db_url,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=10,
-    pool_timeout=10,
-    pool_recycle=1800,
-    echo=settings.DEBUG,
-    connect_args=_connect_args,
-)
+# SQLite doesn't support pool_size/max_overflow; use StaticPool for single-file DB
+if _is_sqlite:
+    from sqlalchemy.pool import StaticPool
+    engine = create_async_engine(
+        _db_url,
+        echo=settings.DEBUG,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_async_engine(
+        _db_url,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=10,
+        pool_timeout=10,
+        pool_recycle=1800,
+        echo=settings.DEBUG,
+        connect_args=_connect_args,
+    )
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(
