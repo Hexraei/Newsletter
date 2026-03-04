@@ -81,6 +81,12 @@ frontend/node_modules/
 *.tmp
 *.temp
 
+# Credential screenshots
+unsplash creds.png
+
+# Downloaded CI logs
+logs_*/
+
 # Neon CLI local config
 .neon
 .agents/

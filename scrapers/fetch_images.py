@@ -35,10 +35,7 @@ load_dotenv(os.path.join(_root, "backend", ".env"))
 import httpx
 
 # ── Unsplash config ──────────────────────────────────────────────────
-UNSPLASH_KEY = os.environ.get(
-    "UNSPLASH_ACCESS_KEY",
-    "FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM",
-)
+UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "")
 
 # ── Category → visual search context for Unsplash fallback ──────────
 CATEGORY_VISUAL = {
