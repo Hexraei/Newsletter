@@ -882,6 +882,8 @@
                 <option value="BT">Biotechnology</option>
                 <option value="CH">Chemical Engineering</option>
                 <option value="AE">Aeronautical / Aerospace</option>
+                <option value="RAE">Robotics & Automation</option>
+                <option value="PT">Production Technology</option>
               </select>
               <label class="input-label" for="register-dept">Department</label>
               <span class="input-error" id="register-dept-error">Please select your department</span>
@@ -1102,6 +1104,19 @@
           throw new Error(data.detail || 'Invalid email or password.');
         }
         saveSession(data);
+
+        // Fetch user profile to get department preference
+        try {
+          const meRes = await fetch(API_BASE + '/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + data.access_token },
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            const userDept = (meData.data && meData.data.department_key) || (meData.data && meData.data.department);
+            if (userDept) localStorage.setItem('newsday_dept', userDept.toUpperCase());
+          }
+        } catch (_) { /* non-critical */ }
+
         showMessage('Welcome back. Redirecting...', 'success');
         setTimeout(() => { window.location.href = 'index.html'; }, 800);
       } catch (err) {

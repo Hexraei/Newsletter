@@ -1,0 +1,26 @@
+﻿2026-03-01T10:19:02.2558856Z ##[group]Run actions/setup-python@v5
+2026-03-01T10:19:02.2560567Z with:
+2026-03-01T10:19:02.2561429Z   python-version: 3.11
+2026-03-01T10:19:02.2562393Z   cache: pip
+2026-03-01T10:19:02.2563441Z   cache-dependency-path: backend/requirements.txt
+
+2026-03-01T10:19:02.2565834Z   check-latest: false
+2026-03-01T10:19:02.2569205Z   token: ***
+2026-03-01T10:19:02.2570459Z   update-environment: true
+2026-03-01T10:19:02.2572131Z   allow-prereleases: false
+2026-03-01T10:19:02.2573360Z   freethreaded: false
+2026-03-01T10:19:02.2574303Z env:
+2026-03-01T10:19:02.2576079Z   PYTHONPATH: /home/runner/work/Newsletter/Newsletter:/home/runner/work/Newsletter/Newsletter/backend
+2026-03-01T10:19:02.2578524Z ##[endgroup]
+2026-03-01T10:19:02.4681082Z ##[group]Installed versions
+2026-03-01T10:19:02.5216988Z Successfully set up CPython (3.11.14)
+2026-03-01T10:19:02.5220729Z ##[endgroup]
+2026-03-01T10:19:02.5632144Z [command]/opt/hostedtoolcache/Python/3.11.14/x64/bin/pip cache dir
+2026-03-01T10:19:03.9858525Z /home/runner/.cache/pip
+2026-03-01T10:19:04.2774172Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.14-pip-1282751907fe317a300b294bb422826c8d0e10bc271f56cbd0750f4189ed9f9e
+2026-03-01T10:19:05.5880017Z Received 8388608 of 34953180 (24.0%), 8.0 MBs/sec
+2026-03-01T10:19:05.8210628Z Received 34953180 of 34953180 (100.0%), 27.0 MBs/sec
+2026-03-01T10:19:05.8213078Z Cache Size: ~33 MB (34953180 B)
+2026-03-01T10:19:05.8422428Z [command]/usr/bin/tar -xf /home/runner/work/_temp/e093ac73-6da7-4c55-b879-aaad3c310d08/cache.tzst -P -C /home/runner/work/Newsletter/Newsletter --use-compress-program unzstd
+2026-03-01T10:19:05.9609901Z Cache restored successfully
+2026-03-01T10:19:05.9718896Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.14-pip-1282751907fe317a300b294bb422826c8d0e10bc271f56cbd0750f4189ed9f9e

@@ -609,7 +609,8 @@
           <div class="dept-dropdown-item" data-key="BT"><span class="dept-abbr">BT</span> Biotechnology Engineering</div>
           <div class="dept-dropdown-item" data-key="CH"><span class="dept-abbr">CH</span> Chemical Engineering</div>
           <div class="dept-dropdown-item" data-key="AE"><span class="dept-abbr">AE</span> Aeronautical / Aerospace</div>
-        </div>
+          <div class="dept-dropdown-item" data-key="RAE"><span class="dept-abbr">RAE</span> Robotics & Automation</div>
+          <div class="dept-dropdown-item" data-key="PT"><span class="dept-abbr">PT</span> Production Technology</div>
       </div>
       <a href="department.html">Department news</a>
       <a href="insights.html">Industrial insights</a>
@@ -1422,7 +1423,7 @@
     });
 
     // Department selector
-    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};
+    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE',RAE:'RAE',PT:'PT'};
     function getSelectedDept() { return localStorage.getItem('newsday_dept') || 'CSE'; }
     function setSelectedDept(key) { localStorage.setItem('newsday_dept', key); }
     (function initDeptSelector() {

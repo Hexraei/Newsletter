@@ -609,7 +609,8 @@
           <div class="dept-dropdown-item" data-key="BT"><span class="dept-abbr">BT</span> Biotechnology Engineering</div>
           <div class="dept-dropdown-item" data-key="CH"><span class="dept-abbr">CH</span> Chemical Engineering</div>
           <div class="dept-dropdown-item" data-key="AE"><span class="dept-abbr">AE</span> Aeronautical / Aerospace</div>
-        </div>
+          <div class="dept-dropdown-item" data-key="RAE"><span class="dept-abbr">RAE</span> Robotics & Automation</div>
+          <div class="dept-dropdown-item" data-key="PT"><span class="dept-abbr">PT</span> Production Technology</div>
       </div>
       <a href="department.html" class="active">Department news</a>
       <a href="insights.html">Industrial insights</a>
@@ -793,7 +794,7 @@
     const API = window.location.origin;
 
     /* Department selector helpers */
-    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE'};
+    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE',RAE:'RAE',PT:'PT'};
     const DEPT_DESCRIPTIONS = {
       CSE: 'Core updates for computer science students: AI, systems, software engineering, security, and open-source tools.',
       IT: 'IT infrastructure, cloud computing, networking, cybersecurity, and DevOps updates.',
@@ -805,13 +806,16 @@
       BT: 'Genetic engineering, bioinformatics, pharmaceuticals, and molecular biology updates.',
       CH: 'Process engineering, petrochemicals, polymers, and industrial chemistry news.',
       AE: 'Aerodynamics, propulsion, avionics, space systems, and flight mechanics updates.',
+      RAE: 'Industrial robots, autonomous systems, ROS, control theory, machine vision, and smart manufacturing.',
+      PT: 'CNC machining, lean manufacturing, Industry 4.0, quality control, additive manufacturing, and process optimization.',
     };
     const DEPT_NAMES = {
       CSE:'Computer Science & Engineering', IT:'Information Technology',
       AIDS:'Artificial Intelligence & Data Science', ECE:'Electronics & Communication',
       EEE:'Electrical & Electronics', ME:'Mechanical Engineering',
       CE:'Civil Engineering', BT:'Biotechnology', CH:'Chemical Engineering',
-      AE:'Aeronautical / Aerospace Engineering'
+      AE:'Aeronautical / Aerospace Engineering',
+      RAE:'Robotics & Automation Engineering', PT:'Production Technology'
     };
     function getSelectedDept() { return localStorage.getItem('newsday_dept') || 'CSE'; }
     function setSelectedDept(key) { localStorage.setItem('newsday_dept', key); }

@@ -77,8 +77,26 @@ class FeedService:
         
         result = await self.db.execute(query)
         items = result.scalars().all()
-        
-        # Batch fetch original URLs from raw content
+
+        # Cross-department supplement for low-content departments
+        if department and len(items) < limit:
+            existing_ids = [item.id for item in items]
+            week_ago_xd = datetime.now(timezone.utc) - timedelta(days=30)
+            xdept_query = (
+                select(ProcessedContent)
+                .where(ProcessedContent.status == "published")
+                .where(ProcessedContent.published_at >= week_ago_xd)
+            )
+            if existing_ids:
+                xdept_query = xdept_query.where(
+                    ProcessedContent.id.not_in(existing_ids)
+                )
+            xdept_query = xdept_query.order_by(
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.published_at.desc()
+            ).limit(limit - len(items)).offset(offset)
+            xd_result = await self.db.execute(xdept_query)
+            items.extend(xd_result.scalars().all())
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
         url_map = {}
         if raw_ids:
@@ -135,6 +153,24 @@ class FeedService:
         ).limit(limit)
         result = await self.db.execute(query)
         items = result.scalars().all()
+
+        # Cross-department supplement for low-content departments
+        if department and len(items) < limit:
+            existing_ids = [item.id for item in items]
+            xdept_query = (
+                select(ProcessedContent)
+                .where(ProcessedContent.status == "published")
+            )
+            if existing_ids:
+                xdept_query = xdept_query.where(
+                    ProcessedContent.id.not_in(existing_ids)
+                )
+            xdept_query = xdept_query.order_by(
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.view_count.desc()
+            ).limit(limit - len(items))
+            xd_result = await self.db.execute(xdept_query)
+            items.extend(xd_result.scalars().all())
         
         # Fetch original URLs
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
@@ -306,6 +342,26 @@ class FeedService:
             ).limit(limit - len(items))
             fb_result = await self.db.execute(fallback_query)
             items.extend(fb_result.scalars().all())
+
+        # Cross-department supplement: fill remaining with top general content
+        if department and len(items) < limit:
+            existing_ids = [item.id for item in items]
+            xdept_query = (
+                select(ProcessedContent)
+                .where(ProcessedContent.status == "published")
+                .where(ProcessedContent.published_at >= recent_window)
+                .where(ProcessedContent.attractiveness_score >= 25)
+            )
+            if existing_ids:
+                xdept_query = xdept_query.where(
+                    ProcessedContent.id.not_in(existing_ids)
+                )
+            xdept_query = xdept_query.order_by(
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.published_at.desc(),
+            ).limit(limit - len(items))
+            xd_result = await self.db.execute(xdept_query)
+            items.extend(xd_result.scalars().all())
 
         # Fetch original URLs
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]

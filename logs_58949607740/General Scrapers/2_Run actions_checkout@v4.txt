@@ -1,0 +1,74 @@
+﻿2026-03-01T10:19:01.3758956Z ##[group]Run actions/checkout@v4
+2026-03-01T10:19:01.3759823Z with:
+2026-03-01T10:19:01.3760279Z   repository: Hexraei/Newsletter
+2026-03-01T10:19:01.3760969Z   token: ***
+2026-03-01T10:19:01.3761374Z   ssh-strict: true
+2026-03-01T10:19:01.3761790Z   ssh-user: git
+2026-03-01T10:19:01.3762216Z   persist-credentials: true
+2026-03-01T10:19:01.3762676Z   clean: true
+2026-03-01T10:19:01.3763097Z   sparse-checkout-cone-mode: true
+2026-03-01T10:19:01.3763590Z   fetch-depth: 1
+2026-03-01T10:19:01.3763983Z   fetch-tags: false
+2026-03-01T10:19:01.3764405Z   show-progress: true
+2026-03-01T10:19:01.3764837Z   lfs: false
+2026-03-01T10:19:01.3765219Z   submodules: false
+2026-03-01T10:19:01.3765637Z   set-safe-directory: true
+2026-03-01T10:19:01.3766287Z env:
+2026-03-01T10:19:01.3767202Z   PYTHONPATH: /home/runner/work/Newsletter/Newsletter:/home/runner/work/Newsletter/Newsletter/backend
+2026-03-01T10:19:01.3768094Z ##[endgroup]
+2026-03-01T10:19:01.4952726Z Syncing repository: Hexraei/Newsletter
+2026-03-01T10:19:01.4959012Z ##[group]Getting Git version info
+2026-03-01T10:19:01.4960513Z Working directory is '/home/runner/work/Newsletter/Newsletter'
+2026-03-01T10:19:01.4965394Z [command]/usr/bin/git version
+2026-03-01T10:19:01.5074049Z git version 2.53.0
+2026-03-01T10:19:01.5103526Z ##[endgroup]
+2026-03-01T10:19:01.5122256Z Temporarily overriding HOME='/home/runner/work/_temp/b563a2ba-5796-496f-877d-bdbd1ec74106' before making global git config changes
+2026-03-01T10:19:01.5125857Z Adding repository directory to the temporary git global config as a safe directory
+2026-03-01T10:19:01.5133226Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Newsletter/Newsletter
+2026-03-01T10:19:01.5185549Z Deleting the contents of '/home/runner/work/Newsletter/Newsletter'
+2026-03-01T10:19:01.5191250Z ##[group]Initializing the repository
+2026-03-01T10:19:01.5197454Z [command]/usr/bin/git init /home/runner/work/Newsletter/Newsletter
+2026-03-01T10:19:01.5319063Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-03-01T10:19:01.5320817Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-03-01T10:19:01.5322712Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-03-01T10:19:01.5324116Z hint: call:
+2026-03-01T10:19:01.5324802Z hint:
+2026-03-01T10:19:01.5325677Z hint: 	git config --global init.defaultBranch <name>
+2026-03-01T10:19:01.5326712Z hint:
+2026-03-01T10:19:01.5327941Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-03-01T10:19:01.5329577Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-03-01T10:19:01.5330810Z hint:
+2026-03-01T10:19:01.5331461Z hint: 	git branch -m <name>
+2026-03-01T10:19:01.5332240Z hint:
+2026-03-01T10:19:01.5333320Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-03-01T10:19:01.5336738Z Initialized empty Git repository in /home/runner/work/Newsletter/Newsletter/.git/
+2026-03-01T10:19:01.5340970Z [command]/usr/bin/git remote add origin https://github.com/Hexraei/Newsletter
+2026-03-01T10:19:01.5378369Z ##[endgroup]
+2026-03-01T10:19:01.5379907Z ##[group]Disabling automatic garbage collection
+2026-03-01T10:19:01.5383732Z [command]/usr/bin/git config --local gc.auto 0
+2026-03-01T10:19:01.5417268Z ##[endgroup]
+2026-03-01T10:19:01.5419834Z ##[group]Setting up auth
+2026-03-01T10:19:01.5426150Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-03-01T10:19:01.5464042Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-03-01T10:19:01.5857620Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-03-01T10:19:01.5894494Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-03-01T10:19:01.6146376Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-03-01T10:19:01.6181577Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-03-01T10:19:01.6435872Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-03-01T10:19:01.6482061Z ##[endgroup]
+2026-03-01T10:19:01.6483432Z ##[group]Fetching the repository
+2026-03-01T10:19:01.6491840Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e562332dcb828f3bf70fa6c49fdf2f638d01c7b1:refs/remotes/origin/main
+2026-03-01T10:19:02.1575790Z From https://github.com/Hexraei/Newsletter
+2026-03-01T10:19:02.1578694Z  * [new ref]         e562332dcb828f3bf70fa6c49fdf2f638d01c7b1 -> origin/main
+2026-03-01T10:19:02.1619529Z ##[endgroup]
+2026-03-01T10:19:02.1622287Z ##[group]Determining the checkout info
+2026-03-01T10:19:02.1623773Z ##[endgroup]
+2026-03-01T10:19:02.1630526Z [command]/usr/bin/git sparse-checkout disable
+2026-03-01T10:19:02.1706248Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-03-01T10:19:02.1759022Z ##[group]Checking out the ref
+2026-03-01T10:19:02.1769555Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-03-01T10:19:02.2023999Z Switched to a new branch 'main'
+2026-03-01T10:19:02.2039956Z branch 'main' set up to track 'origin/main'.
+2026-03-01T10:19:02.2051477Z ##[endgroup]
+2026-03-01T10:19:02.2090951Z [command]/usr/bin/git log -1 --format=%H
+2026-03-01T10:19:02.2119130Z e562332dcb828f3bf70fa6c49fdf2f638d01c7b1

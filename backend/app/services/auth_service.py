@@ -13,6 +13,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User
+from app.departments import DEPARTMENT_KEYS, DEPARTMENTS
 from app.schemas.user import UserCreate, UserUpdate
 
 
@@ -43,12 +44,21 @@ class AuthService:
         if existing_user:
             raise ValueError("Email already registered")
         
+        # Resolve department key
+        dept_val = user_data.department
+        dept_key = None
+        dept_name = dept_val
+        if dept_val and dept_val.upper() in DEPARTMENT_KEYS:
+            dept_key = dept_val.upper()
+            dept_name = next((d["name"] for d in DEPARTMENTS if d["key"] == dept_key), dept_val)
+
         # Create new user
         db_user = User(
             email=user_data.email,
             password_hash=get_password_hash(user_data.password),
             full_name=user_data.full_name,
-            department=user_data.department,
+            department=dept_name,
+            department_key=dept_key,
             year_of_study=user_data.year_of_study,
             college_name=user_data.college_name,
         )

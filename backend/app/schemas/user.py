@@ -43,6 +43,7 @@ class UserInDB(UserBase):
     """User in database schema."""
     id: str
     department: Optional[str] = None
+    department_key: Optional[str] = None
     year_of_study: Optional[int] = None
     graduation_year: Optional[int] = None
     college_name: Optional[str] = None
