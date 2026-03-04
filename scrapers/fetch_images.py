@@ -239,34 +239,79 @@ async def fetch_unsplash(client: httpx.AsyncClient, query: str) -> str:
     return ""
 
 
-# ── Database helpers ────────────────────────────────────────────────
+# ── Database helpers (SQLite + PostgreSQL) ───────────────────────────
 
-def get_db_path() -> str:
-    """Find the SQLite database file."""
-    db_url = os.environ.get("DATABASE_URL", "")
-    if "sqlite" in db_url:
-        path = db_url.split("///")[-1]
-        if os.path.isabs(path):
-            return path
-        return os.path.join(_root, path)
-    return os.path.join(_root, "newsletter.db")
+_DB_URL = os.environ.get("DATABASE_URL", "")
+_IS_POSTGRES = "postgresql" in _DB_URL or "postgres" in _DB_URL
 
 
-def clear_bad_images(conn: sqlite3.Connection):
+def _get_connection():
+    """Return a DB-API 2.0 connection for either PostgreSQL or SQLite."""
+    if _IS_POSTGRES:
+        import psycopg2
+        import psycopg2.extras
+        # Strip async driver prefix if present (e.g. postgresql+asyncpg://)
+        dsn = re.sub(r"^postgresql\+\w+://", "postgresql://", _DB_URL)
+        conn = psycopg2.connect(dsn)
+        conn.autocommit = False
+        return conn
+    else:
+        db_url = _DB_URL
+        if "sqlite" in db_url:
+            path = db_url.split("///")[-1]
+            if not os.path.isabs(path):
+                path = os.path.join(_root, path)
+        else:
+            path = os.path.join(_root, "newsletter.db")
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Database not found: {path}")
+        conn = sqlite3.connect(path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+def _placeholder():
+    """Return the parameter placeholder for the current DB engine."""
+    return "%s" if _IS_POSTGRES else "?"
+
+
+def _join_clause():
+    """Return the JOIN condition between processed_content and raw_content.
+    PostgreSQL uses proper UUIDs; SQLite has a dash-format mismatch.
+    """
+    if _IS_POSTGRES:
+        return "p.raw_content_id = r.id"
+    return "REPLACE(p.raw_content_id, '-', '') = r.id"
+
+
+def _row_get(row, key):
+    """Get a value from a row by column name (works for both sqlite3.Row and psycopg2 DictRow)."""
+    if isinstance(row, dict):
+        return row.get(key)
+    try:
+        return row[key]
+    except (TypeError, KeyError):
+        idx = {"id": 0, "title": 1, "category": 2, "original_url": 3}.get(key)
+        return row[idx] if idx is not None else None
+
+
+def clear_bad_images(conn):
     """Remove duplicate/generic images (same URL used for 3+ articles)."""
     c = conn.cursor()
-    # Find URLs used by 3+ articles — these are generic/irrelevant
-    dupes = c.execute("""
+    c.execute("""
         SELECT featured_image_url, COUNT(*) as cnt
         FROM processed_content
         WHERE featured_image_url IS NOT NULL
         GROUP BY featured_image_url
-        HAVING cnt >= 3
-    """).fetchall()
+        HAVING COUNT(*) >= 3
+    """)
+    dupes = c.fetchall()
     total_cleared = 0
-    for url, cnt in dupes:
+    ph = _placeholder()
+    for row in dupes:
+        url, cnt = row[0], row[1]
         c.execute(
-            "UPDATE processed_content SET featured_image_url = NULL WHERE featured_image_url = ?",
+            f"UPDATE processed_content SET featured_image_url = NULL WHERE featured_image_url = {ph}",
             (url,),
         )
         total_cleared += cnt
@@ -275,35 +320,38 @@ def clear_bad_images(conn: sqlite3.Connection):
     return total_cleared
 
 
-def show_stats(conn: sqlite3.Connection):
+def show_stats(conn):
     """Print image source statistics."""
     c = conn.cursor()
-    total = c.execute("SELECT COUNT(*) FROM processed_content WHERE status='published'").fetchone()[0]
-    with_img = c.execute("SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NOT NULL AND status='published'").fetchone()[0]
-    print(f"\nImage coverage: {with_img}/{total} articles ({100*with_img//total}%)\n")
-    rows = c.execute("""
+    c.execute("SELECT COUNT(*) FROM processed_content WHERE status='published'")
+    total = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NOT NULL AND status='published'")
+    with_img = c.fetchone()[0]
+    pct = (100 * with_img // total) if total else 0
+    print(f"\nImage coverage: {with_img}/{total} articles ({pct}%)\n")
+    c.execute("""
         SELECT
-            CASE WHEN featured_image_url LIKE '%flickr%' THEN 'flickr/openverse'
-                 WHEN featured_image_url LIKE '%unsplash%' THEN 'unsplash'
-                 WHEN featured_image_url LIKE '%wikimedia%' THEN 'wikimedia'
-                 WHEN featured_image_url LIKE '%wp-content%' THEN 'og:image (wordpress)'
-                 WHEN featured_image_url LIKE '%cdn%' THEN 'og:image (cdn)'
+            CASE WHEN featured_image_url LIKE '%%flickr%%' THEN 'flickr/openverse'
+                 WHEN featured_image_url LIKE '%%unsplash%%' THEN 'unsplash'
+                 WHEN featured_image_url LIKE '%%wikimedia%%' THEN 'wikimedia'
+                 WHEN featured_image_url LIKE '%%wp-content%%' THEN 'og:image (wordpress)'
+                 WHEN featured_image_url LIKE '%%cdn%%' THEN 'og:image (cdn)'
                  WHEN featured_image_url IS NULL THEN 'missing'
                  ELSE 'og:image (other)' END as src,
             COUNT(*) as cnt
         FROM processed_content WHERE status='published'
-        GROUP BY src ORDER BY cnt DESC
-    """).fetchall()
-    for src, cnt in rows:
-        print(f"  {src}: {cnt}")
-    # Check duplicates
-    dupes = c.execute("""
+        GROUP BY 1 ORDER BY cnt DESC
+    """)
+    for row in c.fetchall():
+        print(f"  {row[0]}: {row[1]}")
+    c.execute("""
         SELECT COUNT(*) FROM (
             SELECT featured_image_url FROM processed_content
             WHERE featured_image_url IS NOT NULL
             GROUP BY featured_image_url HAVING COUNT(*) >= 3
-        )
-    """).fetchone()[0]
+        ) sub
+    """)
+    dupes = c.fetchone()[0]
     print(f"\n  Duplicate URLs (used 3+ times): {dupes}")
 
 
@@ -311,32 +359,29 @@ def show_stats(conn: sqlite3.Connection):
 
 async def backfill_images(limit: int = 200, batch_size: int = 50):
     """Backfill images: OG scraping (primary) + Unsplash (fallback)."""
-    db_path = get_db_path()
-    if not os.path.exists(db_path):
-        print(f"Database not found: {db_path}")
-        return
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = _get_connection()
     c = conn.cursor()
+    ph = _placeholder()
+    join = _join_clause()
 
-    total_missing = c.execute(
-        "SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NULL AND status = 'published'"
-    ).fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NULL AND status = 'published'")
+    total_missing = c.fetchone()[0]
+    db_label = "PostgreSQL" if _IS_POSTGRES else "SQLite"
+    print(f"Database: {db_label}")
     print(f"Articles missing images: {total_missing}")
     print(f"Processing up to {limit} in batches of {batch_size}")
     print(f"Strategy: OG scrape article URL → Unsplash fallback\n")
 
-    # JOIN to get original_url from raw_content
-    rows = c.execute("""
+    c.execute(f"""
         SELECT p.id, p.title, p.category, r.original_url
         FROM processed_content p
-        JOIN raw_content r ON REPLACE(p.raw_content_id, '-', '') = r.id
+        JOIN raw_content r ON {join}
         WHERE p.featured_image_url IS NULL
           AND p.status = 'published'
         ORDER BY p.attractiveness_score DESC
-        LIMIT ?
-    """, (limit,)).fetchall()
+        LIMIT {ph}
+    """, (limit,))
+    rows = c.fetchall()
 
     if not rows:
         print("No articles need images!")
@@ -349,7 +394,7 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
     unsplash_ok = 0
     failed = 0
     start_time = time.time()
-    unsplash_remaining = 45  # leave ~5 req buffer for frontend
+    unsplash_remaining = 45
 
     async with httpx.AsyncClient(
         timeout=10,
@@ -363,16 +408,14 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
             print(f"=== Batch {batch_num}/{total_batches} ({len(batch)} articles) ===")
 
             for row in batch:
-                article_id = row["id"]
-                title = row["title"] or ""
-                category = row["category"] or "general"
-                original_url = row["original_url"] or ""
+                article_id = _row_get(row, "id") or row[0]
+                title = (_row_get(row, "title") or row[1]) or ""
+                category = (_row_get(row, "category") or row[2]) or "general"
+                original_url = (_row_get(row, "original_url") or row[3]) or ""
 
-                # Step 1: Try OG image scraping from actual article
                 url = await scrape_og_image(client, original_url)
                 source = "OG"
 
-                # Step 2: Unsplash fallback (if OG failed and budget remains)
                 if not url and unsplash_remaining > 0:
                     query = build_search_query(title, category)
                     url = await fetch_unsplash(client, query)
@@ -382,8 +425,8 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
 
                 if url:
                     c.execute(
-                        "UPDATE processed_content SET featured_image_url = ? WHERE id = ?",
-                        (url, article_id),
+                        f"UPDATE processed_content SET featured_image_url = {ph} WHERE id = {ph}",
+                        (url, str(article_id)),
                     )
                     if source == "OG":
                         og_ok += 1
@@ -394,7 +437,6 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
                     failed += 1
                     print(f"  [MISS    ] {title[:65]}")
 
-                # Brief pause to be respectful to article servers
                 await asyncio.sleep(0.3)
 
             conn.commit()
@@ -424,13 +466,13 @@ def main():
     args = parser.parse_args()
 
     if args.stats:
-        conn = sqlite3.connect(get_db_path())
+        conn = _get_connection()
         show_stats(conn)
         conn.close()
         return
 
     if args.clear_bad:
-        conn = sqlite3.connect(get_db_path())
+        conn = _get_connection()
         clear_bad_images(conn)
         show_stats(conn)
         conn.close()
