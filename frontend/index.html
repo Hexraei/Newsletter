@@ -1067,16 +1067,22 @@
         } catch {}
       }
 
-      // Derive short keyword from article title (strip stopwords, take first 3 content words)
-      const STOP = new Set(['the','a','an','in','on','of','to','for','and','or','with','by','at','is','are','was','were','has','have','it','its','this','that','from','as','be','how','why','what','when','who','your','our','their','will','can','may','about','into','over','after','using','new','top','best']);
-      function _getQuery(title) {
-        return (title || '')
+      // Derive a relevant Unsplash search query from article title
+      const STOP = new Set(['the','a','an','in','on','of','to','for','and','or','with','by','at','is','are','was','were','has','have','it','its','this','that','from','as','be','how','why','what','when','who','your','our','their','will','can','may','about','into','over','after','using','new','top','best','just','not','now','get','all','more','per','vs','via','says','been','being','would','could','should','they','them','which','but','first','last','both','here','there','also','even','only','ever','watch','look','see','show','take','give','keep','tell','know','come','goes','went','help','open','close','start','stop','together','every','between','through','while','during','without','hundreds','millions','thousands','several','many','much','work','find','think','make','does','want','need']);
+      const NOISE = new Set(['patch','tuesday','edition','january','february','march','april','may','june','july','august','september','october','november','december','2024','2025','2026','2027','heres','built','released','launches','announces','introduces','raises','million','billion','update','roundup','daily','weekly']);
+      function _getQuery(title, category) {
+        const words = (title || '')
           .toLowerCase()
           .replace(/[^a-z0-9 ]/g, ' ')
           .split(/\s+/)
-          .filter(w => w.length > 2 && !STOP.has(w))
-          .slice(0, 3)
-          .join(' ') || 'technology';
+          .filter(w => w.length >= 3 && !STOP.has(w) && !NOISE.has(w));
+        // Prefer longer, more descriptive words (better Unsplash results)
+        words.sort((a, b) => b.length - a.length);
+        const titlePart = words.slice(0, 2).join(' ');
+        // Category-aware visual context
+        const CTX = {ai_ml:'artificial intelligence',backend:'programming code',webdev:'web development',security:'cybersecurity',career:'career workplace',startup:'startup business',devops:'cloud servers',mobile:'smartphone app',robotics:'robot technology',electronics:'circuit board',research:'scientific research',biotech:'biotechnology',energy:'renewable energy'};
+        const ctx = CTX[category] || 'technology';
+        return titlePart ? `${titlePart} ${ctx}` : ctx;
       }
 
       // Trigger Unsplash download event (required by guidelines when image is shown)
@@ -1178,7 +1184,7 @@
         containerEl.querySelectorAll('.article-card[data-unsplash-query]').forEach(observe);
       }
 
-      return { observe, observeAll, getQuery: _getQuery };
+      return { observe, observeAll, getQuery: _getQuery, _fetchForHero: _fetchImage };
     })();
 
 
@@ -1543,6 +1549,7 @@
         content: item.content || item.summary || item.title || '',
         image: item.featured_image_url || item.image || '',
         image_credit: item.image_credit || null,
+        category: item.category || 'general',
       };
     }
 
@@ -2112,8 +2119,7 @@
       const imgStyle = hasImg ? `background-image:url('${escapeHtml(item.image)}');` : '';
       const imgClass = hasImg ? ' has-image' : '';
       const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(item.title))}"`;
-      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
+      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(item.title, item.category))}"`;      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
         <div class="article-card-visual${imgClass}" style="${imgStyle}">${placeholder}</div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
@@ -2145,7 +2151,7 @@
       const cite = paper.citations ? paper.citations + ' citations' : '';
       const hasImg = !!(paper.featured_image_url);
       const imgStyle = hasImg ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
-      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(paper.title))}"`;
+      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(paper.title, 'research'))}"`;
       return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
         <div class="article-card-visual" style="${imgStyle}"></div>
         <div class="article-card-title">${escapeHtml(paper.title)}</div>
@@ -2242,7 +2248,7 @@
       try {
         const dept = getSelectedDept();
         const res = await fetchWithTimeout(
-          API + '/api/v1/feed/all-sections?breaking_limit=8&department_limit=3&trending_limit=3&department=' + encodeURIComponent(dept),
+          API + '/api/v1/feed/all-sections?breaking_limit=8&department_limit=15&trending_limit=10&department=' + encodeURIComponent(dept),
           {},
           6000
         );
@@ -2346,7 +2352,7 @@
         $btn.dataset.storyId = heroStoryId;
         $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
 
-        // Hero image
+        // Hero image — use featured_image_url, then try Unsplash fallback
         const $visual = $('hero-visual');
         if ($visual) {
           if (slide.image) {
@@ -2355,6 +2361,17 @@
             $visual.style.backgroundPosition = 'center';
           } else {
             $visual.style.backgroundImage = '';
+            // Unsplash fallback for hero slides
+            const heroQuery = UnsplashImageLoader.getQuery(slide.title, slide.category);
+            if (heroQuery) {
+              UnsplashImageLoader._fetchForHero(heroQuery).then(data => {
+                if (data && $visual) {
+                  $visual.style.backgroundImage = `url('${data.url}')`;
+                  $visual.style.backgroundSize = 'cover';
+                  $visual.style.backgroundPosition = 'center';
+                }
+              });
+            }
           }
         }
 
