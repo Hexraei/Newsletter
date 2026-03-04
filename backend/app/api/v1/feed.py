@@ -316,8 +316,8 @@ async def submit_feedback(
 @router.get("/all-sections")
 async def get_all_sections(
     breaking_limit: int = Query(8, ge=1, le=30),
-    department_limit: int = Query(3, ge=1, le=30),
-    trending_limit: int = Query(3, ge=1, le=30),
+    department_limit: int = Query(15, ge=1, le=50),
+    trending_limit: int = Query(10, ge=1, le=30),
     department: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -342,11 +342,11 @@ async def get_all_sections(
 
     # Cache miss — compute live
     service = FeedService(db)
-    breaking = await service.get_breaking_news(limit=breaking_limit, department=department)
-    trending = await service.get_trending_content(limit=trending_limit, department=department)
-    dept_feed = await service.get_personalized_feed(department=department, limit=department_limit)
+    breaking = await service.get_breaking_news(limit=breaking_limit, department=dept_key)
+    trending = await service.get_trending_content(limit=trending_limit, department=dept_key)
+    dept_feed = await service.get_personalized_feed(department=dept_key, limit=department_limit)
     dept_items = dept_feed.get("items", [])
-    research = await service.get_research_papers(department=department, featured_limit=3, general_limit=10)
+    research = await service.get_research_papers(department=dept_key, featured_limit=3, general_limit=10)
 
     return {
         "success": True,

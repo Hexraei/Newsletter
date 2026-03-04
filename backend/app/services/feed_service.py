@@ -59,11 +59,18 @@ class FeedService:
         if department:
             query = query.where(_dept_filter(department))
         
-        # Order by attractiveness score and recency
-        query = query.order_by(
-            ProcessedContent.attractiveness_score.desc(),
-            ProcessedContent.published_at.desc()
-        )
+        # Order by relevance (if filtering by dept) then attractiveness and recency
+        if department:
+            query = query.order_by(
+                ProcessedContent.relevance_score.desc().nullslast(),
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.published_at.desc()
+            )
+        else:
+            query = query.order_by(
+                ProcessedContent.attractiveness_score.desc(),
+                ProcessedContent.published_at.desc()
+            )
         
         # Apply pagination
         query = query.limit(limit).offset(offset)
@@ -217,7 +224,11 @@ class FeedService:
         now = datetime.now(timezone.utc)
         recent_window = now - timedelta(days=30)  # extended window; recency_boost rewards truly new content
 
-        age_hours = func.extract('epoch', literal(now) - ProcessedContent.published_at) / 3600.0
+        if _IS_SQLITE:
+            # SQLite: use julianday for age calculation
+            age_hours = (func.julianday('now') - func.julianday(ProcessedContent.published_at)) * 24.0
+        else:
+            age_hours = func.extract('epoch', literal(now) - ProcessedContent.published_at) / 3600.0
 
         recency_boost = case(
             (age_hours <= 2, 20),
@@ -265,7 +276,7 @@ class FeedService:
             query = query.where(_dept_filter(department))
         primary_query = (
             query
-            .where(total_score >= 55)
+            .where(total_score >= 40)
             .order_by(total_score.desc())
             .limit(limit)
         )
@@ -275,13 +286,13 @@ class FeedService:
 
         # Fallback: if not enough, fill with top recent by attractiveness (14-day window, not 30)
         if len(items) < limit:
-            fallback_window = now - timedelta(days=14)
+            fallback_window = now - timedelta(days=30)
             existing_ids = [item.id for item in items]
             fallback_query = (
                 select(ProcessedContent)
                 .where(ProcessedContent.status == "published")
                 .where(ProcessedContent.published_at >= fallback_window)
-                .where(ProcessedContent.attractiveness_score >= 40)
+                .where(ProcessedContent.attractiveness_score >= 25)
             )
             if department:
                 fallback_query = fallback_query.where(_dept_filter(department))

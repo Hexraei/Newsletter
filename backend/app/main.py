@@ -85,6 +85,7 @@ async def health_check():
 
 # Root endpoint
 @app.get("/", tags=["Root"])
+@app.get("/index.html", tags=["Root"], include_in_schema=False)
 async def root():
     """Serve frontend index.html directly (no-cache) or show API info."""
     frontend_dir = Path(__file__).parent.parent.parent / "frontend"
@@ -120,6 +121,38 @@ async def stories_page():
 @app.get("/research.html", tags=["Root"])
 async def research_page():
     path = Path(__file__).parent.parent.parent / "frontend" / "research.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/auth.html", tags=["Root"])
+async def auth_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "auth.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/skills.html", tags=["Root"])
+async def skills_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "skills.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/insights.html", tags=["Root"])
+async def insights_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "insights.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/reader.html", tags=["Root"])
+async def reader_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "reader.html"
     if path.exists():
         return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return RedirectResponse(url="/")

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai_provider import AIProvider
 from app.models import ProcessedContent, RawContent, Source
+from app.services.dept_relevance import assign_departments, detect_category
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,16 @@ class ContentProcessor:
         source = source_result.scalar_one_or_none()
         source_name = source.name if source else ""
         
+        # Determine department tags via content analysis (not just source tags)
+        source_tags = (source.department_tags or source.default_categories) if source else []
+        source_type = source.source_type if source else ""
+        dept_tags = assign_departments(
+            raw.original_title or "",
+            raw.original_content or "",
+            source_dept_tags=source_tags,
+            source_type=source_type,
+        )
+
         # Determine if this is breaking news using quality + recency + urgency rules
         is_breaking = self._is_breaking_candidate(raw, score)
         breaking_score = self._calculate_breaking_score(raw, score) if is_breaking else None
@@ -221,8 +232,8 @@ class ContentProcessor:
                 "action_step": summary_data.get("action_step", "")
             },
             reading_time_minutes=2,
-            category=self._detect_category(raw),
-            department_tags=(source.department_tags or source.default_categories) if source else ["general"],
+            category=detect_category(raw.original_title or "", raw.original_content or ""),
+            department_tags=dept_tags if dept_tags else (source_tags or ["general"]),
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             quality_score=min(100, score + 10),
@@ -301,6 +312,15 @@ class ContentProcessor:
         featured_image_url = self._extract_featured_image(raw)
         image_credit = None
 
+        # Assign departments via content analysis
+        source_tags = (source.department_tags or source.default_categories) if source else []
+        source_type = source.source_type if source else ""
+        dept_tags = assign_departments(
+            title, content,
+            source_dept_tags=source_tags,
+            source_type=source_type,
+        )
+
         processed = ProcessedContent(
             raw_content_id=raw.id,
             title=title,
@@ -311,8 +331,8 @@ class ContentProcessor:
                 "key_points": [],
             },
             reading_time_minutes=max(1, len(content) // 1000 + 1),
-            category=self._detect_category(raw),
-            department_tags=(source.department_tags or source.default_categories) if source else ["general"],
+            category=detect_category(title, content),
+            department_tags=dept_tags if dept_tags else (source_tags or ["general"]),
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             quality_score=score,
