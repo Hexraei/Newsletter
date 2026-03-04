@@ -1,24 +1,25 @@
 #!/usr/bin/env python
-"""Backfill article images using Unsplash as the primary source.
+"""Backfill article images — OG scraping first, Unsplash fallback.
 
-Strategy:
-  1. Build a smart search query from article title + category
-  2. Fetch a relevant landscape photo from Unsplash
-  3. Store the URL in processed_content.featured_image_url
+Strategy (per article):
+  1. Scrape the original article URL for og:image / twitter:image meta tags
+  2. If OG scraping fails, search Unsplash with a smart title-based query
+  3. Store the winning URL in processed_content.featured_image_url
 
-Uses direct SQLite access to avoid UUID format mismatch between tables.
-
-Usage: python scrapers/fetch_images.py [--limit 200] [--batch-size 45]
+Usage:
+  python scrapers/fetch_images.py [--limit 200] [--batch-size 50]
+  python scrapers/fetch_images.py --clear-bad   # clear duplicate/generic images
+  python scrapers/fetch_images.py --stats        # show image source stats
 """
 
 import asyncio
 import argparse
-import json
 import re
 import sqlite3
 import sys
 import os
 import time
+from html.parser import HTMLParser
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -36,14 +37,10 @@ import httpx
 # ── Unsplash config ──────────────────────────────────────────────────
 UNSPLASH_KEY = os.environ.get(
     "UNSPLASH_ACCESS_KEY",
-    "FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM",  # frontend public key
+    "FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM",
 )
-UNSPLASH_RATE_LIMIT = 50   # free tier: 50 req/hr
-UNSPLASH_BATCH_DELAY = 3   # seconds between batches to stay under rate limit
 
-# ── Category → visual search context ────────────────────────────────
-# Maps article categories to 1-2 words that produce visually relevant
-# Unsplash results when combined with title keywords.
+# ── Category → visual search context for Unsplash fallback ──────────
 CATEGORY_VISUAL = {
     "ai_ml":       "artificial intelligence",
     "backend":     "programming code",
@@ -61,7 +58,6 @@ CATEGORY_VISUAL = {
     "general":     "technology",
 }
 
-# Stop words for title keyword extraction
 _STOP = frozenset({
     "the", "a", "an", "in", "on", "at", "to", "for", "of", "and", "or", "is",
     "are", "was", "were", "has", "have", "how", "why", "what", "when", "where",
@@ -79,7 +75,6 @@ _STOP = frozenset({
     "hundreds", "millions", "billions", "thousands", "several", "many", "much",
 })
 
-# Domain-specific keywords that are visually meaningless on Unsplash
 _VISUAL_NOISE = frozenset({
     "patch", "tuesday", "edition", "january", "february", "march", "april",
     "may", "june", "july", "august", "september", "october", "november",
@@ -90,48 +85,129 @@ _VISUAL_NOISE = frozenset({
 })
 
 
-def build_unsplash_query(title: str, category: str = "general") -> str:
-    """Build a relevant 2-4 word Unsplash search query from title + category.
+# ── OG Image Scraping ───────────────────────────────────────────────
 
-    Strategy:
-      1. Extract meaningful noun-like words from title (skip stopwords + visual noise)
-      2. Pick the 2 most descriptive words
-      3. Append category visual context if title keywords are too generic
-      4. Result: "python programming code" or "cybersecurity breach"
+class _OGParser(HTMLParser):
+    """Fast HTML parser that only extracts og:image and twitter:image."""
+
+    def __init__(self):
+        super().__init__()
+        self.og_image = ""
+        self.twitter_image = ""
+        self._in_head = False
+        self._done = False
+
+    def handle_starttag(self, tag, attrs):
+        if self._done:
+            return
+        if tag == "head":
+            self._in_head = True
+            return
+        if tag == "body":
+            self._done = True
+            return
+        if tag != "meta":
+            return
+        d = dict(attrs)
+        prop = d.get("property", "").lower()
+        name = d.get("name", "").lower()
+        content = d.get("content", "").strip()
+        if not content:
+            return
+        if prop == "og:image" and not self.og_image:
+            self.og_image = content
+        elif name == "twitter:image" and not self.twitter_image:
+            self.twitter_image = content
+
+
+def _is_valid_image_url(url: str) -> bool:
+    """Check if a URL looks like a valid, displayable image."""
+    if not url or len(url) < 10:
+        return False
+    if not url.startswith(("http://", "https://")):
+        return False
+    # Reject SVGs (often logos), data URIs, and tiny placeholders
+    low = url.lower()
+    if low.endswith(".svg") or low.startswith("data:"):
+        return False
+    # Reject common placeholder/logo patterns
+    reject_patterns = [
+        "logo", "favicon", "icon", "badge", "avatar",
+        "1x1", "pixel", "spacer", "blank", "placeholder",
+    ]
+    # Only reject if the pattern is in the filename part, not the domain
+    path_part = low.split("?")[0].split("/")[-1] if "/" in low else low
+    for pat in reject_patterns:
+        if pat in path_part:
+            return False
+    return True
+
+
+async def scrape_og_image(client: httpx.AsyncClient, url: str) -> str:
+    """Fetch a page and extract its og:image or twitter:image meta tag.
+    Only reads the first 50KB to be fast and respectful.
     """
-    # Clean non-ASCII and punctuation
+    if not url or not url.startswith("http"):
+        return ""
+    try:
+        # Use stream to limit download size — only need the <head>
+        async with client.stream("GET", url, follow_redirects=True, timeout=8) as resp:
+            if resp.status_code != 200:
+                return ""
+            ct = resp.headers.get("content-type", "")
+            if "html" not in ct and "text" not in ct:
+                return ""
+            # Read first 50KB — og:image is always in <head>
+            chunks = []
+            total = 0
+            async for chunk in resp.aiter_bytes(chunk_size=8192):
+                chunks.append(chunk)
+                total += len(chunk)
+                if total >= 50_000:
+                    break
+            html = b"".join(chunks).decode("utf-8", errors="replace")
+
+        parser = _OGParser()
+        try:
+            parser.feed(html)
+        except Exception:
+            pass
+
+        # Prefer og:image over twitter:image
+        img = parser.og_image or parser.twitter_image
+        if _is_valid_image_url(img):
+            return img
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.TooManyRedirects):
+        pass
+    except Exception:
+        pass
+    return ""
+
+
+# ── Unsplash Search (fallback) ──────────────────────────────────────
+
+def build_search_query(title: str, category: str = "general") -> str:
+    """Build a 2-4 word search query from title + category context."""
     clean = title.encode("ascii", "ignore").decode()
     clean = re.sub(r"[^\w\s]", " ", clean.lower())
     words = clean.split()
-
-    # Filter: skip stopwords, visual noise, very short words
     meaningful = [
         w for w in words
         if w not in _STOP and w not in _VISUAL_NOISE and len(w) >= 3
     ]
-
-    # Prefer longer, more descriptive words (they produce better image results)
     meaningful.sort(key=lambda w: len(w), reverse=True)
-
-    # Take top 2 meaningful words
     title_keywords = meaningful[:2]
     title_part = " ".join(title_keywords)
-
-    # Get category visual context
     ctx = CATEGORY_VISUAL.get(category, "technology")
-
     if not title_part:
         return ctx
-    # If title keywords overlap with category context, just use title + "technology"
     if any(kw in ctx.lower() for kw in title_keywords):
         return f"{title_part} technology"
     return f"{title_part} {ctx}"
 
 
-async def fetch_unsplash(
-    client: httpx.AsyncClient, query: str
-) -> tuple[str, str]:
-    """Search Unsplash for a landscape photo. Returns (url, photographer_name)."""
+async def fetch_unsplash(client: httpx.AsyncClient, query: str) -> str:
+    """Search Unsplash for a landscape photo. Returns URL or empty string."""
     try:
         resp = await client.get(
             "https://api.unsplash.com/search/photos",
@@ -149,71 +225,21 @@ async def fetch_unsplash(
             if results:
                 photo = results[0]
                 url = photo.get("urls", {}).get("regular", "")
-                name = photo.get("user", {}).get("name", "Unsplash")
-                # Trigger download event (Unsplash guidelines)
                 dl = photo.get("links", {}).get("download_location", "")
                 if dl:
                     try:
                         await client.get(dl, params={"client_id": UNSPLASH_KEY}, timeout=5)
                     except Exception:
                         pass
-                return url, name
+                return url
         elif resp.status_code == 403:
-            print("  [RATE LIMITED] Unsplash rate limit hit!")
+            print("  [RATE LIMITED] Unsplash 50 req/hr limit hit")
     except Exception as e:
         print(f"  [ERROR] Unsplash: {e}")
-    return "", ""
-
-
-async def fetch_openverse(
-    client: httpx.AsyncClient, query: str
-) -> tuple[str, str]:
-    """Search Openverse for a relevant image. Returns (url, creator_name).
-    Free API, no key needed, generous rate limits.
-    """
-    try:
-        resp = await client.get(
-            "https://api.openverse.org/v1/images/",
-            params={"q": query, "page_size": 3},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            results = resp.json().get("results", [])
-            for r in results:
-                url = r.get("url", "")
-                # Skip SVGs, PDFs, and very small thumbnails
-                if url.startswith("http") and not url.endswith((".svg", ".pdf", ".gif")):
-                    creator = r.get("creator", "Openverse")
-                    return url, creator or "Openverse"
-        elif resp.status_code == 429:
-            print("  [RATE LIMITED] Openverse rate limit hit!")
-    except Exception as e:
-        print(f"  [ERROR] Openverse: {e}")
-    return "", ""
-
-
-async def fetch_image(
-    client: httpx.AsyncClient, query: str, fallback_query: str = ""
-) -> str:
-    """Try Openverse first (free, high rate limit), then Unsplash, then fallback query."""
-    # Primary: Openverse
-    url, _ = await fetch_openverse(client, query)
-    if url:
-        return url
-
-    # Secondary: Unsplash
-    url, _ = await fetch_unsplash(client, query)
-    if url:
-        return url
-
-    # Fallback: simpler query
-    if fallback_query and fallback_query != query:
-        url, _ = await fetch_openverse(client, fallback_query)
-        if url:
-            return url
-
     return ""
 
+
+# ── Database helpers ────────────────────────────────────────────────
 
 def get_db_path() -> str:
     """Find the SQLite database file."""
@@ -223,12 +249,68 @@ def get_db_path() -> str:
         if os.path.isabs(path):
             return path
         return os.path.join(_root, path)
-    # Default fallback
     return os.path.join(_root, "newsletter.db")
 
 
+def clear_bad_images(conn: sqlite3.Connection):
+    """Remove duplicate/generic images (same URL used for 3+ articles)."""
+    c = conn.cursor()
+    # Find URLs used by 3+ articles — these are generic/irrelevant
+    dupes = c.execute("""
+        SELECT featured_image_url, COUNT(*) as cnt
+        FROM processed_content
+        WHERE featured_image_url IS NOT NULL
+        GROUP BY featured_image_url
+        HAVING cnt >= 3
+    """).fetchall()
+    total_cleared = 0
+    for url, cnt in dupes:
+        c.execute(
+            "UPDATE processed_content SET featured_image_url = NULL WHERE featured_image_url = ?",
+            (url,),
+        )
+        total_cleared += cnt
+    conn.commit()
+    print(f"Cleared {total_cleared} duplicate images ({len(dupes)} unique URLs used 3+ times)")
+    return total_cleared
+
+
+def show_stats(conn: sqlite3.Connection):
+    """Print image source statistics."""
+    c = conn.cursor()
+    total = c.execute("SELECT COUNT(*) FROM processed_content WHERE status='published'").fetchone()[0]
+    with_img = c.execute("SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NOT NULL AND status='published'").fetchone()[0]
+    print(f"\nImage coverage: {with_img}/{total} articles ({100*with_img//total}%)\n")
+    rows = c.execute("""
+        SELECT
+            CASE WHEN featured_image_url LIKE '%flickr%' THEN 'flickr/openverse'
+                 WHEN featured_image_url LIKE '%unsplash%' THEN 'unsplash'
+                 WHEN featured_image_url LIKE '%wikimedia%' THEN 'wikimedia'
+                 WHEN featured_image_url LIKE '%wp-content%' THEN 'og:image (wordpress)'
+                 WHEN featured_image_url LIKE '%cdn%' THEN 'og:image (cdn)'
+                 WHEN featured_image_url IS NULL THEN 'missing'
+                 ELSE 'og:image (other)' END as src,
+            COUNT(*) as cnt
+        FROM processed_content WHERE status='published'
+        GROUP BY src ORDER BY cnt DESC
+    """).fetchall()
+    for src, cnt in rows:
+        print(f"  {src}: {cnt}")
+    # Check duplicates
+    dupes = c.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT featured_image_url FROM processed_content
+            WHERE featured_image_url IS NOT NULL
+            GROUP BY featured_image_url HAVING COUNT(*) >= 3
+        )
+    """).fetchone()[0]
+    print(f"\n  Duplicate URLs (used 3+ times): {dupes}")
+
+
+# ── Main backfill logic ─────────────────────────────────────────────
+
 async def backfill_images(limit: int = 200, batch_size: int = 50):
-    """Backfill images using Openverse (free) + Unsplash."""
+    """Backfill images: OG scraping (primary) + Unsplash (fallback)."""
     db_path = get_db_path()
     if not os.path.exists(db_path):
         print(f"Database not found: {db_path}")
@@ -238,18 +320,18 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
-    # Count articles missing images
     total_missing = c.execute(
         "SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NULL AND status = 'published'"
     ).fetchone()[0]
     print(f"Articles missing images: {total_missing}")
     print(f"Processing up to {limit} in batches of {batch_size}")
-    print(f"Sources: Openverse (primary, free) + Unsplash (secondary)\n")
+    print(f"Strategy: OG scrape article URL → Unsplash fallback\n")
 
-    # Load articles missing images (ordered by attractiveness for priority)
+    # JOIN to get original_url from raw_content
     rows = c.execute("""
-        SELECT p.id, p.title, p.category, p.department_tags
+        SELECT p.id, p.title, p.category, r.original_url
         FROM processed_content p
+        JOIN raw_content r ON REPLACE(p.raw_content_id, '-', '') = r.id
         WHERE p.featured_image_url IS NULL
           AND p.status = 'published'
         ORDER BY p.attractiveness_score DESC
@@ -263,11 +345,17 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
 
     print(f"Fetching images for {len(rows)} articles...\n")
 
-    updated = 0
+    og_ok = 0
+    unsplash_ok = 0
     failed = 0
     start_time = time.time()
+    unsplash_remaining = 45  # leave ~5 req buffer for frontend
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(
+        timeout=10,
+        follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0 (NewsDay/1.0; image-backfill)"},
+    ) as client:
         for batch_start in range(0, len(rows), batch_size):
             batch = rows[batch_start:batch_start + batch_size]
             batch_num = batch_start // batch_size + 1
@@ -278,47 +366,76 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
                 article_id = row["id"]
                 title = row["title"] or ""
                 category = row["category"] or "general"
+                original_url = row["original_url"] or ""
 
-                query = build_unsplash_query(title, category)
-                ctx = CATEGORY_VISUAL.get(category, "technology")
-                fallback_q = f"{ctx} abstract"
+                # Step 1: Try OG image scraping from actual article
+                url = await scrape_og_image(client, original_url)
+                source = "OG"
 
-                url = await fetch_image(client, query, fallback_q)
+                # Step 2: Unsplash fallback (if OG failed and budget remains)
+                if not url and unsplash_remaining > 0:
+                    query = build_search_query(title, category)
+                    url = await fetch_unsplash(client, query)
+                    if url:
+                        unsplash_remaining -= 1
+                        source = "Unsplash"
 
                 if url:
                     c.execute(
                         "UPDATE processed_content SET featured_image_url = ? WHERE id = ?",
                         (url, article_id),
                     )
-                    updated += 1
-                    print(f"  [OK] q='{query}' | {title[:55]}")
+                    if source == "OG":
+                        og_ok += 1
+                    else:
+                        unsplash_ok += 1
+                    print(f"  [{source:8s}] {title[:65]}")
                 else:
                     failed += 1
-                    print(f"  [--] q='{query}' | {title[:55]}")
+                    print(f"  [MISS    ] {title[:65]}")
 
-                # Openverse rate limit is ~100/min; be gentle
-                await asyncio.sleep(0.8)
+                # Brief pause to be respectful to article servers
+                await asyncio.sleep(0.3)
 
             conn.commit()
             elapsed = time.time() - start_time
-            print(f"    Progress: {updated}/{batch_start + len(batch)} images in {elapsed:.0f}s")
+            total_ok = og_ok + unsplash_ok
+            print(f"    Progress: {total_ok}/{batch_start + len(batch)} | OG:{og_ok} Unsplash:{unsplash_ok} Miss:{failed} | {elapsed:.0f}s")
 
             if batch_start + batch_size < len(rows):
-                print(f"    Pausing 2s between batches...")
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
     conn.close()
     elapsed = time.time() - start_time
-    print(f"\nDone! Updated {updated}/{len(rows)} articles in {elapsed:.0f}s")
-    print(f"  {failed} failed")
-    print(f"  Remaining without images: {total_missing - updated}")
+    total_ok = og_ok + unsplash_ok
+    print(f"\nDone! Updated {total_ok}/{len(rows)} articles in {elapsed:.0f}s")
+    print(f"  OG images: {og_ok}")
+    print(f"  Unsplash:  {unsplash_ok}")
+    print(f"  Failed:    {failed}")
+    print(f"  Remaining: {total_missing - total_ok}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Backfill article images from Unsplash")
+    parser = argparse.ArgumentParser(description="Backfill article images (OG scrape + Unsplash)")
     parser.add_argument("--limit", type=int, default=200, help="Max articles to process")
     parser.add_argument("--batch-size", type=int, default=50, help="Articles per batch")
+    parser.add_argument("--clear-bad", action="store_true", help="Clear duplicate/generic images first")
+    parser.add_argument("--stats", action="store_true", help="Show image statistics and exit")
     args = parser.parse_args()
+
+    if args.stats:
+        conn = sqlite3.connect(get_db_path())
+        show_stats(conn)
+        conn.close()
+        return
+
+    if args.clear_bad:
+        conn = sqlite3.connect(get_db_path())
+        clear_bad_images(conn)
+        show_stats(conn)
+        conn.close()
+        return
+
     asyncio.run(backfill_images(limit=args.limit, batch_size=args.batch_size))
 
 
