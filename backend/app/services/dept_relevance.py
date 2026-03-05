@@ -360,69 +360,137 @@ CATEGORY_KEYWORDS = {
         "openai", "chatgpt", "generative ai", "transformer model",
         "reinforcement learning", "classification model", "pytorch",
         "tensorflow", "hugging face", "fine-tuning",
+        "ai", "ml", "neural net", "transformer", "diffusion",
+        "gemini", "claude", "copilot",
+        "language model", "vision model", "embedding", "agent",
+        "multimodal", "image generation", "text-to-image", "model training",
+        "inference", "benchmark", "prompt", "xai", "grok",
     ],
     "security": [
         "cybersecurity", "cyber security", "vulnerability", "exploit",
         "malware", "ransomware", "data breach", "zero-day", "cve",
         "hacking", "phishing", "ddos", "firewall", "encryption",
+        "hack", "cyber", "intrusion detection", "threat",
     ],
     "webdev": [
         "web development", "javascript", "typescript", "react",
         "angular", "vue.js", "svelte", "css", "html", "frontend",
         "next.js", "nuxt", "tailwind", "webpack", "vite",
+        "vue", "nextjs", "web app", "blazor", "webassembly", "wasm",
+        "browser", "dom",
     ],
     "backend": [
         "backend", "server-side", "fastapi", "django", "flask",
         "spring boot", "node.js", "express.js", "graphql",
         "microservice", "rest api",
+        "python", "java", "golang", "rust", "node", "nodejs",
+        "api", "database", "sql", "redis", "postgresql", "mongodb",
+        "mysql", "c++", "gitops", "argo cd", "asp.net",
     ],
     "mobile": [
         "android", "ios", "flutter", "react native", "swift",
         "kotlin", "mobile app", "mobile development",
+        "smartphone", "iphone", "ipad", "samsung galaxy", "pixel",
+        "xiaomi", "oneplus", "nothing phone", "mobile phone",
     ],
     "devops": [
         "devops", "docker", "kubernetes", "ci/cd", "terraform",
         "ansible", "jenkins", "github actions", "aws", "azure",
         "gcp", "cloud computing", "infrastructure",
+        "k8s", "cloud", "serverless", "saas", "data center",
+        "vmware", "sre",
     ],
     "career": [
         "job opening", "hiring", "interview", "salary", "career",
         "placement", "internship", "recruitment", "campus placement",
         "job fair", "resume", "job market",
+        "job", "layoff", "recruit", "headcount", "workforce",
+        "employee", "leadership", "workplace", "talent",
     ],
     "startup": [
         "startup", "funding round", "venture capital", "series a",
         "series b", "ipo", "unicorn", "entrepreneur", "founded",
         "seed funding", "angel investor",
+        "funding", "vc", "valuation", "seed round", "acquisition",
+        "techcrunch", "disrupt", "polymarket", "fintech",
     ],
     "research": [
         "research paper", "arxiv", "ieee", "acm", "journal",
         "conference paper", "peer-reviewed", "citation",
         "preprint", "publication",
+        "researcher", "scientist", "study finds", "study reveals",
+        "fossil", "archaeolog", "paleontolog", "physicist",
+        "discovery", "experiment",
     ],
     "electronics": [
         "semiconductor", "chip", "vlsi", "fpga", "microcontroller",
         "pcb", "circuit", "transistor", "embedded", "iot",
+        "processor", "sensor", "rfid", "mipi", "5g", "6g",
+        "telecom", "spectrum", "wireless", "antenna",
     ],
     "robotics": [
         "robot", "robotics", "automation", "autonomous", "drone",
         "plc", "scada", "manipulator", "humanoid",
+        "lidar", "actuator", "ros", "gazebo", "blender",
     ],
     "energy": [
         "renewable energy", "solar", "wind energy", "battery",
         "electric vehicle", "power grid", "smart grid",
+        "wind", "ev", "renewable", "hydrogen", "nuclear", "grid",
+        "electricity", "power plant", "coal", "oil supply",
+        "energy security", "gasification", "refinery", "petroleum",
+        "ntpc", "charging station", "sodium-ion",
     ],
     "biotech": [
         "biotechnology", "genetic", "crispr", "dna", "genome",
         "pharmaceutical", "drug discovery", "vaccine",
+        "gene", "protein", "rna", "pharma", "clinical trial",
+        "biomedical", "fda", "drug", "therapy", "oncology",
+        "cancer", "immunology", "biosafety",
+    ],
+    "aerospace": [
+        "aerospace", "aviation", "aircraft", "airplane", "satellite",
+        "space", "isro", "nasa", "spacex", "rocket", "launch vehicle",
+        "orbit", "lunar", "mars", "astronaut", "starship",
+        "fighter jet", "stealth", "missile", "air force", "iaf",
+        "hal", "rafale", "drdo", "defence", "defense",
+        "airspace", "flight cancell",
+    ],
+    "automotive": [
+        "automobile", "automotive", "car sales", "suv", "sedan",
+        "vehicle sales", "ev sales", "electric car",
+        "maruti", "hyundai", "tata motors", "mahindra",
+        "mercedes", "bmw", "audi", "toyota", "honda",
+        "ducati", "triumph", "hero", "bajaj", "motorcycle",
+        "ebike", "scooter",
+    ],
+    "gadgets": [
+        "gadget", "wearable", "smartwatch", "headphone", "earbuds",
+        "projector", "printer", "camera", "speaker", "display",
+        "tablet", "laptop", "macbook", "apple watch", "airpods",
+        "lego", "kickstarter",
+    ],
+    "healthcare": [
+        "health care", "healthcare", "hospital", "medical device",
+        "patient", "diagnosis", "clinical", "telemedicine",
+        "surgery", "physician", "dermatology", "pathology",
+        "disease", "disorder", "treatment", "symptom",
+        "geriatric", "abortion", "snakebite", "disability",
+    ],
+    "education": [
+        "education", "university", "college", "campus", "exam",
+        "admission", "scholarship", "neet", "cbse", "cuet",
+        "ignou", "registration", "classroom", "curriculum",
+        "student", "teacher", "learning environment",
     ],
 }
 
 
 def detect_category(title: str, content: str) -> str:
-    """Detect content category using multi-word phrase matching.
+    """Detect content category using phrase and keyword matching.
 
-    Uses full phrases to avoid false positives from short substring matches.
+    Uses word boundary matching for short keywords (<=3 chars) to avoid
+    false positives (e.g. "ai" matching inside "maintain").
     """
     text = _tokenize(f"{title} {content}")
 
@@ -430,12 +498,36 @@ def detect_category(title: str, content: str) -> str:
     for cat, phrases in CATEGORY_KEYWORDS.items():
         score = 0
         for phrase in phrases:
-            if phrase in text:
+            if len(phrase) <= 3:
+                if re.search(r'\b' + re.escape(phrase) + r'\b', text):
+                    score += 1
+            elif phrase in text:
                 score += 1
         if score > 0:
             scores[cat] = score
 
     if scores:
         return max(scores, key=scores.get)
+
+    # Broad fallback before returning "general"
+    if any(term in text for term in [
+        'code', 'program', 'software', 'developer', 'coding',
+        'github', 'stack overflow', 'open source', 'terminal',
+    ]):
+        return 'backend'
+    if any(term in text for term in [
+        'research', 'study', 'paper', 'journal', 'conference',
+        'ieee', 'acm', 'scientists', 'laboratory',
+    ]):
+        return 'research'
+    if any(term in text for term in [
+        'launch', 'spacecraft', 'orbit', 'astronaut', 'airspace',
+    ]):
+        return 'aerospace'
+    if any(term in text for term in [
+        'power', 'fuel', 'mining', 'crude oil', 'natural gas',
+    ]):
+        return 'energy'
+        return 'research'
 
     return "general"
