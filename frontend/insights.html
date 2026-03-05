@@ -527,6 +527,116 @@
     .footer-bottom-links a { font-size: 12px; color: var(--gray-400); text-decoration: none; }
     .footer-bottom-links a:hover { color: var(--black); }
 
+    /* ===== TRENDING TOPICS BAR ===== */
+    .trending-topics {
+      padding: 20px var(--page-margin);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .trending-topics-label {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--gray-500);
+      margin-bottom: 10px;
+    }
+    .trending-topics-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .topic-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gray-600);
+      cursor: pointer;
+      transition: all 0.15s;
+      background: transparent;
+      font-family: 'Inter', sans-serif;
+    }
+    .topic-pill:hover, .topic-pill.active { background: var(--accent); color: var(--white); border-color: var(--accent); }
+    .topic-pill .topic-count { font-weight: 700; opacity: 0.7; }
+
+    /* ===== CATEGORY GROUPS ===== */
+    .category-group {
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .category-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    .category-group-header:hover { opacity: 0.7; }
+    .category-group-title {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--gray-900);
+    }
+    .category-group-count {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--gray-400);
+      margin-left: 8px;
+    }
+    .collapse-icon {
+      font-size: 14px;
+      color: var(--gray-400);
+      transition: transform 0.2s;
+    }
+    .category-group.collapsed .collapse-icon { transform: rotate(-90deg); }
+    .category-group.collapsed .category-group-body { display: none; }
+
+    /* ===== DEPARTMENT PULSE ===== */
+    .dept-pulse { margin-top: 4px; }
+    .dept-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .dept-bar .dept-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray-600);
+      min-width: 70px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dept-bar .bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--gray-200);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .dept-bar .bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .dept-bar .count {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-500);
+      min-width: 24px;
+      text-align: right;
+    }
+
     /* ===== RESPONSIVE ===== */
     @media (max-width: 1080px) {
       .main-layout { grid-template-columns: 1fr 280px; }
@@ -553,6 +663,8 @@
       .feed-item { flex-direction: column; gap: 16px; }
       .feed-item-thumb { width: 100%; min-width: 100%; height: 180px; }
       .footer { grid-template-columns: 1fr; }
+      .trending-topics-pills { gap: 6px; }
+      .topic-pill { padding: 5px 10px; font-size: 11px; }
     }
   </style>
 </head>
@@ -601,7 +713,7 @@
       <a href="insights.html" class="active">Industrial insights</a>
       <a href="research.html">Research Papers</a>
       <a href="skills.html">Skills</a>
-      <a href="stories.html">Student Stories</a>
+      <a href="stories.html">Deep Reads</a>
       <a href="auth.html">Log In</a>
     </div>
   </nav>
@@ -616,6 +728,12 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
       Back to Home
     </a>
+  </div>
+
+  <!-- TRENDING TOPICS -->
+  <div class="trending-topics" id="trending-topics" style="display:none;">
+    <div class="trending-topics-label">Trending Topics</div>
+    <div class="trending-topics-pills" id="trending-topics-pills"></div>
   </div>
 
   <!-- MAIN CONTENT -->
@@ -692,6 +810,12 @@
           <!-- populated by JS -->
         </div>
       </div>
+
+      <!-- Department Pulse -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Department Pulse</div>
+        <div class="dept-pulse" id="dept-pulse"></div>
+      </div>
     </aside>
   </div>
 
@@ -708,7 +832,7 @@
         <li><a href="insights.html">Industrial Insights</a></li>
         <li><a href="research.html">Research Papers</a></li>
         <li><a href="skills.html">Skills</a></li>
-        <li><a href="stories.html">Student Stories</a></li>
+        <li><a href="stories.html">Deep Reads</a></li>
       </ul>
     </div>
     <div>
@@ -789,6 +913,7 @@
     let breakingItems = [];
     let filteredItems = [];
     let activeTag = 'all';
+    let activeCategoryFilter = 'all';
     let searchQuery = '';
     let storySeq = 0;
     const storyRegistry = new Map();
@@ -807,6 +932,9 @@
     const $tagCloud = $('tag-cloud');
     const $sidebarRecommended = $('sidebar-recommended');
     const $sidebarTrending = $('sidebar-trending');
+    const $trendingTopics = $('trending-topics');
+    const $trendingTopicsPills = $('trending-topics-pills');
+    const $deptPulse = $('dept-pulse');
 
     const $storyModal = $('story-modal');
     const $storyModalTitle = $('story-modal-title');
@@ -862,18 +990,6 @@
       const words = String(text || '').trim().split(/\s+/).filter(Boolean);
       if (words.length <= maxWords) return words.join(' ');
       return words.slice(0, maxWords).join(' ').replace(/[,:;\-]+$/, '') + '.';
-    }
-
-    function ensureMinWords(text, minWords, fallback) {
-      const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
-      if (countWords(cleaned) > minWords) return cleaned;
-      const base = cleaned || String(fallback || '').trim();
-      let expanded = base;
-      if (!expanded) return '';
-      if (!/[.!?]$/.test(expanded)) expanded += '.';
-      const extension = ' This matters for students because it affects learning choices, project direction, and interview discussions in practical ways.';
-      expanded = `${expanded.replace(/[.!?]$/, '')}.${extension}`;
-      return trimToWordCount(expanded, 40);
     }
 
     function isUsefulAiLine(value) {
@@ -983,24 +1099,6 @@
       return id;
     }
 
-    function defaultWhyImportant(item) {
-      const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|breach|attack|privacy|zero-day/.test(text))
-        return 'Security and privacy changes can directly affect your projects, data, and internship work.';
-      if (/market|industry|funding|policy|regulation|ban|lawsuit/.test(text))
-        return 'Industry and policy shifts influence hiring trends, salaries, and the tools companies adopt.';
-      return 'This topic reflects a shift in the technical landscape that CS students should actively track.';
-    }
-
-    function defaultImpact(item) {
-      const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|breach|attack|privacy|zero-day/.test(text))
-        return 'For students: prioritize secure coding, dependency hygiene, and threat-aware design in coursework and projects.';
-      if (/ai|machine learning|llm|neural/.test(text))
-        return 'For students: hands-on AI literacy and practical model tooling are becoming important for internships and interviews.';
-      return 'For students: align projects and learning plans with this signal to stay relevant and market-ready.';
-    }
-
     function titleAnchoredQuick(item) {
       const title = cleanAiLine(item.title || 'This story');
       return `${title}. This summary focuses on the core claim and immediate context students should evaluate carefully before drawing conclusions.`;
@@ -1037,42 +1135,38 @@
 
     function buildStoryPackage(item, summary, points) {
       const fallbackQuick = shortText(item.summary || item.content || item.title || '', 170);
-      let quickSeed = stripSourcePrefix(cleanAiLine(summary.hook || points[0] || summary.why_it_matters || fallbackQuick)) || titleAnchoredQuick(item);
-      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || defaultWhyImportant(item))) || defaultWhyImportant(item);
-      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || defaultImpact(item))) || defaultImpact(item);
-      if (!isRelevantToStory(quickSeed, item)) quickSeed = titleAnchoredQuick(item);
-      if (!isRelevantToStory(whySeed, item)) whySeed = titleAnchoredWhy(item);
-      if (!isRelevantToStory(impactSeed, item)) impactSeed = titleAnchoredImpact(item);
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, 'This story highlights a meaningful technical update that students should understand clearly.'), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, 'It matters because this change can influence skills, hiring expectations, and project quality.'), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, 'Students should use this signal to adjust learning priorities and improve practical work.'), 190);
+      let quickSeed = stripSourcePrefix(cleanAiLine(summary.what_happened || summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
+        || fallbackQuick;
+      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || ''))
+        || shortText(item.summary || item.content || '', 190);
+      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || ''))
+        || shortText(item.summary || '', 190);
+      if (quickSeed && !isRelevantToStory(quickSeed, item) && countWords(quickSeed) < 15) quickSeed = titleAnchoredQuick(item);
+      if (whySeed && !isRelevantToStory(whySeed, item) && countWords(whySeed) < 15) whySeed = titleAnchoredWhy(item);
+      const quickSummary = shortText(quickSeed || item.title || '', 170);
+      const whyImportant = shortText(whySeed || '', 190);
+      const impact = shortText(impactSeed || '', 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, item.summary]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
 
     function buildHeuristicStoryPackage(item) {
       const title = cleanAiLine(item.title || 'This story');
-      const base = stripSourcePrefix(item.summary || item.content || '');
-      const quickSeed = `${title}. ${base || 'The report highlights a concrete shift in technology conversations students should track this week.'}`;
-      const whySeed = titleAnchoredWhy(item);
-      const impactSeed = titleAnchoredImpact(item);
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, titleAnchoredQuick(item)), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, defaultWhyImportant(item)), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, defaultImpact(item)), 190);
+      const base = stripSourcePrefix(item.content || item.summary || '');
+      const quickSeed = base ? `${title}. ${base}` : title;
+      const whySeed = base || title;
+      const impactSeed = base || '';
+      const quickSummary = shortText(quickSeed, 170);
+      const whyImportant = shortText(whySeed, 190);
+      const impact = shortText(impactSeed, 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, base]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
 
     function isValidStoryPackage(pkg, item) {
       if (!pkg || typeof pkg !== 'object') return false;
-      const qs = String(pkg.quickSummary || '').trim();
-      const wi = String(pkg.whyImportant || '').trim();
-      const im = String(pkg.impact || '').trim();
-      const fa = String(pkg.fullArticle || '').trim();
-      if (!qs || !wi || !im || !fa) return false;
-      if (countWords(qs) <= 12 || countWords(wi) <= 12 || countWords(im) <= 12) return false;
-      if (!isRelevantToStory(qs, item)) return false;
-      if (!isRelevantToStory(wi, item)) return false;
+      const quickSummary = String(pkg.quickSummary || '').trim();
+      if (!quickSummary || countWords(quickSummary) < 5) return false;
       return true;
     }
 
@@ -1131,7 +1225,9 @@
         const payload = await res.json();
         const data = payload.data || payload;
         const summary = data.summary || {};
-        const points = Array.isArray(summary.key_points) ? summary.key_points.map(cleanAiLine).filter(isUsefulAiLine) : [];
+        const rawPoints = Array.isArray(summary.key_facts) ? summary.key_facts
+          : Array.isArray(summary.key_points) ? summary.key_points : [];
+        const points = rawPoints.map(cleanAiLine).filter(isUsefulAiLine);
         const aiResult = buildStoryPackage(item, summary, points);
         if (isValidStoryPackage(aiResult, item)) { setStoryCache(cacheKey, aiResult); return aiResult; }
         const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
@@ -1212,7 +1308,63 @@
         $feed.innerHTML = '<div class="empty-state">No stories found matching your criteria.</div>';
         return;
       }
-      $feed.innerHTML = items.map(renderFeedItem).join('');
+      // Group articles by category
+      const groups = {};
+      items.forEach(item => {
+        const cat = formatCategory(item);
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(item);
+      });
+      const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+      $feed.innerHTML = sorted.map(([cat, catItems]) =>
+        `<div class="category-group">
+          <div class="category-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><span class="category-group-title">${cat}</span><span class="category-group-count">(${catItems.length})</span></span>
+            <span class="collapse-icon">▾</span>
+          </div>
+          <div class="category-group-body">
+            ${catItems.map(renderFeedItem).join('')}
+          </div>
+        </div>`
+      ).join('');
+    }
+
+    /* ================================================================
+       RENDER: TRENDING TOPICS & DEPT PULSE
+    ================================================================ */
+    function renderTrendingTopics(items) {
+      const counts = {};
+      items.forEach(item => {
+        const cat = formatCategory(item);
+        counts[cat] = (counts[cat] || 0) + 1;
+      });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      if (!top.length) return;
+      $trendingTopics.style.display = '';
+      $trendingTopicsPills.innerHTML =
+        '<button class="topic-pill active" data-cat="all">All</button>' +
+        top.map(([cat, count]) =>
+          `<button class="topic-pill" data-cat="${cat}">${cat} <span class="topic-count">(${count})</span></button>`
+        ).join('');
+    }
+
+    function renderDeptPulse(items) {
+      const counts = {};
+      items.forEach(item => {
+        const cat = formatCategory(item);
+        counts[cat] = (counts[cat] || 0) + 1;
+      });
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (!sorted.length) return;
+      const maxCount = sorted[0][1];
+      $deptPulse.innerHTML = sorted.map(([cat, count]) => {
+        const pct = Math.round((count / maxCount) * 100);
+        return `<div class="dept-bar">
+          <span class="dept-name">${cat}</span>
+          <div class="bar-track"><div class="bar" style="width:${pct}%"></div></div>
+          <span class="count">${count}</span>
+        </div>`;
+      }).join('');
     }
 
     /* ================================================================
@@ -1244,6 +1396,9 @@
     function applyFilters() {
       const query = searchQuery.toLowerCase().trim();
       filteredItems = allFeedItems.filter(item => {
+        if (activeCategoryFilter !== 'all') {
+          if (formatCategory(item) !== activeCategoryFilter) return false;
+        }
         if (activeTag !== 'all') {
           const tags = inferTags(item);
           if (!tags.includes(activeTag)) return false;
@@ -1257,7 +1412,7 @@
 
       renderFeed(filteredItems);
 
-      if (query || activeTag !== 'all') {
+      if (query || activeTag !== 'all' || activeCategoryFilter !== 'all') {
         $searchCount.textContent = `${filteredItems.length} result${filteredItems.length !== 1 ? 's' : ''} found`;
         $searchCount.classList.add('visible');
       } else {
@@ -1279,6 +1434,14 @@
       if (!pill) return;
       activeTag = pill.dataset.tag;
       $tagCloud.querySelectorAll('.tag-pill').forEach(p => p.classList.toggle('active', p.dataset.tag === activeTag));
+      applyFilters();
+    });
+
+    $trendingTopicsPills.addEventListener('click', e => {
+      const pill = e.target.closest('.topic-pill');
+      if (!pill) return;
+      activeCategoryFilter = pill.dataset.cat;
+      $trendingTopicsPills.querySelectorAll('.topic-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === activeCategoryFilter));
       applyFilters();
     });
 
@@ -1389,6 +1552,8 @@
       renderFeed(filteredItems);
       renderSidebarItems($sidebarRecommended, relatedItems, 5);
       renderSidebarItems($sidebarTrending, breakingItems, 5);
+      renderTrendingTopics(allFeedItems);
+      renderDeptPulse(allFeedItems);
 
       // Pre-warm AI insights
       const warmPool = [...allFeedItems.slice(0, 5), ...relatedItems.slice(0, 3), ...breakingItems.slice(0, 3)];
