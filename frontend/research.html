@@ -474,9 +474,28 @@
       line-height: 1.6;
       color: #222;
     }
+    .story-modal-authors {
+      font-size: 13px;
+      color: #444;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+    .story-modal-citations {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: #1a3d6b;
+      background: rgba(26,61,107,0.08);
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-top: 6px;
+    }
+    .story-modal-citations[hidden] { display: none; }
     .story-modal-footer {
       padding: 16px 24px 24px;
       display: flex;
+      flex-wrap: wrap;
       justify-content: flex-end;
       gap: 10px;
       border-top: 1px solid #1a1a1a;
@@ -492,9 +511,14 @@
       color: #1a1a1a;
       text-decoration: none;
       font-size: 13px;
+      cursor: pointer;
     }
     .story-source-link:hover { background: #1a1a1a; color: #fff; }
     .story-source-link[hidden] { display: none; }
+    .story-source-link.primary-action { background: #1a1a1a; color: #fff; }
+    .story-source-link.primary-action:hover { background: #333; }
+    .story-source-link.saved-state { background: #1a3d6b; color: #fff; border-color: #1a3d6b; }
+    .story-source-link.copy-success { background: #2e7d32; color: #fff; border-color: #2e7d32; }
     body.modal-open { overflow: hidden; }
 
     /* ===== FOOTER ===== */
@@ -759,6 +783,8 @@
         <div>
           <h3 class="story-modal-title" id="story-modal-title">Loading story...</h3>
           <div class="story-modal-meta" id="story-modal-meta"></div>
+          <div class="story-modal-authors" id="story-modal-authors" hidden></div>
+          <span class="story-modal-citations" id="story-modal-citations" hidden></span>
         </div>
         <button class="story-modal-close" id="story-modal-close" type="button" aria-label="Close">x</button>
       </div>
@@ -781,8 +807,11 @@
         </div>
       </div>
       <div class="story-modal-footer">
+        <button class="story-source-link" id="story-copy-citation" type="button" hidden>Copy Citation</button>
+        <button class="story-source-link" id="story-save-btn" type="button" hidden>Save</button>
+        <a class="story-source-link" id="story-doi-link" href="#" target="_blank" rel="noopener noreferrer" hidden>DOI Link</a>
         <button class="story-source-link" id="story-toggle-article" type="button">Show Full AI Article</button>
-        <a class="story-source-link" id="story-source-link" href="#" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+        <a class="story-source-link primary-action" id="story-source-link" href="#" target="_blank" rel="noopener noreferrer">View Paper</a>
       </div>
     </div>
   </div>
@@ -825,6 +854,8 @@
     const $storyModal = $('story-modal');
     const $storyModalTitle = $('story-modal-title');
     const $storyModalMeta = $('story-modal-meta');
+    const $storyModalAuthors = $('story-modal-authors');
+    const $storyModalCitations = $('story-modal-citations');
     const $storyQuickSummary = $('story-quick-summary');
     const $storyWhyImportant = $('story-why-important');
     const $storyImpact = $('story-impact');
@@ -833,6 +864,9 @@
     const $storyToggleArticle = $('story-toggle-article');
     const $storySourceLink = $('story-source-link');
     const $storyModalClose = $('story-modal-close');
+    const $storyDoiLink = $('story-doi-link');
+    const $storySaveBtn = $('story-save-btn');
+    const $storyCopyCitation = $('story-copy-citation');
 
     /* ================================================================
        UTILS
@@ -880,18 +914,6 @@
       const words = String(text || '').trim().split(/\s+/).filter(Boolean);
       if (words.length <= maxWords) return words.join(' ');
       return words.slice(0, maxWords).join(' ').replace(/[,:;\-]+$/, '') + '.';
-    }
-
-    function ensureMinWords(text, minWords, fallback) {
-      const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
-      if (countWords(cleaned) > minWords) return cleaned;
-      const base = cleaned || String(fallback || '').trim();
-      let expanded = base;
-      if (!expanded) return '';
-      if (!/[.!?]$/.test(expanded)) expanded += '.';
-      const extension = ' This matters for students because it affects learning choices, project direction, and interview discussions in practical ways.';
-      expanded = `${expanded.replace(/[.!?]$/, '')}.${extension}`;
-      return trimToWordCount(expanded, 40);
     }
 
     function isUsefulAiLine(value) {
@@ -990,32 +1012,20 @@
       const id = `story-${storySeq}`;
       const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
+        content_id: item.content_id || '',
         title: item.title || '',
         source: item.source || 'CS Desk',
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
         summary: cleanSummary,
+        authors: item.authors || '',
+        venue: item.venue || '',
+        citations: item.citations || 0,
+        doi: item.doi || '',
+        published_at: item.published_at || '',
       });
       return id;
-    }
-
-    function defaultWhyImportant(item) {
-      const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|privacy|vulnerability|attack/.test(text))
-        return 'Understanding security research helps students build more robust and trustworthy systems.';
-      if (/machine learning|deep learning|neural|llm|transformer/.test(text))
-        return 'Staying current with ML research is critical for students entering AI/ML careers.';
-      return 'This research reflects an active area of investigation that students should be aware of for coursework and career preparation.';
-    }
-
-    function defaultImpact(item) {
-      const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/machine learning|deep learning|neural|llm/.test(text))
-        return 'For students: study the methodology and consider replicating key experiments in your projects.';
-      if (/material|composite|alloy|polymer/.test(text))
-        return 'For students: explore how these findings connect to industry applications and potential thesis topics.';
-      return 'For students: read the abstract and methodology to understand the research approach and identify potential project ideas.';
     }
 
     function titleAnchoredQuick(item) {
@@ -1054,42 +1064,38 @@
 
     function buildStoryPackage(item, summary, points) {
       const fallbackQuick = shortText(item.summary || item.content || item.title || '', 170);
-      let quickSeed = stripSourcePrefix(cleanAiLine(summary.hook || points[0] || summary.why_it_matters || fallbackQuick)) || titleAnchoredQuick(item);
-      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || defaultWhyImportant(item))) || defaultWhyImportant(item);
-      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || defaultImpact(item))) || defaultImpact(item);
-      if (!isRelevantToStory(quickSeed, item)) quickSeed = titleAnchoredQuick(item);
-      if (!isRelevantToStory(whySeed, item)) whySeed = titleAnchoredWhy(item);
-      if (!isRelevantToStory(impactSeed, item)) impactSeed = titleAnchoredImpact(item);
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, 'This story highlights a meaningful technical update that students should understand clearly.'), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, 'It matters because this change can influence skills, hiring expectations, and project quality.'), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, 'Students should use this signal to adjust learning priorities and improve practical work.'), 190);
+      let quickSeed = stripSourcePrefix(cleanAiLine(summary.what_happened || summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
+        || fallbackQuick;
+      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || ''))
+        || shortText(item.summary || item.content || '', 190);
+      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || ''))
+        || shortText(item.summary || '', 190);
+      if (quickSeed && !isRelevantToStory(quickSeed, item) && countWords(quickSeed) < 15) quickSeed = titleAnchoredQuick(item);
+      if (whySeed && !isRelevantToStory(whySeed, item) && countWords(whySeed) < 15) whySeed = titleAnchoredWhy(item);
+      const quickSummary = shortText(quickSeed || item.title || '', 170);
+      const whyImportant = shortText(whySeed || '', 190);
+      const impact = shortText(impactSeed || '', 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, item.summary]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
 
     function buildHeuristicStoryPackage(item) {
       const title = cleanAiLine(item.title || 'This story');
-      const base = stripSourcePrefix(item.summary || item.content || '');
-      const quickSeed = `${title}. ${base || 'The report highlights a concrete shift in technology conversations students should track this week.'}`;
-      const whySeed = titleAnchoredWhy(item);
-      const impactSeed = titleAnchoredImpact(item);
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, titleAnchoredQuick(item)), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, defaultWhyImportant(item)), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, defaultImpact(item)), 190);
+      const base = stripSourcePrefix(item.content || item.summary || '');
+      const quickSeed = base ? `${title}. ${base}` : title;
+      const whySeed = base || title;
+      const impactSeed = base || '';
+      const quickSummary = shortText(quickSeed, 170);
+      const whyImportant = shortText(whySeed, 190);
+      const impact = shortText(impactSeed, 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, base]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
 
     function isValidStoryPackage(pkg, item) {
       if (!pkg || typeof pkg !== 'object') return false;
-      const qs = String(pkg.quickSummary || '').trim();
-      const wi = String(pkg.whyImportant || '').trim();
-      const im = String(pkg.impact || '').trim();
-      const fa = String(pkg.fullArticle || '').trim();
-      if (!qs || !wi || !im || !fa) return false;
-      if (countWords(qs) <= 12 || countWords(wi) <= 12 || countWords(im) <= 12) return false;
-      if (!isRelevantToStory(qs, item)) return false;
-      if (!isRelevantToStory(wi, item)) return false;
+      const quickSummary = String(pkg.quickSummary || '').trim();
+      if (!quickSummary || countWords(quickSummary) < 5) return false;
       return true;
     }
 
@@ -1148,7 +1154,9 @@
         const payload = await res.json();
         const data = payload.data || payload;
         const summary = data.summary || {};
-        const points = Array.isArray(summary.key_points) ? summary.key_points.map(cleanAiLine).filter(isUsefulAiLine) : [];
+        const rawPoints = Array.isArray(summary.key_facts) ? summary.key_facts
+          : Array.isArray(summary.key_points) ? summary.key_points : [];
+        const points = rawPoints.map(cleanAiLine).filter(isUsefulAiLine);
         const aiResult = buildStoryPackage(item, summary, points);
         if (isValidStoryPackage(aiResult, item)) { setStoryCache(cacheKey, aiResult); return aiResult; }
         const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
@@ -1161,10 +1169,92 @@
       }
     }
 
+    let currentModalItem = null;
+    let currentSaveState = false;
+
+    function getAuthToken() {
+      try {
+        const raw = localStorage.getItem('newsday_session');
+        if (!raw) return null;
+        const s = JSON.parse(raw);
+        return s.access_token || null;
+      } catch { return null; }
+    }
+
+    function buildApaCitation(item) {
+      const authors = item.authors || 'Unknown';
+      const year = item.published_at ? new Date(item.published_at).getFullYear() : 'n.d.';
+      const title = item.title || 'Untitled';
+      const venue = item.venue || '';
+      const doi = item.doi ? `DOI: https://doi.org/${item.doi}` : '';
+      const parts = [`${authors} (${year}).`, `${title}.`];
+      if (venue) parts.push(`${venue}.`);
+      if (doi) parts.push(doi);
+      return parts.join(' ');
+    }
+
+    async function toggleSave(contentId) {
+      const token = getAuthToken();
+      if (!token || !contentId) return;
+      const method = currentSaveState ? 'DELETE' : 'POST';
+      try {
+        const res = await fetchWithTimeout(API + `/api/v1/feed/${encodeURIComponent(contentId)}/save`, {
+          method,
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        }, 5000);
+        if (res.ok) {
+          currentSaveState = !currentSaveState;
+          $storySaveBtn.textContent = currentSaveState ? 'Saved ✓' : 'Save';
+          $storySaveBtn.classList.toggle('saved-state', currentSaveState);
+        }
+      } catch {}
+    }
+
     async function openStoryModal(item) {
       if (!item) return;
+      currentModalItem = item;
+      currentSaveState = false;
       $storyModalTitle.textContent = item.title || 'Story';
       $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+
+      // Full author list
+      if (item.authors) {
+        $storyModalAuthors.textContent = item.authors;
+        $storyModalAuthors.hidden = false;
+      } else {
+        $storyModalAuthors.hidden = true;
+      }
+
+      // Citation count badge
+      if (item.citations && item.citations > 0) {
+        $storyModalCitations.textContent = `${item.citations} citation${item.citations !== 1 ? 's' : ''}`;
+        $storyModalCitations.hidden = false;
+      } else {
+        $storyModalCitations.hidden = true;
+      }
+
+      // DOI link
+      if (item.doi) {
+        $storyDoiLink.href = `https://doi.org/${encodeURIComponent(item.doi)}`;
+        $storyDoiLink.hidden = false;
+      } else {
+        $storyDoiLink.hidden = true;
+      }
+
+      // Save button (only if auth token present and content_id available)
+      if (getAuthToken() && item.content_id) {
+        $storySaveBtn.textContent = 'Save';
+        $storySaveBtn.classList.remove('saved-state');
+        $storySaveBtn.hidden = false;
+      } else {
+        $storySaveBtn.hidden = true;
+      }
+
+      // Copy citation button
+      $storyCopyCitation.hidden = false;
+      $storyCopyCitation.textContent = 'Copy Citation';
+      $storyCopyCitation.classList.remove('copy-success');
+
       $storyQuickSummary.textContent = 'Preparing summary...';
       $storyWhyImportant.textContent = 'Preparing context...';
       $storyImpact.textContent = 'Preparing student impact...';
@@ -1203,6 +1293,38 @@
     $storyModal.addEventListener('click', e => { if (e.target === $storyModal) closeStoryModal(); });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && $storyModal.classList.contains('open')) closeStoryModal();
+    });
+    $storySaveBtn.addEventListener('click', () => {
+      if (currentModalItem && currentModalItem.content_id) toggleSave(currentModalItem.content_id);
+    });
+    $storyCopyCitation.addEventListener('click', async () => {
+      if (!currentModalItem) return;
+      const citation = buildApaCitation(currentModalItem);
+      try {
+        await navigator.clipboard.writeText(citation);
+        $storyCopyCitation.textContent = 'Copied!';
+        $storyCopyCitation.classList.add('copy-success');
+        setTimeout(() => {
+          $storyCopyCitation.textContent = 'Copy Citation';
+          $storyCopyCitation.classList.remove('copy-success');
+        }, 2000);
+      } catch {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = citation;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        $storyCopyCitation.textContent = 'Copied!';
+        $storyCopyCitation.classList.add('copy-success');
+        setTimeout(() => {
+          $storyCopyCitation.textContent = 'Copy Citation';
+          $storyCopyCitation.classList.remove('copy-success');
+        }, 2000);
+      }
     });
 
     /* ================================================================
@@ -1339,9 +1461,11 @@
       const authors = item.authors || '';
       const venue = item.venue || '';
       const citations = item.citations || 0;
+      const doi = item.doi || '';
       const metaParts = [authors, venue].filter(Boolean);
       if (citations) metaParts.push(citations + ' citations');
       return {
+        content_id: item.id || '',
         title: item.title || '',
         url: item.original_url || item.url || '#',
         source: venue || item.source || 'Research',
@@ -1355,6 +1479,7 @@
         authors,
         venue,
         citations,
+        doi,
         meta_line: metaParts.join(' · '),
       };
     }
