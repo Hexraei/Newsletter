@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai_provider import AIProvider
 from app.models import ProcessedContent, RawContent, Source
-from app.services.dept_relevance import assign_departments, detect_category
+from app.services.dept_relevance import assign_departments, detect_category, score_article_departments
 
 logger = logging.getLogger(__name__)
 
@@ -141,13 +141,8 @@ class ContentProcessor:
         # Calculate attractiveness score
         attractiveness_score = await self.calculate_attractiveness_score(raw)
         
-        # Determine processing path
-        if attractiveness_score >= 60:
-            # High score: Full NLP processing
-            processed = await self._process_with_nlp(raw, attractiveness_score)
-        else:
-            # Low score: Basic processing (snippet only)
-            processed = await self._process_basic(raw, attractiveness_score)
+        # All articles get AI processing (score is for ranking, not gating)
+        processed = await self._process_with_nlp(raw, attractiveness_score)
         
         # Update raw content status
         raw.status = "processed"
@@ -161,10 +156,11 @@ class ContentProcessor:
         
         # Get AI summary
         try:
+            detected_cat = detect_category(raw.original_title or "", raw.original_content or "")
             summary_data = await self.ai_provider.summarize(
                 title=raw.original_title or "",
                 content=raw.original_content or "",
-                category="tech"
+                category=detected_cat or "general"
             )
         except Exception as e:
             # Fallback to basic if AI fails
@@ -188,6 +184,16 @@ class ContentProcessor:
             source_dept_tags=source_tags,
             source_type=source_type,
         )
+
+        # Compute relevance_score from department scoring (0-100 scale)
+        dept_scores = score_article_departments(
+            raw.original_title or "",
+            raw.original_content or "",
+            source_dept_tags=source_tags,
+            source_type=source_type,
+        )
+        max_dept_score = dept_scores[0][1] if dept_scores else 0
+        relevance_score = min(100, int(max_dept_score * 10))
 
         # Determine if this is breaking news using quality + recency + urgency rules
         is_breaking = self._is_breaking_candidate(raw, score)
@@ -236,6 +242,7 @@ class ContentProcessor:
             department_tags=dept_tags if dept_tags else (source_tags or ["general"]),
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
+            relevance_score=relevance_score,
             quality_score=min(100, score + 10),
             content_type=content_type,
             status="published",
@@ -321,6 +328,15 @@ class ContentProcessor:
             source_type=source_type,
         )
 
+        # Compute relevance_score from department scoring (0-100 scale)
+        dept_scores = score_article_departments(
+            title, content,
+            source_dept_tags=source_tags,
+            source_type=source_type,
+        )
+        max_dept_score = dept_scores[0][1] if dept_scores else 0
+        relevance_score = min(100, int(max_dept_score * 10))
+
         processed = ProcessedContent(
             raw_content_id=raw.id,
             title=title,
@@ -335,6 +351,7 @@ class ContentProcessor:
             department_tags=dept_tags if dept_tags else (source_tags or ["general"]),
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
+            relevance_score=relevance_score,
             quality_score=score,
             content_type=content_type if content_type == "research_paper" else "snippet",
             status="published",
