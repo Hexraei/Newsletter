@@ -15,6 +15,8 @@ from app.models import User
 from app.schemas.responses import ErrorResponse, SingleResponse, SuccessResponse
 from app.schemas.user import (
     ChangePassword,
+    PasswordReset,
+    PasswordResetConfirm,
     Token,
     UserCreate,
     UserLogin,
@@ -23,6 +25,7 @@ from app.schemas.user import (
     UserUpdate,
 )
 from app.services.auth_service import AuthService
+from app.services.email_service import send_reset_email
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -202,6 +205,53 @@ async def get_user_stats(
     )
     
     return SingleResponse(data=stats)
+
+
+@router.post(
+    "/forgot-password",
+    response_model=SuccessResponse
+)
+@limiter.limit("5/hour")
+async def forgot_password(
+    request: Request,
+    body: PasswordReset,
+    db: AsyncSession = Depends(get_db)
+):
+    """Request a password reset link. Always returns success to prevent email enumeration."""
+    auth_service = AuthService(db)
+    token = await auth_service.generate_reset_token(body.email)
+
+    if token:
+        base_url = str(request.base_url).rstrip("/")
+        await send_reset_email(body.email, token, base_url)
+
+    return SuccessResponse(message="If an account exists, a reset link has been sent.")
+
+
+@router.post(
+    "/reset-password",
+    response_model=SuccessResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid or expired token"}
+    }
+)
+@limiter.limit("5/hour")
+async def reset_password(
+    request: Request,
+    body: PasswordResetConfirm,
+    db: AsyncSession = Depends(get_db)
+):
+    """Reset password using a valid reset token."""
+    auth_service = AuthService(db)
+    success = await auth_service.reset_password(body.token, body.new_password)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+
+    return SuccessResponse(message="Password has been reset successfully.")
 
 
 @router.post(

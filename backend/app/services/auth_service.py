@@ -1,6 +1,7 @@
 """Authentication service for user management."""
 
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import select
@@ -135,6 +136,36 @@ class AuthService:
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         }
     
+    async def generate_reset_token(self, email: str) -> Optional[str]:
+        """Generate a password reset token for the given email. Returns the token, or None if user not found."""
+        user = await self.get_user_by_email(email)
+        if not user:
+            return None
+
+        token = secrets.token_urlsafe(64)
+        user.reset_token = token
+        user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+        await self.db.commit()
+        return token
+
+    async def reset_password(self, token: str, new_password: str) -> bool:
+        """Reset a user's password using a valid reset token."""
+        result = await self.db.execute(
+            select(User).where(User.reset_token == token)
+        )
+        user = result.scalar_one_or_none()
+        if not user or not user.reset_token_expiry:
+            return False
+
+        if datetime.utcnow() > user.reset_token_expiry.replace(tzinfo=None):
+            return False
+
+        user.password_hash = get_password_hash(new_password)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        await self.db.commit()
+        return True
+
     async def deactivate_user(self, user: User) -> None:
         """Deactivate user account."""
         user.is_active = False

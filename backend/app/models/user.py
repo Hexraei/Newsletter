@@ -75,6 +75,10 @@ class User(Base):
     )
     weekly_goal: Mapped[int] = mapped_column(Integer, default=7)
     
+    # Password Reset
+    reset_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    reset_token_expiry: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
