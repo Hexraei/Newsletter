@@ -129,38 +129,34 @@ class GroqService:
         raise RuntimeError(err_msg)
 
     async def summarize_content(self, title: str, content: str, category: str = "tech") -> dict:
-        """Summarize content using JSON-first prompts for better relevance."""
+        """Summarize content using content-first prompts."""
 
         context_terms = self._extract_context_terms(title, content, category)
         context_hint = ", ".join(context_terms[:10]) if context_terms else category
 
-        system_prompt = """You are a senior editor for a computer science college newsletter.
+        system_prompt = """You are summarizing a news article for college students.
 
-Your job is to interpret news intelligently, not just shorten text.
-Focus on relevance for CS students: architecture trade-offs, performance, security, tooling, hiring signals, and project decisions.
-Write with technical clarity and creative framing, but never fluff.
+Extract the core information from the article. Do not invent or assume anything not stated in the text.
 
-Return ONLY valid JSON with this exact schema:
+Return ONLY valid JSON:
 {
-  "hook": "one vivid sentence under 24 words",
-  "why_it_matters": "one concrete sentence under 32 words",
-  "key_points": ["3 to 5 concise factual bullets"],
-  "action_step": "one practical next step for students under 28 words"
+  "what_happened": "1-2 plain sentences stating the main event. Include who, what, when if available.",
+  "why_it_matters": "1-2 sentences on concrete impact — on jobs, technology, industry, or academics. Be specific.",
+  "key_facts": ["3-5 specific facts from the article: numbers, names, dates, companies, technologies. Only facts explicitly stated."]
 }
 
 Rules:
 - No markdown, no code fences, no extra keys.
-- Keep every field grounded in the provided title/content.
-- Avoid generic filler like "stay informed" or "this is important".
-- Mention concrete technical or career implications.
-- Include at least two context-specific terms from the source when possible."""
+- Keep every statement grounded in the provided title/content.
+- Never use filler phrases like 'stay informed' or 'this is important'.
+- Include concrete terms from the source when possible."""
 
         user_prompt = (
             f"Title: {title}\n"
             f"Category: {category}\n\n"
             f"Content:\n{content[:3000]}\n\n"
-            f"Context terms to anchor: {context_hint}\n\n"
-            "Generate the JSON now."
+            f"Key terms from source: {context_hint}\n\n"
+            "Extract the core information as JSON."
         )
 
         data, _model_used = await self._chat_completion(
@@ -178,14 +174,13 @@ Rules:
         if self._is_summary_strong(summary, context_terms):
             return summary
 
-        repair_system = """You are revising a weak summary. Keep the same JSON schema exactly.
+        repair_system = """You are revising a weak article summary. Keep the same JSON schema exactly.
 
 Fix these problems:
-- Remove generic language and filler.
-- Make statements technically specific and grounded in the source.
-- Keep the tone creative but factual.
-- Ensure each key point adds new information, not repetition.
-- Include concrete implications for students building projects or preparing for interviews."""
+- Remove generic language and filler phrases.
+- Ground every statement in specific facts from the source text.
+- Ensure key_facts contains actual data points (numbers, names, dates, technologies).
+- Do not add information that isn't in the original article."""
 
         repair_prompt = (
             f"Title: {title}\n"
@@ -300,13 +295,13 @@ Rules:
 
     def _normalize_summary(self, payload: dict) -> dict:
         result = {
-            "hook": self._clean_line(payload.get("hook")),
+            "hook": self._clean_line(payload.get("what_happened") or payload.get("hook")),
             "why_it_matters": self._clean_line(payload.get("why_it_matters") or payload.get("why")),
             "key_points": [],
-            "action_step": self._clean_line(payload.get("action_step") or payload.get("next_step")),
+            "action_step": self._clean_line(payload.get("action_step") or payload.get("next_step") or ""),
         }
 
-        raw_points = payload.get("key_points")
+        raw_points = payload.get("key_facts") or payload.get("key_points")
         points: list[str] = []
         if isinstance(raw_points, list):
             points = [self._clean_line(point, max_len=160) for point in raw_points]
@@ -342,22 +337,17 @@ Rules:
     def _is_summary_strong(self, summary: dict, context_terms: list[str]) -> bool:
         hook = self._clean_line(summary.get("hook"))
         why = self._clean_line(summary.get("why_it_matters"))
-        action = self._clean_line(summary.get("action_step"))
         points = [self._clean_line(p, max_len=200) for p in (summary.get("key_points") or [])]
         points = [p for p in points if p]
 
-        if self._word_count(hook) < 8:
+        if self._word_count(hook) < 6:
             return False
-        if self._word_count(why) < 10:
+        if self._word_count(why) < 6:
             return False
-        if self._word_count(action) < 10:
-            return False
-        if len(points) < 3:
-            return False
-        if any(self._word_count(p) < 8 for p in points[:3]):
+        if len(points) < 2:
             return False
 
-        merged = " ".join([hook, why, action, *points]).lower()
+        merged = " ".join([hook, why, *points]).lower()
         generic_hits = sum(1 for phrase in self.GENERIC_PHRASES if phrase in merged)
         if generic_hits >= 2:
             return False

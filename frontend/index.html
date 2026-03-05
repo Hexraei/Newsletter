@@ -854,10 +854,10 @@
   <!-- HERO -->
   <section class="hero" id="hero">
     <div class="hero-text active" id="hero-text">
-      <div class="breaking-tag" id="hero-breaking-tag">BREAKING</div>
+      <div class="breaking-tag" id="hero-breaking-tag" style="display:none">BREAKING</div>
       <div class="hero-source" id="hero-source">HACKER NEWS</div>
-      <h1 class="hero-title" id="hero-title">Loading breaking news...</h1>
-      <p class="hero-subtitle" id="hero-subtitle">Fetching the latest stories</p>
+      <h1 class="hero-title" id="hero-title">Loading top stories...</h1>
+      <p class="hero-subtitle" id="hero-subtitle">Fetching the latest news</p>
       <a class="hero-btn" id="hero-btn" href="#">Read AI Brief</a>
     </div>
 
@@ -1740,20 +1740,6 @@
       return String(text || '').trim().split(/\s+/).filter(Boolean).length;
     }
 
-    function ensureMinWords(text, minWords, fallback) {
-      const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
-      if (countWords(cleaned) > minWords) return cleaned;
-
-      const base = cleaned || String(fallback || '').trim();
-      let expanded = base;
-      if (!expanded) return '';
-
-      if (!/[.!?]$/.test(expanded)) expanded += '.';
-      const extension = ' This matters for students because it affects learning choices, project direction, and interview discussions in practical ways.';
-      expanded = `${expanded.replace(/[.!?]$/, '')}.${extension}`;
-      return trimToWordCount(expanded, 40);
-    }
-
     function loadPersistedStoryCache() {
       try {
         const raw = localStorage.getItem(STORY_DETAIL_STORAGE_KEY);
@@ -1921,54 +1907,25 @@
       return id;
     }
 
-    function defaultWhyImportant(item) {
-      const text = normalizeText(item.title + ' ' + item.content + ' ' + item.category);
-      if (/security|breach|attack|privacy|zero-day/.test(text)) {
-        return 'Security and privacy changes can directly affect your projects, data, and internship work.';
-      }
-      if (/market|industry|funding|policy|regulation|ban|lawsuit/.test(text)) {
-        return 'Industry and policy shifts influence hiring trends, salaries, and the tools companies adopt.';
-      }
-      return 'This topic reflects a shift in the technical landscape that CS students should actively track.';
-    }
-
-    function defaultImpact(item) {
-      const text = normalizeText(item.title + ' ' + item.content + ' ' + item.category);
-      if (/security|breach|attack|privacy|zero-day/.test(text)) {
-        return 'For students: prioritize secure coding, dependency hygiene, and threat-aware design in coursework and projects.';
-      }
-      if (/ai|machine learning|llm|neural/.test(text)) {
-        return 'For students: hands-on AI literacy and practical model tooling are becoming important for internships and interviews.';
-      }
-      return 'For students: align projects and learning plans with this signal to stay relevant and market-ready.';
-    }
-
     function buildStoryPackage(item, summary, points) {
       const fallbackQuick = shortText(item.summary || item.content || item.title || '', 170);
-      let quickSeed = stripSourcePrefix(cleanAiLine(summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
+      // Support both old (hook) and new (what_happened) AI field names
+      let quickSeed = stripSourcePrefix(cleanAiLine(summary.what_happened || summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
         || fallbackSummary(item, 'department')
-        || 'This story captures a meaningful update students should track.';
-      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || defaultWhyImportant(item)))
-        || defaultWhyImportant(item);
-      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || defaultImpact(item)))
-        || defaultImpact(item);
+        || fallbackQuick;
+      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || ''))
+        || shortText(item.summary || item.content || '', 190);
+      // Support both old (action_step) and new (key_facts as impact source)
+      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || ''))
+        || shortText(item.summary || '', 190);
 
-      if (!isRelevantToStory(quickSeed, item)) quickSeed = titleAnchoredQuick(item);
-      if (!isRelevantToStory(whySeed, item)) whySeed = titleAnchoredWhy(item);
-      if (!isRelevantToStory(impactSeed, item)) impactSeed = titleAnchoredImpact(item);
+      // Only apply relevance check if the seed is generic filler, not factual content
+      if (quickSeed && !isRelevantToStory(quickSeed, item) && countWords(quickSeed) < 15) quickSeed = titleAnchoredQuick(item);
+      if (whySeed && !isRelevantToStory(whySeed, item) && countWords(whySeed) < 15) whySeed = titleAnchoredWhy(item);
 
-      const quickSummary = shortText(
-        ensureMinWords(quickSeed, 12, 'This story highlights a meaningful technical update that students should understand clearly.'),
-        170
-      );
-      const whyImportant = shortText(
-        ensureMinWords(whySeed, 12, 'It matters because this change can influence skills, hiring expectations, and project quality.'),
-        190
-      );
-      const impact = shortText(
-        ensureMinWords(impactSeed, 12, 'Students should use this signal to adjust learning priorities and improve practical work.'),
-        190
-      );
+      const quickSummary = shortText(quickSeed || item.title || '', 170);
+      const whyImportant = shortText(whySeed || '', 190);
+      const impact = shortText(impactSeed || '', 190);
       const fullArticle = buildArticle50to60Words([
         quickSummary,
         whyImportant,
@@ -1980,14 +1937,14 @@
 
     function buildHeuristicStoryPackage(item) {
       const title = cleanAiLine(item.title || 'This story');
-      const base = stripSourcePrefix(item.summary || item.content || '');
-      const quickSeed = `${title}. ${base || 'The report highlights a concrete shift in technology conversations students should track this week.'}`;
-      const whySeed = titleAnchoredWhy(item);
-      const impactSeed = titleAnchoredImpact(item);
+      const base = stripSourcePrefix(item.content || item.summary || '');
+      const quickSeed = base ? `${title}. ${base}` : title;
+      const whySeed = base || title;
+      const impactSeed = base || '';
 
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, titleAnchoredQuick(item)), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, defaultWhyImportant(item)), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, defaultImpact(item)), 190);
+      const quickSummary = shortText(quickSeed, 170);
+      const whyImportant = shortText(whySeed, 190);
+      const impact = shortText(impactSeed, 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, base]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
@@ -1996,12 +1953,8 @@
       if (!pkg || typeof pkg !== 'object') return false;
       const quickSummary = String(pkg.quickSummary || '').trim();
       const whyImportant = String(pkg.whyImportant || '').trim();
-      const impact = String(pkg.impact || '').trim();
-      const fullArticle = String(pkg.fullArticle || '').trim();
-      if (!quickSummary || !whyImportant || !impact || !fullArticle) return false;
-      if (countWords(quickSummary) <= 12 || countWords(whyImportant) <= 12 || countWords(impact) <= 12) return false;
-      if (!isRelevantToStory(quickSummary, item)) return false;
-      if (!isRelevantToStory(whyImportant, item)) return false;
+      // Package is valid if it has at least a quickSummary with real content
+      if (!quickSummary || countWords(quickSummary) < 5) return false;
       return true;
     }
 
@@ -2017,6 +1970,7 @@
         return result;
       }
 
+      // Send full content when available (from feed API), fall back to summary
       const text = item.content || item.summary || item.title || '';
       const category = /market|policy|industry|regulation/i.test(item.category || item.title || text)
         ? 'industrial-insight'
@@ -2033,9 +1987,10 @@
         const payload = await res.json();
         const data = payload.data || payload;
         const summary = data.summary || {};
-        const points = Array.isArray(summary.key_points)
-          ? summary.key_points.map(cleanAiLine).filter(isUsefulAiLine)
-          : [];
+        // Support both old (key_points) and new (key_facts) field names
+        const rawPoints = Array.isArray(summary.key_facts) ? summary.key_facts
+          : Array.isArray(summary.key_points) ? summary.key_points : [];
+        const points = rawPoints.map(cleanAiLine).filter(isUsefulAiLine);
 
         const aiResult = buildStoryPackage(item, summary, points);
         if (isValidStoryPackage(aiResult, item)) {

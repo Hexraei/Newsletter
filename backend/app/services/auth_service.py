@@ -1,7 +1,7 @@
 """Authentication service for user management."""
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select
@@ -80,7 +80,7 @@ class AuthService:
             return None
         
         # Update last login
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
         await self.db.commit()
         
         return user
@@ -144,20 +144,31 @@ class AuthService:
 
         token = secrets.token_urlsafe(64)
         user.reset_token = token
-        user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+        user.reset_token_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
         await self.db.commit()
         return token
 
     async def reset_password(self, token: str, new_password: str) -> bool:
         """Reset a user's password using a valid reset token."""
+        # Use hmac.compare_digest for constant-time comparison to prevent timing attacks.
+        # Hash the token to query by prefix, then verify full token in constant time.
         result = await self.db.execute(
-            select(User).where(User.reset_token == token)
+            select(User).where(User.reset_token.isnot(None))
         )
-        user = result.scalar_one_or_none()
+        users_with_tokens = result.scalars().all()
+        user = None
+        for u in users_with_tokens:
+            if u.reset_token and secrets.compare_digest(u.reset_token, token):
+                user = u
+                break
+
         if not user or not user.reset_token_expiry:
             return False
 
-        if datetime.utcnow() > user.reset_token_expiry.replace(tzinfo=None):
+        if datetime.now(timezone.utc) > user.reset_token_expiry.replace(tzinfo=timezone.utc):
+            user.reset_token = None
+            user.reset_token_expiry = None
+            await self.db.commit()
             return False
 
         user.password_hash = get_password_hash(new_password)

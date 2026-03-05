@@ -99,20 +99,25 @@ class FeedService:
             items.extend(xd_result.scalars().all())
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
         url_map = {}
+        content_map = {}
         if raw_ids:
             raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url)
+                select(RawContent.id, RawContent.original_url, RawContent.original_content)
                 .where(RawContent.id.in_(raw_ids))
             )
-            url_map = {str(row.id): row.original_url for row in raw_result.all()}
+            for row in raw_result.all():
+                url_map[str(row.id)] = row.original_url
+                content_map[str(row.id)] = row.original_content
         
         # Format response
         feed_items = []
         for item in items:
+            raw_id = str(item.raw_content_id) if item.raw_content_id else None
             feed_items.append({
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
+                "content": content_map.get(raw_id, "") if raw_id else "",
                 "content_blocks": item.content_blocks,
                 "category": item.category,
                 "topic_tags": item.topic_tags,
@@ -172,21 +177,25 @@ class FeedService:
             xd_result = await self.db.execute(xdept_query)
             items.extend(xd_result.scalars().all())
         
-        # Fetch original URLs
+        # Fetch original URLs and content
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
         url_map = {}
+        content_map = {}
         if raw_ids:
             raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url)
+                select(RawContent.id, RawContent.original_url, RawContent.original_content)
                 .where(RawContent.id.in_(raw_ids))
             )
-            url_map = {str(row.id): row.original_url for row in raw_result.all()}
+            for row in raw_result.all():
+                url_map[str(row.id)] = row.original_url
+                content_map[str(row.id)] = row.original_content
         
         return [
             {
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
+                "content": content_map.get(str(item.raw_content_id), "") if item.raw_content_id else "",
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
                 "is_breaking": item.is_breaking,
@@ -220,18 +229,22 @@ class FeedService:
 
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
         url_map = {}
+        content_map = {}
         if raw_ids:
             raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url)
+                select(RawContent.id, RawContent.original_url, RawContent.original_content)
                 .where(RawContent.id.in_(raw_ids))
             )
-            url_map = {str(row.id): row.original_url for row in raw_result.all()}
+            for row in raw_result.all():
+                url_map[str(row.id)] = row.original_url
+                content_map[str(row.id)] = row.original_content
 
         return [
             {
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
+                "content": content_map.get(str(item.raw_content_id), "") if item.raw_content_id else "",
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
                 "is_breaking": item.is_breaking,
@@ -363,21 +376,25 @@ class FeedService:
             xd_result = await self.db.execute(xdept_query)
             items.extend(xd_result.scalars().all())
 
-        # Fetch original URLs
+        # Fetch original URLs and content
         raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
         url_map = {}
+        content_map = {}
         if raw_ids:
             raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url)
+                select(RawContent.id, RawContent.original_url, RawContent.original_content)
                 .where(RawContent.id.in_(raw_ids))
             )
-            url_map = {str(row.id): row.original_url for row in raw_result.all()}
+            for row in raw_result.all():
+                url_map[str(row.id)] = row.original_url
+                content_map[str(row.id)] = row.original_content
 
         return [
             {
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
+                "content": content_map.get(str(item.raw_content_id), "") if item.raw_content_id else "",
                 "content_blocks": item.content_blocks,
                 "category": item.category,
                 "topic_tags": item.topic_tags,

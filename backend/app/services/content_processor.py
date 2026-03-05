@@ -185,7 +185,7 @@ class ContentProcessor:
             source_type=source_type,
         )
 
-        # Compute relevance_score from department scoring (0-100 scale)
+        # Compute composite relevance_score (5-100) from multiple signals
         dept_scores = score_article_departments(
             raw.original_title or "",
             raw.original_content or "",
@@ -193,7 +193,28 @@ class ContentProcessor:
             source_type=source_type,
         )
         max_dept_score = dept_scores[0][1] if dept_scores else 0
-        relevance_score = min(100, int(max_dept_score * 10))
+        # Content quality
+        content_len = len(raw.original_content or "")
+        _rel = 0
+        if content_len >= 500: _rel += 15
+        elif content_len >= 200: _rel += 10
+        elif content_len >= 50: _rel += 5
+        kp = summary_data.get("key_points", [])
+        hook = summary_data.get("hook", "")
+        if kp and len(kp) >= 2: _rel += 10
+        if hook and hook != (raw.original_title or "") and len(hook) > 20: _rel += 5
+        # Category specificity
+        _cat = detect_category(raw.original_title or "", raw.original_content or "")
+        if _cat and _cat != "general": _rel += 15
+        else: _rel += 3
+        # Department relevance
+        _rel += min(35, int(max_dept_score * 3.5))
+        # Source quality
+        if score >= 50: _rel += 20
+        elif score >= 40: _rel += 15
+        elif score >= 30: _rel += 10
+        elif score >= 20: _rel += 5
+        relevance_score = max(5, min(100, _rel))
 
         # Determine if this is breaking news using quality + recency + urgency rules
         is_breaking = self._is_breaking_candidate(raw, score)
@@ -328,14 +349,27 @@ class ContentProcessor:
             source_type=source_type,
         )
 
-        # Compute relevance_score from department scoring (0-100 scale)
+        # Compute composite relevance_score (5-100) from multiple signals
         dept_scores = score_article_departments(
             title, content,
             source_dept_tags=source_tags,
             source_type=source_type,
         )
         max_dept_score = dept_scores[0][1] if dept_scores else 0
-        relevance_score = min(100, int(max_dept_score * 10))
+        content_len = len(content)
+        _rel = 0
+        if content_len >= 500: _rel += 15
+        elif content_len >= 200: _rel += 10
+        elif content_len >= 50: _rel += 5
+        _cat = detect_category(title, content)
+        if _cat and _cat != "general": _rel += 15
+        else: _rel += 3
+        _rel += min(35, int(max_dept_score * 3.5))
+        if score >= 50: _rel += 20
+        elif score >= 40: _rel += 15
+        elif score >= 30: _rel += 10
+        elif score >= 20: _rel += 5
+        relevance_score = max(5, min(100, _rel))
 
         processed = ProcessedContent(
             raw_content_id=raw.id,
@@ -402,24 +436,38 @@ class ContentProcessor:
             "shutdown",
             "offline",
             "hacked",
+            "launch",
+            "release",
+            "unveils",
+            "announces",
+            "critical",
+            "alert",
+            "leaked",
+            "disruption",
+            "acquisition",
+            "ipo",
+            "layoff",
+            "raises",
         ]
         return any(k in text for k in keywords)
 
     def _is_breaking_candidate(self, raw: RawContent, score: int) -> bool:
         """Decide if a story should be marked as breaking.
 
-        Avoids marking every high-engagement post as breaking by adding recency
-        and urgency constraints.
+        Uses achievable score thresholds (max score ~55 from RSS feeds).
         """
         age_hours = self._content_age_hours(raw)
         if age_hours is None or age_hours > 48:
             return False
 
-        if score >= 92 and age_hours <= 48:
+        # Tier 1: Top-scoring + recent
+        if score >= 48 and age_hours <= 12:
             return True
-        if score >= 85 and age_hours <= 24:
+        # Tier 2: Good score + very fresh
+        if score >= 40 and age_hours <= 6:
             return True
-        if score >= 78 and age_hours <= 12 and self._has_urgent_keywords(raw):
+        # Tier 3: Decent score + fresh + urgent keywords
+        if score >= 35 and age_hours <= 24 and self._has_urgent_keywords(raw):
             return True
 
         return False
@@ -430,7 +478,9 @@ class ContentProcessor:
         boost = 0
 
         if age_hours is not None:
-            if age_hours <= 2:
+            if age_hours <= 1:
+                boost += 25
+            elif age_hours <= 3:
                 boost += 20
             elif age_hours <= 6:
                 boost += 15
@@ -440,7 +490,7 @@ class ContentProcessor:
                 boost += 5
 
         if self._has_urgent_keywords(raw):
-            boost += 8
+            boost += 10
 
         return min(100, score + boost)
     

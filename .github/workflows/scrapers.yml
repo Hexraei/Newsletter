@@ -42,7 +42,7 @@ jobs:
     needs: migrate
     if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -59,17 +59,28 @@ jobs:
           pip install python-dotenv feedparser beautifulsoup4 aiohttp fake-useragent
 
       - name: Run RSS scrapers
+        id: run_rss
+        continue-on-error: true
         run: python scrapers/run_rss.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+      - name: Scrape summary
+        if: always()
+        run: |
+          echo "=== RSS Scraper Summary ==="
+          echo "RSS scrapers outcome: ${{ steps.run_rss.outcome }}"
+          if [ "${{ steps.run_rss.outcome }}" = "failure" ]; then
+            echo "::warning::RSS scrapers failed"
+          fi
 
   scrape-general:
     name: General Scrapers
     needs: migrate
     if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -86,10 +97,21 @@ jobs:
           pip install python-dotenv feedparser beautifulsoup4 aiohttp fake-useragent
 
       - name: Run general scrapers
+        id: run_general
+        continue-on-error: true
         run: python scrapers/run_general.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+      - name: Scrape summary
+        if: always()
+        run: |
+          echo "=== General Scraper Summary ==="
+          echo "General scrapers outcome: ${{ steps.run_general.outcome }}"
+          if [ "${{ steps.run_general.outcome }}" = "failure" ]; then
+            echo "::warning::General scrapers failed"
+          fi
 
   scrape-research:
     name: Research Papers
@@ -113,9 +135,20 @@ jobs:
           pip install python-dotenv feedparser beautifulsoup4 aiohttp fake-useragent
 
       - name: Run research scrapers
+        id: run_research
+        continue-on-error: true
         run: python scrapers/run_research.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Scrape summary
+        if: always()
+        run: |
+          echo "=== Research Scraper Summary ==="
+          echo "Research scrapers outcome: ${{ steps.run_research.outcome }}"
+          if [ "${{ steps.run_research.outcome }}" = "failure" ]; then
+            echo "::warning::Research scrapers failed"
+          fi
 
   backfill-images:
     name: Backfill Article Images
@@ -138,7 +171,35 @@ jobs:
           pip install httpx python-dotenv
 
       - name: Backfill images (OG scrape + Unsplash fallback)
+        id: backfill
+        continue-on-error: true
         run: python scrapers/fetch_images.py --limit 200 --batch-size 50
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+
+      - name: Backfill summary
+        if: always()
+        run: |
+          echo "=== Image Backfill Summary ==="
+          echo "Backfill outcome: ${{ steps.backfill.outcome }}"
+          if [ "${{ steps.backfill.outcome }}" = "failure" ]; then
+            echo "::warning::Image backfill failed"
+          fi
+
+  summary:
+    name: Scrape Summary
+    needs: [scrape-rss, scrape-general, backfill-images]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report status
+        run: |
+          echo "=== Workflow Summary ==="
+          echo "RSS: ${{ needs.scrape-rss.result }}"
+          echo "General: ${{ needs.scrape-general.result }}"
+          echo "Images: ${{ needs.backfill-images.result }}"
+          if [ "${{ needs.scrape-rss.result }}" = "failure" ] && [ "${{ needs.scrape-general.result }}" = "failure" ]; then
+            echo "::error::All scrapers failed!"
+            exit 1
+          fi

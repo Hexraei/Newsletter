@@ -39,32 +39,30 @@ class FreeAIService:
             return data["choices"][0]["message"]["content"]
     
     async def summarize_content(self, title: str, content: str, category: str = "tech") -> dict:
-        """Summarize content."""
+        """Summarize content with content-first approach."""
 
-        system = """You are a senior editor for a computer science college newsletter.
+        system = """You are summarizing a news article for college students.
 
-Your job is to interpret news intelligently, not just compress text.
-Focus on relevance for CS students: learning roadmap, internships, project decisions, interview prep, and technical trends.
+Extract the core information from the article. Do not invent or assume anything not stated in the text.
 
-Return ONLY valid JSON with this exact schema:
+Return ONLY valid JSON:
 {
-  "hook": "one sharp sentence under 22 words",
-  "why_it_matters": "one concrete sentence under 28 words",
-  "key_points": ["3 to 5 concise factual bullets"],
-  "action_step": "one practical next step for students under 24 words"
+  "what_happened": "1-2 plain sentences stating the main event. Include who, what, when if available.",
+  "why_it_matters": "1-2 sentences on concrete impact — on jobs, technology, industry, or academics. Be specific.",
+  "key_facts": ["3-5 specific facts from the article: numbers, names, dates, companies, technologies. Only facts explicitly stated."]
 }
 
 Rules:
 - No markdown, no code fences, no extra keys.
-- Be specific, factual, and grounded in the provided content.
-- Avoid generic wording like "stay informed" or "this is important".
-- Mention technical or career implications when appropriate."""
+- Never use filler phrases like 'stay informed', 'this is important', 'in today's rapidly evolving world'.
+- If the article lacks substance for key_facts, return fewer bullets rather than padding with vague statements.
+- Ground every sentence in the provided text."""
 
         prompt = (
             f"Title: {title}\n"
             f"Category: {category}\n\n"
             f"Content:\n{content[:3000]}\n\n"
-            "Generate the JSON now."
+            "Extract the core information as JSON."
         )
         
         try:
@@ -128,11 +126,18 @@ Rules:
             "action_step": ""
         }
 
-        result["hook"] = self._clean_line(payload.get("hook"))
-        result["why_it_matters"] = self._clean_line(payload.get("why_it_matters") or payload.get("why"))
-        result["action_step"] = self._clean_line(payload.get("action_step") or payload.get("next_step"))
+        # Map content-first fields to existing schema
+        result["hook"] = self._clean_line(
+            payload.get("what_happened") or payload.get("hook")
+        )
+        result["why_it_matters"] = self._clean_line(
+            payload.get("why_it_matters") or payload.get("why")
+        )
+        result["action_step"] = self._clean_line(
+            payload.get("action_step") or payload.get("next_step") or ""
+        )
 
-        raw_points = payload.get("key_points")
+        raw_points = payload.get("key_facts") or payload.get("key_points")
         if isinstance(raw_points, list):
             points = [self._clean_line(point, max_len=160) for point in raw_points]
         elif isinstance(raw_points, str):
@@ -148,7 +153,8 @@ Rules:
         parsed_json = self._extract_json_object(text)
         if parsed_json:
             result = self._normalize_summary(parsed_json)
-            if result["hook"] and result["why_it_matters"] and result["action_step"] and result["key_points"]:
+            # Accept if we got the core fields (what_happened/hook + key_facts/key_points)
+            if result["hook"] and (result["key_points"] or result["why_it_matters"]):
                 return result
 
         result = {
@@ -188,30 +194,24 @@ Rules:
             elif current_section == 'action' and not result['action_step']:
                 result['action_step'] = self._clean_line(line)
         
-        # Fallbacks
+        # Fallbacks — use empty strings instead of generic filler
         if not result['hook']:
-            result['hook'] = "Key update students should notice now"
+            result['hook'] = ""
         if not result['why_it_matters']:
-            result['why_it_matters'] = "This can influence what you build, learn, and discuss in interviews this semester"
-        if not result['key_points']:
-            result['key_points'] = [
-                "The story signals a relevant technical or industry shift",
-                "Students can use this context for projects and interview preparation",
-                "Expect follow-on changes in tools, workflows, or hiring priorities",
-            ]
+            result['why_it_matters'] = ""
         if not result['action_step']:
-            result['action_step'] = "Translate this trend into one practical project, skill, or discussion topic this week"
+            result['action_step'] = ""
         
         return result
     
     def _basic_summarize(self, title: str, content: str) -> dict:
-        """Basic fallback summarization."""
-        sentences = [s.strip() for s in content.split(".") if len(s.strip()) > 20][:4]
+        """Basic fallback summarization — extracts actual sentences from content."""
+        sentences = [s.strip() for s in content.split(".") if len(s.strip()) > 20][:5]
         return {
             "hook": title,
-            "why_it_matters": "Relevant for college students",
-            "key_points": sentences if sentences else ["Key information available"],
-            "action_step": "Consider implications for your studies"
+            "why_it_matters": sentences[0] + "." if sentences else "",
+            "key_points": [s + "." for s in sentences[1:4]] if len(sentences) > 1 else [],
+            "action_step": ""
         }
 
 
@@ -219,17 +219,13 @@ class MockAIService:
     """Mock AI service for testing without any external calls."""
     
     async def summarize_content(self, title: str, content: str, category: str = "tech") -> dict:
-        """Return mock summary."""
+        """Return mock summary using actual content."""
+        sentences = [s.strip() for s in content.split(".") if len(s.strip()) > 20][:5]
         return {
-            "hook": f"🚀 {title[:50]}...",
-            "why_it_matters": "This development could impact your academic journey and future career opportunities.",
-            "key_points": [
-                "Key development in the field",
-                "Students should stay informed",
-                "May affect job market trends",
-                "Opportunity for skill development"
-            ],
-            "action_step": "Research more about this topic and discuss with peers"
+            "hook": title,
+            "why_it_matters": sentences[0] + "." if sentences else "",
+            "key_points": [s + "." for s in sentences[1:4]] if len(sentences) > 1 else [],
+            "action_step": ""
         }
     
     async def generate_headline(self, title: str, content: str) -> str:

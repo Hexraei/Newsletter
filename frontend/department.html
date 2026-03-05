@@ -939,18 +939,6 @@
       return words.slice(0, maxWords).join(' ').replace(/[,:;\-]+$/, '') + '.';
     }
 
-    function ensureMinWords(text, minWords, fallback) {
-      const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
-      if (countWords(cleaned) > minWords) return cleaned;
-      const base = cleaned || String(fallback || '').trim();
-      let expanded = base;
-      if (!expanded) return '';
-      if (!/[.!?]$/.test(expanded)) expanded += '.';
-      const extension = ' This matters for students because it affects learning choices, project direction, and interview discussions in practical ways.';
-      expanded = `${expanded.replace(/[.!?]$/, '')}.${extension}`;
-      return trimToWordCount(expanded, 40);
-    }
-
     function isUsefulAiLine(value) {
       const text = cleanAiLine(value);
       if (!text) return false;
@@ -1056,24 +1044,6 @@
       return id;
     }
 
-    function defaultWhyImportant(item) {
-      const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|breach|attack|privacy|zero-day/.test(text))
-        return 'Security and privacy changes can directly affect your projects, data, and internship work.';
-      if (/market|industry|funding|policy|regulation|ban|lawsuit/.test(text))
-        return 'Industry and policy shifts influence hiring trends, salaries, and the tools companies adopt.';
-      return 'This topic reflects a shift in the technical landscape that CS students should actively track.';
-    }
-
-    function defaultImpact(item) {
-      const text = normalizeText(item.title + ' ' + (item.content || '') + ' ' + (item.category || ''));
-      if (/security|breach|attack|privacy|zero-day/.test(text))
-        return 'For students: prioritize secure coding, dependency hygiene, and threat-aware design in coursework and projects.';
-      if (/ai|machine learning|llm|neural/.test(text))
-        return 'For students: hands-on AI literacy and practical model tooling are becoming important for internships and interviews.';
-      return 'For students: align projects and learning plans with this signal to stay relevant and market-ready.';
-    }
-
     function titleAnchoredQuick(item) {
       const title = cleanAiLine(item.title || 'This story');
       return `${title}. This summary focuses on the core claim and immediate context students should evaluate carefully before drawing conclusions.`;
@@ -1110,42 +1080,38 @@
 
     function buildStoryPackage(item, summary, points) {
       const fallbackQuick = shortText(item.summary || item.content || item.title || '', 170);
-      let quickSeed = stripSourcePrefix(cleanAiLine(summary.hook || points[0] || summary.why_it_matters || fallbackQuick)) || titleAnchoredQuick(item);
-      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || defaultWhyImportant(item))) || defaultWhyImportant(item);
-      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || defaultImpact(item))) || defaultImpact(item);
-      if (!isRelevantToStory(quickSeed, item)) quickSeed = titleAnchoredQuick(item);
-      if (!isRelevantToStory(whySeed, item)) whySeed = titleAnchoredWhy(item);
-      if (!isRelevantToStory(impactSeed, item)) impactSeed = titleAnchoredImpact(item);
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, 'This story highlights a meaningful technical update that students should understand clearly.'), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, 'It matters because this change can influence skills, hiring expectations, and project quality.'), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, 'Students should use this signal to adjust learning priorities and improve practical work.'), 190);
+      let quickSeed = stripSourcePrefix(cleanAiLine(summary.what_happened || summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
+        || fallbackQuick;
+      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || ''))
+        || shortText(item.summary || item.content || '', 190);
+      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || ''))
+        || shortText(item.summary || '', 190);
+      if (quickSeed && !isRelevantToStory(quickSeed, item) && countWords(quickSeed) < 15) quickSeed = titleAnchoredQuick(item);
+      if (whySeed && !isRelevantToStory(whySeed, item) && countWords(whySeed) < 15) whySeed = titleAnchoredWhy(item);
+      const quickSummary = shortText(quickSeed || item.title || '', 170);
+      const whyImportant = shortText(whySeed || '', 190);
+      const impact = shortText(impactSeed || '', 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, item.summary]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
 
     function buildHeuristicStoryPackage(item) {
       const title = cleanAiLine(item.title || 'This story');
-      const base = stripSourcePrefix(item.summary || item.content || '');
-      const quickSeed = `${title}. ${base || 'The report highlights a concrete shift in technology conversations students should track this week.'}`;
-      const whySeed = titleAnchoredWhy(item);
-      const impactSeed = titleAnchoredImpact(item);
-      const quickSummary = shortText(ensureMinWords(quickSeed, 12, titleAnchoredQuick(item)), 170);
-      const whyImportant = shortText(ensureMinWords(whySeed, 12, defaultWhyImportant(item)), 190);
-      const impact = shortText(ensureMinWords(impactSeed, 12, defaultImpact(item)), 190);
+      const base = stripSourcePrefix(item.content || item.summary || '');
+      const quickSeed = base ? `${title}. ${base}` : title;
+      const whySeed = base || title;
+      const impactSeed = base || '';
+      const quickSummary = shortText(quickSeed, 170);
+      const whyImportant = shortText(whySeed, 190);
+      const impact = shortText(impactSeed, 190);
       const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, base]);
       return { quickSummary, whyImportant, impact, fullArticle };
     }
 
     function isValidStoryPackage(pkg, item) {
       if (!pkg || typeof pkg !== 'object') return false;
-      const qs = String(pkg.quickSummary || '').trim();
-      const wi = String(pkg.whyImportant || '').trim();
-      const im = String(pkg.impact || '').trim();
-      const fa = String(pkg.fullArticle || '').trim();
-      if (!qs || !wi || !im || !fa) return false;
-      if (countWords(qs) <= 12 || countWords(wi) <= 12 || countWords(im) <= 12) return false;
-      if (!isRelevantToStory(qs, item)) return false;
-      if (!isRelevantToStory(wi, item)) return false;
+      const quickSummary = String(pkg.quickSummary || '').trim();
+      if (!quickSummary || countWords(quickSummary) < 5) return false;
       return true;
     }
 
@@ -1205,7 +1171,9 @@
         const payload = await res.json();
         const data = payload.data || payload;
         const summary = data.summary || {};
-        const points = Array.isArray(summary.key_points) ? summary.key_points.map(cleanAiLine).filter(isUsefulAiLine) : [];
+        const rawPoints = Array.isArray(summary.key_facts) ? summary.key_facts
+          : Array.isArray(summary.key_points) ? summary.key_points : [];
+        const points = rawPoints.map(cleanAiLine).filter(isUsefulAiLine);
         const aiResult = buildStoryPackage(item, summary, points);
         if (isValidStoryPackage(aiResult, item)) { setStoryCache(cacheKey, aiResult); return aiResult; }
         const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;

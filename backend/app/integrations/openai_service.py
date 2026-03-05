@@ -30,16 +30,19 @@ class OpenAIService:
     ) -> dict:
         """Summarize content using GPT."""
         
-        system_prompt = """You are a content summarizer for a college newsletter. 
-Convert articles into concise 2-3 minute summaries.
+        system_prompt = """You are summarizing a news article for college students.
+
+Extract the core information from the article. Do not invent or assume anything not stated in the text.
 
 Format:
-- Hook: One catchy attention-grabbing sentence
-- Why it matters: One line on relevance
-- Key points: 3-6 bullet points
-- Action step: One practical takeaway
+- What happened: 1-2 plain sentences stating the main event (who, what, when)
+- Why it matters: 1-2 sentences on concrete impact (jobs, technology, industry, academics)
+- Key facts: 3-5 specific facts from the article (numbers, names, dates, companies, technologies)
 
-Keep it brief, engaging, student-friendly."""
+Rules:
+- Never use filler phrases like 'stay informed' or 'this is important'.
+- Only include facts explicitly stated in the article.
+- Be concise but complete."""
 
         user_prompt = f"""Title: {title}
 Category: {category}
@@ -47,7 +50,7 @@ Category: {category}
 Content:
 {content[:3000]}
 
-Provide the summary in the specified format."""
+Extract the core information in the format above."""
 
         response = await self.client.post(
             "/chat/completions",
@@ -139,12 +142,14 @@ Create the best headline:"""
             
             lower = line.lower()
             
-            if 'hook' in lower:
+            if 'what happened' in lower or 'hook' in lower:
                 current_section = 'hook'
                 result['hook'] = line.split(':', 1)[-1].strip()
             elif 'why' in lower and 'matter' in lower:
                 current_section = 'why'
                 result['why_it_matters'] = line.split(':', 1)[-1].strip()
+            elif 'key fact' in lower or 'key point' in lower:
+                current_section = 'points'
             elif 'action' in lower or 'takeaway' in lower:
                 current_section = 'action'
                 result['action_step'] = line.split(':', 1)[-1].strip()
