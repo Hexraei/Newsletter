@@ -2,6 +2,7 @@
 # Note: Render/production uses backend/requirements.txt directly (see render.yaml)
 -r backend/requirements.txt
 python-dotenv>=1.0.0
+python-json-logger>=2.0.0
 feedparser>=6.0.0
 beautifulsoup4>=4.12.0
 aiohttp>=3.9.0

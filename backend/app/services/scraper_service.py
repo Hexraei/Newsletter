@@ -2,7 +2,7 @@
 
 import asyncio
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -154,8 +154,8 @@ class ScraperService:
                     items_stored += 1
             
             # Update source last scraped
-            source.last_scraped_at = datetime.utcnow()
-            source.last_success_at = datetime.utcnow()
+            source.last_scraped_at = datetime.now(timezone.utc)
+            source.last_success_at = datetime.now(timezone.utc)
             await self.db.commit()
             
             return {

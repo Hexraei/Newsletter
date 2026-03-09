@@ -1,5 +1,7 @@
 """Scraper management API endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,8 @@ from app.tasks.scraper_tasks import (
     trigger_scraper,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -30,6 +34,7 @@ async def get_scrapers_status(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Get status of all scrapers."""
+    logger.info("ADMIN_ACTION: scrapers/status by %s (id=%s)", current_user.email, current_user.id)
     service = ScraperService(db)
     status_list = await service.get_scraper_status()
     
@@ -46,8 +51,9 @@ async def run_single_scraper(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Manually trigger a single scraper."""
+    logger.info("ADMIN_ACTION: scrapers/run/%s by %s (id=%s)", scraper_name, current_user.email, current_user.id)
     
-    valid_scrapers = ["hackernews", "reddit", "twitter", "github", "medium", "producthunt"]
+    valid_scrapers= ["hackernews", "reddit", "twitter", "github", "medium", "producthunt"]
     
     if scraper_name not in valid_scrapers:
         raise HTTPException(
@@ -68,6 +74,7 @@ async def run_all_scrapers(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Manually trigger all scrapers."""
+    logger.info("ADMIN_ACTION: scrapers/run-all by %s (id=%s)", current_user.email, current_user.id)
     
     import asyncio
     result = await trigger_all_scrapers()
@@ -82,8 +89,9 @@ async def schedule_scraper(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Schedule a scraper to run via Celery."""
+    logger.info("ADMIN_ACTION: scrapers/schedule/%s by %s (id=%s)", scraper_name, current_user.email, current_user.id)
     
-    task_map = {
+    task_map= {
         "hackernews": scrape_hackernews,
         "reddit": scrape_reddit,
         "twitter": scrape_twitter,
@@ -114,6 +122,7 @@ async def process_pending(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Process pending raw content."""
+    logger.info("ADMIN_ACTION: scrapers/process-pending by %s (id=%s)", current_user.email, current_user.id)
     
     processor = ContentProcessor(db)
     result = await processor.process_pending_items(limit=limit)
@@ -127,6 +136,7 @@ async def get_processing_stats(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Get content processing statistics."""
+    logger.info("ADMIN_ACTION: scrapers/stats by %s (id=%s)", current_user.email, current_user.id)
     
     processor = ContentProcessor(db)
     stats = await processor.get_processing_stats()
@@ -141,6 +151,7 @@ async def get_pending_content(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Get list of pending raw content."""
+    logger.info("ADMIN_ACTION: scrapers/pending by %s (id=%s)", current_user.email, current_user.id)
     
     result = await db.execute(
         select(RawContent)
@@ -174,6 +185,7 @@ async def toggle_source(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Enable/disable a scraper source."""
+    logger.info("ADMIN_ACTION: scrapers/sources/%s/toggle by %s (id=%s)", source_id, current_user.email, current_user.id)
     
     result = await db.execute(
         select(Source).where(Source.id == source_id)
@@ -201,6 +213,7 @@ async def get_celery_queue_status(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Get Celery task queue status."""
+    logger.info("ADMIN_ACTION: scrapers/queue/status by %s (id=%s)", current_user.email, current_user.id)
     
     try:
         from app.tasks.scraper_tasks import celery_app
@@ -230,6 +243,7 @@ async def dev_refresh_content(
     current_user: User = Depends(get_current_admin_user)
 ):
     """Dev-only: Reset, re-scrape HN, and process all content. Requires admin auth."""
+    logger.info("ADMIN_ACTION: scrapers/dev/refresh by %s (id=%s)", current_user.email, current_user.id)
     from app.config import settings
     if not settings.DEBUG:
         raise HTTPException(status_code=403, detail="Only available in debug mode")

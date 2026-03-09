@@ -104,3 +104,6 @@ SCRAPER_RESULTS.md
 # Scraper output
 *.xlsx
 *.csv
+
+# Database backups
+backups/

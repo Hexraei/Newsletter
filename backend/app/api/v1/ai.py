@@ -1,6 +1,8 @@
 """AI-powered content processing endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.api.deps import get_optional_current_user
 from app.integrations.ai_provider import AIProvider, check_ai_status, get_ai_provider_options
@@ -8,6 +10,7 @@ from app.schemas.content import EmbedRequest, HeadlineRequest, SummarizeRequest
 from app.schemas.responses import SingleResponse
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("/status", response_model=SingleResponse)
@@ -25,7 +28,9 @@ async def list_providers():
 
 
 @router.post("/summarize", response_model=SingleResponse)
+@limiter.limit("10/minute")
 async def summarize_content(
+    req: Request,
     request: SummarizeRequest,
     current_user=Depends(get_optional_current_user)
 ):
@@ -53,7 +58,9 @@ async def summarize_content(
 
 
 @router.post("/headline", response_model=SingleResponse)
+@limiter.limit("10/minute")
 async def generate_headline(
+    req: Request,
     request: HeadlineRequest,
     current_user=Depends(get_optional_current_user)
 ):
@@ -81,7 +88,9 @@ async def generate_headline(
 
 
 @router.post("/embed", response_model=SingleResponse)
+@limiter.limit("10/minute")
 async def generate_embedding(
+    req: Request,
     request: EmbedRequest,
     current_user=Depends(get_optional_current_user)
 ):

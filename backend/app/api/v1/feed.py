@@ -6,6 +6,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +19,7 @@ from app.services.cache_service import cached, get_cache, invalidate_feed_caches
 from app.services.feed_service import FeedService
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +170,13 @@ async def get_daily_digest(
 
 
 @router.get("/search")
+@limiter.limit("30/minute")
 async def search_content(
+    request: Request,
     q: str = Query(..., min_length=1, max_length=200),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Search content by title, summary, or tags."""
     

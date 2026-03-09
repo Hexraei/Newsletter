@@ -1000,7 +1000,7 @@
 
   <!-- Footer -->
   <footer class="auth-footer">
-    <span>2026 NEWS DAY · <a href="index.html">Back to home</a></span>
+    <span>2026 NEWS DAY · <a href="index.html">Back to home</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
   </footer>
 
   <script>
@@ -1104,9 +1104,9 @@
     /* ===== SESSION HELPERS ===== */
     function saveSession(data) {
       const session = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
+        user: data.user || null,
         expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+        authenticated: true,
       };
       localStorage.setItem('newsday_session', JSON.stringify(session));
     }
@@ -1154,6 +1154,7 @@
       try {
         const res = await fetch(API_BASE + '/auth/login', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         });
@@ -1166,7 +1167,7 @@
         // Fetch user profile to get department preference
         try {
           const meRes = await fetch(API_BASE + '/auth/me', {
-            headers: { 'Authorization': 'Bearer ' + data.access_token },
+            credentials: 'include',
           });
           if (meRes.ok) {
             const meData = await meRes.json();
@@ -1244,6 +1245,7 @@
         // Register succeeded — now log in to get tokens
         const loginRes = await fetch(API_BASE + '/auth/login', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         });
@@ -1348,12 +1350,19 @@
 
       // Check if already logged in
       const session = getSession();
-      if (session && session.access_token) {
+      if (session && session.authenticated) {
         window.location.href = 'index.html';
         return;
       }
     })();
   </script>
+<!-- Cookie Consent Banner -->
+<div id="cookie-consent" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(30,30,30,0.97);color:#e0e0e0;padding:14px 24px;font-size:13px;z-index:9999;font-family:'DM Sans',sans-serif;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <span>We use cookies and localStorage for authentication and to improve your experience. <a href="/privacy" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a></span>
+    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">Accept</button>
+</div>
+<script>if(!localStorage.getItem('cc_accepted'))document.getElementById('cookie-consent').style.display='flex';</script>
+
 <script>
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

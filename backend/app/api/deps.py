@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,16 +10,25 @@ from app.config import settings
 from app.core.security import decode_token
 from app.models import User, get_db
 
-# OAuth2 scheme for token authentication
+# OAuth2 scheme for token authentication (fallback for API clients)
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_PREFIX}/auth/login",
     auto_error=False
 )
 
 
+def _extract_token(request: Request, header_token: Optional[str]) -> Optional[str]:
+    """Extract JWT from httpOnly cookie first, then Authorization header."""
+    token = request.cookies.get("access_token")
+    if token:
+        return token
+    return header_token
+
+
 async def get_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    token: Optional[str] = Depends(oauth2_scheme)
+    header_token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
     """Get current authenticated user from token."""
     credentials_exception = HTTPException(
@@ -28,6 +37,7 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    token = _extract_token(request, header_token)
     if not token:
         raise credentials_exception
     
@@ -92,10 +102,12 @@ async def get_current_admin_user(
 
 
 async def get_optional_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    token: Optional[str] = Depends(oauth2_scheme)
+    header_token: Optional[str] = Depends(oauth2_scheme)
 ) -> Optional[User]:
     """Get current user if authenticated, else None."""
+    token = _extract_token(request, header_token)
     if not token:
         return None
     

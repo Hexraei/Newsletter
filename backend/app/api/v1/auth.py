@@ -1,8 +1,10 @@
 """Authentication API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
@@ -11,6 +13,7 @@ from app.api.deps import (
     get_db,
     get_optional_current_user,
 )
+from app.config import settings
 from app.models import User
 from app.schemas.responses import ErrorResponse, SingleResponse, SuccessResponse
 from app.schemas.user import (
@@ -29,6 +32,34 @@ from app.services.email_service import send_reset_email
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+
+def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str):
+    """Set httpOnly authentication cookies on the response."""
+    is_secure = settings.COOKIE_SECURE
+    domain = settings.COOKIE_DOMAIN if settings.COOKIE_DOMAIN else None
+    samesite = settings.COOKIE_SAMESITE
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=is_secure,
+        samesite=samesite,
+        domain=domain,
+        path="/",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=is_secure,
+        samesite=samesite,
+        domain=domain,
+        path="/api/v1/auth/refresh",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
 
 
 @router.post(
@@ -90,21 +121,29 @@ async def login(
         )
     
     tokens = auth_service.create_tokens(str(user.id))
-    return Token(**tokens)
+    token_data = Token(**tokens)
+    response = JSONResponse(content=token_data.model_dump())
+    set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
+    return response
 
 
 @router.post(
     "/refresh",
     response_model=Token
 )
+@limiter.limit("10/minute")
 async def refresh_token(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Refresh access token."""
     auth_service = AuthService(db)
     tokens = auth_service.create_tokens(str(current_user.id))
-    return Token(**tokens)
+    token_data = Token(**tokens)
+    response = JSONResponse(content=token_data.model_dump())
+    set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
+    return response
 
 
 @router.get(
@@ -261,7 +300,26 @@ async def reset_password(
 async def logout(
     current_user: User = Depends(get_current_active_user)
 ):
-    """Logout (client should discard tokens)."""
-    # JWT tokens are stateless, so we just tell client to discard them
-    # For token revocation, we'd need a blacklist (Redis recommended)
-    return SuccessResponse(message="Logged out successfully")
+    """Logout (clears auth cookies; client should also discard any stored session)."""
+    response = JSONResponse(content={"success": True, "message": "Logged out successfully"})
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/api/v1/auth/refresh")
+    return response
+
+
+@router.delete(
+    "/me",
+    response_model=SuccessResponse
+)
+async def delete_account(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete user account and all associated data (GDPR right to erasure)."""
+    from app.models import UserSaves, UserReads, UserFeedback
+    await db.execute(delete(UserSaves).where(UserSaves.user_id == str(current_user.id)))
+    await db.execute(delete(UserReads).where(UserReads.user_id == str(current_user.id)))
+    await db.execute(delete(UserFeedback).where(UserFeedback.user_id == str(current_user.id)))
+    await db.delete(current_user)
+    await db.commit()
+    return SuccessResponse(message="Account and all associated data deleted")

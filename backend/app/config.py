@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     
     # App
     APP_NAME: str = "College Newsletter API"
-    DEBUG: bool = False
+    ENVIRONMENT: str = "development"  # development, staging, production
+    DEBUG: Optional[bool] = None
     VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
     
@@ -29,18 +30,66 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    @field_validator("SECRET_KEY", "JWT_SECRET_KEY")
+    @field_validator("SECRET_KEY")
     @classmethod
-    def validate_secrets(cls, v: str, info) -> str:
+    def validate_secret_key(cls, v: str, info) -> str:
         if v in _INSECURE_DEFAULTS:
+            import os
+            env = os.getenv("ENVIRONMENT", "development")
+            if env != "development":
+                raise ValueError(
+                    f"SECRET_KEY must be changed from default in {env} mode. "
+                    'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+                )
             import warnings
             warnings.warn(
-                f"{info.field_name} is using an insecure placeholder value. "
-                "Set a strong random secret in backend/.env before deploying.",
+                "SECRET_KEY is using an insecure placeholder. "
+                "Set a strong random secret in .env before deploying.",
                 stacklevel=2,
             )
         if len(v) < 16:
-            raise ValueError(f"{info.field_name} must be at least 16 characters")
+            raise ValueError("SECRET_KEY must be at least 16 characters")
+        return v
+
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret_key(cls, v: str, info) -> str:
+        if v in _INSECURE_DEFAULTS:
+            import os
+            env = os.getenv("ENVIRONMENT", "development")
+            if env != "development":
+                raise ValueError(
+                    f"JWT_SECRET_KEY must be changed from default in {env} mode. "
+                    'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+                )
+            import warnings
+            warnings.warn(
+                "JWT_SECRET_KEY is using an insecure placeholder. "
+                "Set a strong random secret in .env before deploying.",
+                stacklevel=2,
+            )
+        if len(v) < 16:
+            raise ValueError("JWT_SECRET_KEY must be at least 16 characters")
+        return v
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def auto_debug(cls, v, info):
+        # If not explicitly set, derive from ENVIRONMENT
+        if v is None:
+            env = info.data.get("ENVIRONMENT", "development") if info.data else "development"
+            return env == "development"
+        return v
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [s.strip() for s in v.split(",")]
         return v
     
     # Database
@@ -53,6 +102,15 @@ class Settings(BaseSettings):
     
     # CORS — explicit allowlist only
     CORS_ORIGINS: List[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
+
+    # Cookie settings (for httpOnly JWT cookies)
+    COOKIE_DOMAIN: Optional[str] = None  # None = current domain; set for cloud
+    COOKIE_SECURE: bool = False  # True in production (HTTPS only)
+    COOKIE_SAMESITE: str = "lax"  # lax for OAuth compat
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "json"  # "json" for production, "text" for development
     
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100

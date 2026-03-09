@@ -608,7 +608,7 @@
         var raw = localStorage.getItem('newsday_session');
         if (!raw) { window.location.replace('auth.html'); return; }
         var s = JSON.parse(raw);
-        if (!s.access_token || (s.expires_at && Date.now() > s.expires_at)) {
+        if (!s.authenticated || (s.expires_at && Date.now() > s.expires_at)) {
           localStorage.removeItem('newsday_session');
           window.location.replace('auth.html');
           return;
@@ -777,8 +777,8 @@
   <div class="footer-bottom">
     <span class="footer-copy">2026 NEWS DAY. All rights reserved.</span>
     <div class="footer-bottom-links">
-      <a href="#">Privacy</a>
-      <a href="#">Terms</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
     </div>
   </div>
 
@@ -1246,7 +1246,7 @@
         const raw = localStorage.getItem('newsday_session');
         if (!raw) return null;
         const s = JSON.parse(raw);
-        return s.access_token || null;
+        return s.authenticated ? true : null;
       } catch { return null; }
     }
 
@@ -1263,13 +1263,13 @@
     }
 
     async function toggleSave(contentId) {
-      const token = getAuthToken();
-      if (!token || !contentId) return;
+      if (!getAuthToken() || !contentId) return;
       const method = currentSaveState ? 'DELETE' : 'POST';
       try {
         const res = await fetchWithTimeout(API + `/api/v1/feed/${encodeURIComponent(contentId)}/save`, {
           method,
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
         }, 5000);
         if (res.ok) {
           currentSaveState = !currentSaveState;
@@ -1660,6 +1660,13 @@
       document.addEventListener('click', () => dropdown.classList.remove('open'));
     })();
   </script>
+<!-- Cookie Consent Banner -->
+<div id="cookie-consent" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(30,30,30,0.97);color:#e0e0e0;padding:14px 24px;font-size:13px;z-index:9999;font-family:'DM Sans',sans-serif;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <span>We use cookies and localStorage for authentication and to improve your experience. <a href="/privacy" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a></span>
+    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">Accept</button>
+</div>
+<script>if(!localStorage.getItem('cc_accepted'))document.getElementById('cookie-consent').style.display='flex';</script>
+
 <script>
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

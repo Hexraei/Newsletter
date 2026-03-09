@@ -268,6 +268,24 @@ async def reader_page():
     return RedirectResponse(url="/")
 
 
+@app.get("/privacy", tags=["Root"])
+@app.get("/privacy.html", tags=["Root"], include_in_schema=False)
+async def privacy_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "privacy.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
+@app.get("/terms", tags=["Root"])
+@app.get("/terms.html", tags=["Root"], include_in_schema=False)
+async def terms_page():
+    path = Path(__file__).parent.parent.parent / "frontend" / "terms.html"
+    if path.exists():
+        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return RedirectResponse(url="/")
+
+
 # Include API router
 app.include_router(router)
 
