@@ -1,8 +1,11 @@
 """API endpoints for content feed."""
 
+import hashlib
+import json
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +16,21 @@ from app.schemas.responses import SingleResponse, SuccessResponse
 from app.services.feed_service import FeedService
 
 router = APIRouter()
+
+
+def compute_etag(data: dict) -> str:
+    """Compute ETag from response data."""
+    content = json.dumps(data, sort_keys=True, default=str)
+    return hashlib.md5(content.encode()).hexdigest()
+
+
+def etag_response(request: Request, data: dict) -> JSONResponse | Response:
+    """Return 304 if ETag matches, otherwise JSONResponse with ETag header."""
+    etag = compute_etag(data)
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match.strip('"') == etag:
+        return Response(status_code=304)
+    return JSONResponse(content=data, headers={"ETag": f'"{etag}"'})
 
 
 @router.get("/personalized")
@@ -43,6 +61,7 @@ async def get_personalized_feed(
 
 @router.get("/trending")
 async def get_trending(
+    request: Request,
     limit: int = Query(10, ge=1, le=50),
     department: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
@@ -50,11 +69,13 @@ async def get_trending(
     """Get trending content."""
     
     service = FeedService(db)
-    return await service.get_trending_content(limit=limit, department=department)
+    data = await service.get_trending_content(limit=limit, department=department)
+    return etag_response(request, data)
 
 
 @router.get("/breaking")
 async def get_breaking_news(
+    request: Request,
     limit: int = Query(5, ge=1, le=20),
     department: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
@@ -62,11 +83,13 @@ async def get_breaking_news(
     """Get breaking news alerts."""
     
     service = FeedService(db)
-    return await service.get_breaking_news(limit=limit, department=department)
+    data = await service.get_breaking_news(limit=limit, department=department)
+    return etag_response(request, data)
 
 
 @router.get("/daily-digest")
 async def get_daily_digest(
+    request: Request,
     limit: int = Query(5, ge=1, le=10),
     department: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
@@ -74,7 +97,8 @@ async def get_daily_digest(
     """Get daily digest of top content."""
     
     service = FeedService(db)
-    return await service.get_daily_digest(limit=limit, department=department)
+    data = await service.get_daily_digest(limit=limit, department=department)
+    return etag_response(request, data)
 
 
 @router.get("/search")
@@ -315,6 +339,7 @@ async def submit_feedback(
 
 @router.get("/all-sections")
 async def get_all_sections(
+    request: Request,
     breaking_limit: int = Query(8, ge=1, le=30),
     department_limit: int = Query(15, ge=1, le=50),
     trending_limit: int = Query(10, ge=1, le=30),
@@ -336,7 +361,8 @@ async def get_all_sections(
             {"d": dept_key},
         )).first()
         if row and row[0]:
-            return {"success": True, "data": row[0]}
+            data = {"success": True, "data": row[0]}
+            return etag_response(request, data)
     except Exception:
         pass  # cached_feeds table may not exist (e.g. SQLite local dev)
 
@@ -348,7 +374,7 @@ async def get_all_sections(
     dept_items = dept_feed.get("items", [])
     research = await service.get_research_papers(department=dept_key, featured_limit=3, general_limit=10)
 
-    return {
+    data = {
         "success": True,
         "data": {
             "breaking": breaking,
@@ -357,6 +383,7 @@ async def get_all_sections(
             "research_papers": research,
         },
     }
+    return etag_response(request, data)
 
 
 @router.get("/stats")

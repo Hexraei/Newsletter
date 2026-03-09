@@ -60,6 +60,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+STATIC_EXTENSIONS = frozenset([
+    '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg',
+    '.woff', '.woff2', '.ico',
+])
+USER_SPECIFIC_SEGMENTS = frozenset(["/save", "/read", "/feedback", "/search"])
+
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    """Add Cache-Control headers based on response path."""
+    response = await call_next(request)
+    path = request.url.path
+
+    if path.startswith("/api/v1/feed/") and request.method == "GET":
+        if not any(seg in path for seg in USER_SPECIFIC_SEGMENTS):
+            response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    elif any(path.endswith(ext) for ext in STATIC_EXTENSIONS):
+        response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+    elif path.startswith("/api/v1/ai/") and request.method == "GET":
+        response.headers["Cache-Control"] = "public, max-age=3600"
+
+    return response
+
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])
