@@ -125,6 +125,19 @@ async def root():
     }
 
 
+@app.get("/sw.js", tags=["Root"], include_in_schema=False)
+async def service_worker():
+    """Serve service worker from root scope with no-cache headers."""
+    sw_path = Path(__file__).parent.parent.parent / "frontend" / "sw.js"
+    if sw_path.exists():
+        return FileResponse(
+            str(sw_path),
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    return JSONResponse(status_code=404, content={"detail": "Service worker not found"})
+
+
 @app.get("/department.html", tags=["Root"])
 async def department_page():
     path = Path(__file__).parent.parent.parent / "frontend" / "department.html"

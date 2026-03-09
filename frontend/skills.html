@@ -148,6 +148,9 @@
   </style>
 </head>
 <body>
+<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
+    ⚡ You're offline — showing cached content
+</div>
 
   <nav class="navbar">
     <a class="navbar-brand" href="index.html">NEWS DAY</a>
@@ -479,5 +482,19 @@
       loadSkills();
     })();
   </script>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+window.addEventListener('online', () => {
+    document.getElementById('offline-banner').style.display = 'none';
+});
+window.addEventListener('offline', () => {
+    document.getElementById('offline-banner').style.display = 'block';
+});
+if (!navigator.onLine) {
+    document.getElementById('offline-banner').style.display = 'block';
+}
+</script>
 </body>
 </html>
