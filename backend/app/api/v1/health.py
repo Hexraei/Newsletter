@@ -13,9 +13,19 @@ from app.services.cache_service import get_cache, RedisCache
 router = APIRouter()
 
 
-@router.get("/content")
+@router.get(
+    "/content",
+    summary="Check content freshness",
+    description="Returns content freshness metrics including last scrape time, article counts for 24h and 7d windows, "
+                "and whether the content is considered stale.",
+    responses={200: {"description": "Content health metrics"}},
+)
 async def content_health(db: AsyncSession = Depends(get_db)):
-    """Check content freshness and scraper health."""
+    """Check content freshness and scraper health.
+
+    Reports the most recent scrape timestamp, article counts for the last
+    24 hours and 7 days, and a staleness flag (true if no articles in 24h).
+    """
     now = datetime.now(timezone.utc)
     cutoff_24h = now - timedelta(hours=24)
     cutoff_7d = now - timedelta(days=7)
@@ -54,9 +64,18 @@ async def content_health(db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/cache")
+@router.get(
+    "/cache",
+    summary="Get cache health",
+    description="Returns cache backend type (Redis or in-memory) and hit/miss statistics.",
+    responses={200: {"description": "Cache health and statistics"}},
+)
 async def cache_stats():
-    """Return cache backend type and hit/miss statistics."""
+    """Return cache backend type and hit/miss statistics.
+
+    Reports whether Redis or in-memory cache is active, along with
+    hit rate, miss count, and other performance metrics.
+    """
     cache = get_cache()
     stats = await cache.stats()
     stats["backend_type"] = "redis" if isinstance(cache, RedisCache) else "in-memory"

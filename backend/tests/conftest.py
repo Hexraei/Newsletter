@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Generator
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -15,22 +15,25 @@ from app.config import Settings, get_settings
 from app.main import app
 from app.models import Base, get_db
 
-# Test database URL
+# Test database URL — fall back to SQLite when PostgreSQL is unavailable
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/newsletter_test")
+SQLITE_FALLBACK_URL = "sqlite+aiosqlite:///./test_newsletter.db"
 
-# Create async engine for testing
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    echo=False,
-    future=True
-)
+_db_available = False
+
+
+def _build_engine(url: str):
+    return create_async_engine(url, echo=False, future=True)
+
+
+test_engine = _build_engine(TEST_DATABASE_URL)
 
 # Create test session factory
 TestingSessionLocal = sessionmaker(
     test_engine,
     class_=AsyncSession,
     expire_on_commit=False,
-    autoflush=False
+    autoflush=False,
 )
 
 
@@ -57,18 +60,36 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database() -> AsyncGenerator[None, None]:
-    """Create test database tables."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    
+    """Create test database tables. Falls back to SQLite if PostgreSQL is unavailable."""
+    global test_engine, TestingSessionLocal, _db_available
+
+    try:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        _db_available = True
+    except Exception:
+        # PostgreSQL unavailable — switch to SQLite so DB-dependent tests can run
+        await test_engine.dispose()
+        test_engine = _build_engine(SQLITE_FALLBACK_URL)
+        TestingSessionLocal.configure(bind=test_engine)
+        try:
+            async with test_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            _db_available = True
+        except Exception:
+            yield
+            return
+
     yield
-    
+
     # Clean up
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    
-    await test_engine.dispose()
+    try:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await test_engine.dispose()
+    except Exception:
+        pass
 
 
 @pytest_asyncio.fixture
@@ -81,7 +102,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Create an async HTTP client."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 

@@ -286,6 +286,16 @@ async def terms_page():
     return RedirectResponse(url="/")
 
 
+@app.get("/robots.txt", tags=["Root"])
+async def robots_txt():
+    return FileResponse(str(frontend_path / "robots.txt"), media_type="text/plain")
+
+
+@app.get("/sitemap.xml", tags=["Root"])
+async def sitemap_xml():
+    return FileResponse(str(frontend_path / "sitemap.xml"), media_type="application/xml")
+
+
 # Include API router
 app.include_router(router)
 

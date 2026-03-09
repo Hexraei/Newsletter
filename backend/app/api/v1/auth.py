@@ -64,10 +64,15 @@ def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: s
 
 @router.post(
     "/register",
+    summary="Register new user",
+    description="Creates a new user account with email, password, and optional profile information. "
+                "Rate limited to 3 registrations per hour per IP.",
     response_model=SingleResponse[UserResponse],
     status_code=status.HTTP_201_CREATED,
     responses={
-        400: {"model": ErrorResponse, "description": "Email already registered"}
+        201: {"description": "User registered successfully"},
+        400: {"model": ErrorResponse, "description": "Email already registered"},
+        429: {"description": "Rate limit exceeded"},
     }
 )
 @limiter.limit("3/hour")
@@ -76,7 +81,11 @@ async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Register a new user."""
+    """Register a new user account.
+
+    Creates the account with a hashed password. Returns the new user profile.
+    Rate limited to 3 registrations per hour per IP address.
+    """
     auth_service = AuthService(db)
     
     try:
@@ -91,7 +100,16 @@ async def register(
 
 @router.post(
     "/login",
-    response_model=Token
+    summary="Login",
+    description="Authenticates a user with email and password. Returns JWT tokens and sets httpOnly auth cookies. "
+                "Rate limited to 5 attempts per minute per IP.",
+    response_model=Token,
+    responses={
+        200: {"description": "Login successful, tokens returned"},
+        401: {"description": "Incorrect email or password"},
+        403: {"description": "User account is inactive"},
+        429: {"description": "Rate limit exceeded"},
+    }
 )
 @limiter.limit("5/minute")
 async def login(
@@ -99,7 +117,11 @@ async def login(
     credentials: UserLogin,
     db: AsyncSession = Depends(get_db)
 ):
-    """Login with email and password."""
+    """Login with email and password.
+
+    Returns access and refresh tokens as both JSON body and httpOnly cookies.
+    Rate limited to 5 attempts per minute per IP address.
+    """
     auth_service = AuthService(db)
     
     user = await auth_service.authenticate_user(
@@ -129,7 +151,15 @@ async def login(
 
 @router.post(
     "/refresh",
-    response_model=Token
+    summary="Refresh access token",
+    description="Issues new access and refresh tokens using the current valid session. "
+                "Rate limited to 10 refreshes per minute.",
+    response_model=Token,
+    responses={
+        200: {"description": "New tokens issued"},
+        401: {"description": "Invalid or expired token"},
+        429: {"description": "Rate limit exceeded"},
+    }
 )
 @limiter.limit("10/minute")
 async def refresh_token(
@@ -137,7 +167,11 @@ async def refresh_token(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Refresh access token."""
+    """Refresh access token.
+
+    Issues a new access/refresh token pair. The current token must still be valid.
+    New tokens are returned as both JSON body and httpOnly cookies.
+    """
     auth_service = AuthService(db)
     tokens = auth_service.create_tokens(str(current_user.id))
     token_data = Token(**tokens)
@@ -148,25 +182,44 @@ async def refresh_token(
 
 @router.get(
     "/me",
-    response_model=SingleResponse[UserResponse]
+    summary="Get current user profile",
+    description="Returns the authenticated user's profile information including department, interests, and settings.",
+    response_model=SingleResponse[UserResponse],
+    responses={
+        200: {"description": "User profile data"},
+        401: {"description": "Not authenticated"},
+    }
 )
 async def get_me(
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get current user profile."""
+    """Get the current authenticated user's profile.
+
+    Returns all profile fields including department, interests, and streak data.
+    """
     return SingleResponse(data=current_user)
 
 
 @router.put(
     "/me",
-    response_model=SingleResponse[UserResponse]
+    summary="Update current user profile",
+    description="Updates the authenticated user's profile fields such as name, department, interests, and weekly goal.",
+    response_model=SingleResponse[UserResponse],
+    responses={
+        200: {"description": "Updated user profile"},
+        401: {"description": "Not authenticated"},
+        422: {"description": "Invalid update data"},
+    }
 )
 async def update_me(
     user_data: UserUpdate,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Update current user profile."""
+    """Update the current user's profile.
+
+    Accepts partial updates — only provided fields are changed.
+    """
     auth_service = AuthService(db)
     updated_user = await auth_service.update_user(current_user, user_data)
     return SingleResponse(data=updated_user)
@@ -174,14 +227,24 @@ async def update_me(
 
 @router.post(
     "/change-password",
-    response_model=SuccessResponse
+    summary="Change password",
+    description="Changes the authenticated user's password. Requires the current password for verification.",
+    response_model=SuccessResponse,
+    responses={
+        200: {"description": "Password changed successfully"},
+        400: {"description": "Incorrect current password"},
+        401: {"description": "Not authenticated"},
+    }
 )
 async def change_password(
     password_data: ChangePassword,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Change user password."""
+    """Change the authenticated user's password.
+
+    Requires the current password for verification before setting the new one.
+    """
     auth_service = AuthService(db)
     
     success = await auth_service.change_password(
@@ -201,13 +264,23 @@ async def change_password(
 
 @router.get(
     "/stats",
-    response_model=SingleResponse[UserStats]
+    summary="Get user statistics",
+    description="Returns reading statistics for the authenticated user including streak days, saved items, and favorite categories.",
+    response_model=SingleResponse[UserStats],
+    responses={
+        200: {"description": "User statistics"},
+        401: {"description": "Not authenticated"},
+    }
 )
 async def get_user_stats(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get user statistics."""
+    """Get the authenticated user's reading statistics.
+
+    Includes total reads, streak days, weekly goal progress,
+    skill badge count, saved items count, and top 5 favorite categories.
+    """
     from sqlalchemy import select, func
     from app.models import UserSaves, UserReads, ProcessedContent
     
@@ -248,7 +321,14 @@ async def get_user_stats(
 
 @router.post(
     "/forgot-password",
-    response_model=SuccessResponse
+    summary="Request password reset",
+    description="Sends a password reset link to the provided email address if an account exists. "
+                "Always returns success to prevent email enumeration. Rate limited to 5 per hour.",
+    response_model=SuccessResponse,
+    responses={
+        200: {"description": "Reset email sent (or account does not exist)"},
+        429: {"description": "Rate limit exceeded"},
+    }
 )
 @limiter.limit("5/hour")
 async def forgot_password(
@@ -256,7 +336,11 @@ async def forgot_password(
     body: PasswordReset,
     db: AsyncSession = Depends(get_db)
 ):
-    """Request a password reset link. Always returns success to prevent email enumeration."""
+    """Request a password reset link.
+
+    Always returns success to prevent email enumeration.
+    If the account exists, a reset link is sent via email.
+    """
     auth_service = AuthService(db)
     token = await auth_service.generate_reset_token(body.email)
 
@@ -269,9 +353,14 @@ async def forgot_password(
 
 @router.post(
     "/reset-password",
+    summary="Reset password with token",
+    description="Resets the user's password using a valid reset token obtained from the forgot-password flow. "
+                "Rate limited to 5 attempts per hour.",
     response_model=SuccessResponse,
     responses={
-        400: {"model": ErrorResponse, "description": "Invalid or expired token"}
+        200: {"description": "Password reset successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid or expired token"},
+        429: {"description": "Rate limit exceeded"},
     }
 )
 @limiter.limit("5/hour")
@@ -280,7 +369,10 @@ async def reset_password(
     body: PasswordResetConfirm,
     db: AsyncSession = Depends(get_db)
 ):
-    """Reset password using a valid reset token."""
+    """Reset password using a valid reset token.
+
+    The token is single-use and expires after a configured time period.
+    """
     auth_service = AuthService(db)
     success = await auth_service.reset_password(body.token, body.new_password)
 
@@ -295,12 +387,23 @@ async def reset_password(
 
 @router.post(
     "/logout",
-    response_model=SuccessResponse
+    summary="Logout",
+    description="Logs out the current user by clearing httpOnly auth cookies. "
+                "The client should also discard any stored tokens.",
+    response_model=SuccessResponse,
+    responses={
+        200: {"description": "Logged out successfully"},
+        401: {"description": "Not authenticated"},
+    }
 )
 async def logout(
     current_user: User = Depends(get_current_active_user)
 ):
-    """Logout (clears auth cookies; client should also discard any stored session)."""
+    """Logout the current user.
+
+    Clears httpOnly auth cookies. The client should also discard
+    any locally stored tokens or session data.
+    """
     response = JSONResponse(content={"success": True, "message": "Logged out successfully"})
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/api/v1/auth/refresh")
@@ -309,13 +412,24 @@ async def logout(
 
 @router.delete(
     "/me",
-    response_model=SuccessResponse
+    summary="Delete account",
+    description="Permanently deletes the authenticated user's account and all associated data "
+                "including saves, reading history, and feedback (GDPR right to erasure).",
+    response_model=SuccessResponse,
+    responses={
+        200: {"description": "Account and all data deleted"},
+        401: {"description": "Not authenticated"},
+    }
 )
 async def delete_account(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Delete user account and all associated data (GDPR right to erasure)."""
+    """Delete user account and all associated data.
+
+    Permanently removes the user account along with saves, reading history,
+    and feedback records (GDPR right to erasure). This action is irreversible.
+    """
     from app.models import UserSaves, UserReads, UserFeedback
     await db.execute(delete(UserSaves).where(UserSaves.user_id == str(current_user.id)))
     await db.execute(delete(UserReads).where(UserReads.user_id == str(current_user.id)))

@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin_user, get_db
@@ -17,15 +17,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/run")
+@router.post(
+    "/run",
+    summary="Run full content pipeline",
+    description="Executes the full content pipeline: scrape → process → embed. Admin only. "
+                "Limits control the maximum items processed at each stage.",
+    responses={
+        200: {"description": "Pipeline execution results"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Admin access required"},
+    },
+)
 async def run_pipeline(
-    scrape_limit: int = 10,
-    process_limit: int = 10,
-    embed_limit: int = 10,
+    scrape_limit: int = Query(10, ge=1, description="Maximum number of items to scrape"),
+    process_limit: int = Query(10, ge=1, description="Maximum number of items to process with AI"),
+    embed_limit: int = Query(10, ge=1, description="Maximum number of items to generate embeddings for"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Run the full content pipeline (admin only)."""
+    """Run the full content pipeline (admin only).
+
+    Executes scraping, AI processing, and embedding generation sequentially.
+    Each stage is limited to the specified maximum number of items.
+    """
     logger.info("ADMIN_ACTION: pipeline/run by %s (id=%s)", current_user.email, current_user.id)
     
     service = PipelineService(db)
@@ -38,23 +52,44 @@ async def run_pipeline(
     return result
 
 
-@router.get("/status")
+@router.get(
+    "/status",
+    summary="Get pipeline status",
+    description="Returns the current status of the content pipeline including pending, processing, and completed item counts.",
+    responses={200: {"description": "Pipeline status information"}},
+)
 async def get_pipeline_status(
     db: AsyncSession = Depends(get_db)
 ):
-    """Get pipeline status."""
+    """Get current content pipeline status.
+
+    Reports counts of items at each pipeline stage (pending, processing, published).
+    """
     
     service = PipelineService(db)
     return await service.get_pipeline_status()
 
 
-@router.post("/process")
+@router.post(
+    "/process",
+    summary="Process pending content",
+    description="Processes pending raw content through the AI pipeline (summarization, tagging, scoring). Admin only.",
+    responses={
+        200: {"description": "Processing results"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Admin access required"},
+    },
+)
 async def process_pending(
-    limit: int = 10,
+    limit: int = Query(10, ge=1, description="Maximum number of pending items to process"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Process pending raw content (admin only)."""
+    """Process pending raw content through AI (admin only).
+
+    Runs summarization, category tagging, and attractiveness scoring
+    on up to `limit` pending items.
+    """
     logger.info("ADMIN_ACTION: pipeline/process by %s (id=%s)", current_user.email, current_user.id)
     
     service = ContentProcessor(db)
@@ -66,13 +101,26 @@ async def process_pending(
     }
 
 
-@router.post("/process/{content_id}")
+@router.post(
+    "/process/{content_id}",
+    summary="Process single content item",
+    description="Processes a specific raw content item through the AI pipeline. Admin only.",
+    responses={
+        200: {"description": "Processing result for the item"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Admin access required"},
+        404: {"description": "Content item not found"},
+    },
+)
 async def process_single(
-    content_id: str,
+    content_id: str = Path(description="Unique identifier of the raw content item to process"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Process a single content item (admin only)."""
+    """Process a single content item through the AI pipeline (admin only).
+
+    Useful for reprocessing or debugging individual articles.
+    """
     logger.info("ADMIN_ACTION: pipeline/process/%s by %s (id=%s)", content_id, current_user.email, current_user.id)
     
     service = PipelineService(db)
@@ -84,13 +132,26 @@ async def process_single(
     return result
 
 
-@router.post("/embed")
+@router.post(
+    "/embed",
+    summary="Generate content embeddings",
+    description="Generates vector embeddings for processed content that lacks them. Admin only. "
+                "Used for semantic search and content similarity.",
+    responses={
+        200: {"description": "Embedding generation results"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Admin access required"},
+    },
+)
 async def generate_embeddings(
-    limit: int = 10,
+    limit: int = Query(10, ge=1, description="Maximum number of items to generate embeddings for"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Generate embeddings for content without embeddings (admin only)."""
+    """Generate vector embeddings for content without them (admin only).
+
+    Processes up to `limit` published articles that don't yet have embeddings.
+    """
     logger.info("ADMIN_ACTION: pipeline/embed by %s (id=%s)", current_user.email, current_user.id)
     
     service = VectorService(db)
@@ -102,21 +163,42 @@ async def generate_embeddings(
     }
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    summary="Get processing statistics",
+    description="Returns detailed content processing statistics including counts by status, category breakdown, and processing times.",
+    responses={200: {"description": "Processing statistics"}},
+)
 async def get_processing_stats(
     db: AsyncSession = Depends(get_db)
 ):
-    """Get content processing statistics."""
+    """Get content processing statistics.
+
+    Reports counts by processing status, category breakdown, and timing metrics.
+    """
     
     service = ContentProcessor(db)
     return await service.get_processing_stats()
 
 
-@router.post("/cache/invalidate")
+@router.post(
+    "/cache/invalidate",
+    summary="Invalidate feed caches",
+    description="Clears all cached feed data, forcing fresh computation on next request. Admin only.",
+    responses={
+        200: {"description": "Cache invalidation result with stats"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Admin access required"},
+    },
+)
 async def invalidate_caches(
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Invalidate all feed caches (admin only)."""
+    """Invalidate all feed caches (admin only).
+
+    Removes all cached feed entries and returns the number of keys removed
+    along with updated cache statistics.
+    """
     logger.info("ADMIN_ACTION: pipeline/cache/invalidate by %s (id=%s)", current_user.email, current_user.id)
     removed = await invalidate_feed_caches()
     stats = await get_cache().stats()
