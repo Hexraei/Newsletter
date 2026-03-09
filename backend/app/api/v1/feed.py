@@ -13,9 +13,76 @@ from app.api.deps import get_current_active_user, get_current_user, get_optional
 from app.models import ProcessedContent, RawContent, User, UserFeedback, UserSaves
 from app.schemas.content import FeedbackRequest
 from app.schemas.responses import SingleResponse, SuccessResponse
+from app.services.cache_service import cached, get_cache, invalidate_feed_caches
 from app.services.feed_service import FeedService
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Cached data-fetching helpers (in-memory TTL cache sits in front of DB/service)
+# ---------------------------------------------------------------------------
+
+@cached(ttl=1800, key_prefix="feed:trending")
+async def _fetch_trending(limit: int, department: Optional[str], db: AsyncSession):
+    service = FeedService(db)
+    return await service.get_trending_content(limit=limit, department=department)
+
+
+@cached(ttl=600, key_prefix="feed:breaking")
+async def _fetch_breaking(limit: int, department: Optional[str], db: AsyncSession):
+    service = FeedService(db)
+    return await service.get_breaking_news(limit=limit, department=department)
+
+
+@cached(ttl=21600, key_prefix="feed:daily_digest")
+async def _fetch_daily_digest(limit: int, department: Optional[str], db: AsyncSession):
+    service = FeedService(db)
+    return await service.get_daily_digest(limit=limit, department=department)
+
+
+@cached(ttl=3600, key_prefix="feed:all_sections")
+async def _fetch_all_sections(
+    breaking_limit: int,
+    department_limit: int,
+    trending_limit: int,
+    department: Optional[str],
+    db: AsyncSession,
+):
+    dept_key = (department or "CSE").upper()
+
+    from sqlalchemy import text as sa_text
+    try:
+        row = (await db.execute(
+            sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
+            {"d": dept_key},
+        )).first()
+        if row and row[0]:
+            return {"success": True, "data": row[0]}
+    except Exception:
+        pass  # cached_feeds table may not exist (e.g. SQLite local dev)
+
+    service = FeedService(db)
+    breaking = await service.get_breaking_news(limit=breaking_limit, department=dept_key)
+    trending = await service.get_trending_content(limit=trending_limit, department=dept_key)
+    dept_feed = await service.get_personalized_feed(department=dept_key, limit=department_limit)
+    dept_items = dept_feed.get("items", [])
+    research = await service.get_research_papers(department=dept_key, featured_limit=3, general_limit=10)
+
+    return {
+        "success": True,
+        "data": {
+            "breaking": breaking,
+            "department": dept_items,
+            "trending": trending,
+            "research_papers": research,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# ETag helpers
+# ---------------------------------------------------------------------------
 
 
 def compute_etag(data: dict) -> str:
@@ -34,6 +101,7 @@ def etag_response(request: Request, data: dict) -> JSONResponse | Response:
 
 
 @router.get("/personalized")
+@cached(ttl=1800, key_prefix="feed:personalized")
 async def get_personalized_feed(
     interests: Optional[List[str]] = Query(None),
     department: Optional[str] = None,
@@ -68,8 +136,7 @@ async def get_trending(
 ):
     """Get trending content."""
     
-    service = FeedService(db)
-    data = await service.get_trending_content(limit=limit, department=department)
+    data = await _fetch_trending(limit=limit, department=department, db=db)
     return etag_response(request, data)
 
 
@@ -82,8 +149,7 @@ async def get_breaking_news(
 ):
     """Get breaking news alerts."""
     
-    service = FeedService(db)
-    data = await service.get_breaking_news(limit=limit, department=department)
+    data = await _fetch_breaking(limit=limit, department=department, db=db)
     return etag_response(request, data)
 
 
@@ -96,8 +162,7 @@ async def get_daily_digest(
 ):
     """Get daily digest of top content."""
     
-    service = FeedService(db)
-    data = await service.get_daily_digest(limit=limit, department=department)
+    data = await _fetch_daily_digest(limit=limit, department=department, db=db)
     return etag_response(request, data)
 
 
@@ -214,6 +279,7 @@ async def get_saved_content(
 
 
 @router.get("/category/{category}")
+@cached(ttl=1800, key_prefix="feed:category")
 async def get_by_category(
     category: str,
     limit: int = Query(10, ge=1, le=50),
@@ -348,42 +414,23 @@ async def get_all_sections(
 ):
     """Unified section response for the homepage with optional department filtering.
 
-    Serves pre-cached data for instant page loads. Falls back to live
-    computation on cache miss.
+    In-memory TTL cache → DB-level cached_feeds → live computation.
     """
-    dept_key = (department or "CSE").upper()
-
-    # Try cached data first (instant response)
-    from sqlalchemy import text as sa_text
-    try:
-        row = (await db.execute(
-            sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
-            {"d": dept_key},
-        )).first()
-        if row and row[0]:
-            data = {"success": True, "data": row[0]}
-            return etag_response(request, data)
-    except Exception:
-        pass  # cached_feeds table may not exist (e.g. SQLite local dev)
-
-    # Cache miss — compute live
-    service = FeedService(db)
-    breaking = await service.get_breaking_news(limit=breaking_limit, department=dept_key)
-    trending = await service.get_trending_content(limit=trending_limit, department=dept_key)
-    dept_feed = await service.get_personalized_feed(department=dept_key, limit=department_limit)
-    dept_items = dept_feed.get("items", [])
-    research = await service.get_research_papers(department=dept_key, featured_limit=3, general_limit=10)
-
-    data = {
-        "success": True,
-        "data": {
-            "breaking": breaking,
-            "department": dept_items,
-            "trending": trending,
-            "research_papers": research,
-        },
-    }
+    data = await _fetch_all_sections(
+        breaking_limit=breaking_limit,
+        department_limit=department_limit,
+        trending_limit=trending_limit,
+        department=department,
+        db=db,
+    )
     return etag_response(request, data)
+
+
+@router.get("/cache-stats")
+async def get_cache_stats():
+    """Return in-memory cache statistics (hits, misses, keys, memory estimate)."""
+    cache = get_cache()
+    return await cache.stats()
 
 
 @router.get("/stats")
