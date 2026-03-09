@@ -799,6 +799,7 @@
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
+    #fc-last-updated { font-size: 11px; color: #888; text-align: right; padding: 4px 24px 0; display: none; letter-spacing: 0.3px; }
   </style>
 </head>
 <body>
@@ -883,6 +884,8 @@
       <div class="hero-progress-bar" id="hero-progress-bar"></div>
     </div>
   </section>
+
+  <div id="fc-last-updated" style="display:none"></div>
 
   <!-- DEPARTMENT NEWS -->
   <section class="content-section" id="department">
@@ -1019,6 +1022,69 @@
        CONFIG
     ======================================================== */
     const API = window.location.origin;
+
+    /* ================================================================
+       FEED CACHE — TTL-based localStorage with stale-while-revalidate
+    ================================================================ */
+    const FeedCache = {
+      get(key) {
+        try {
+          const item = localStorage.getItem('fc_' + key);
+          if (!item) return null;
+          const { data, cachedAt, ttl } = JSON.parse(item);
+          if (Date.now() - cachedAt > ttl) {
+            localStorage.removeItem('fc_' + key);
+            return null;
+          }
+          return data;
+        } catch { return null; }
+      },
+      set(key, data, ttlMs) {
+        try {
+          const item = JSON.stringify({ data, cachedAt: Date.now(), ttl: ttlMs });
+          localStorage.setItem('fc_' + key, item);
+        } catch (e) {
+          this.prune();
+          try { localStorage.setItem('fc_' + key, JSON.stringify({ data, cachedAt: Date.now(), ttl: ttlMs })); } catch {}
+        }
+      },
+      meta(key) {
+        try {
+          const item = localStorage.getItem('fc_' + key);
+          if (!item) return null;
+          const { cachedAt, ttl } = JSON.parse(item);
+          return { cachedAt, ttl };
+        } catch { return null; }
+      },
+      prune() {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('fc_'));
+        const now = Date.now();
+        for (const key of keys) {
+          try {
+            const { cachedAt, ttl } = JSON.parse(localStorage.getItem(key));
+            if (now - cachedAt > ttl) localStorage.removeItem(key);
+          } catch { localStorage.removeItem(key); }
+        }
+      },
+      clear() {
+        Object.keys(localStorage).filter(k => k.startsWith('fc_')).forEach(k => localStorage.removeItem(k));
+      }
+    };
+
+    let _feedCacheLastFetchTime = null;
+    function updateLastUpdatedIndicator() {
+      const el = document.getElementById('fc-last-updated');
+      if (!el || !_feedCacheLastFetchTime) { if (el) el.style.display = 'none'; return; }
+      const diff = Date.now() - _feedCacheLastFetchTime;
+      const sec = Math.floor(diff / 1000);
+      let text;
+      if (sec < 10) text = 'Updated just now';
+      else if (sec < 60) text = 'Updated ' + sec + 's ago';
+      else { const min = Math.floor(sec / 60); text = 'Updated ' + min + ' min ago'; }
+      el.textContent = text;
+      el.style.display = '';
+    }
+    setInterval(updateLastUpdatedIndicator, 30000);
 
     /* ========================================================
        UNSPLASH IMAGE LOADER
@@ -2151,28 +2217,6 @@
     /* ========================================================
        DATA LOADING
     ======================================================== */
-    const CACHE_KEY = 'newsday_feed_cache';
-    const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
-    function saveFeedCache(data) {
-      try {
-        const dept = getSelectedDept();
-        const store = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-        store[dept] = { ts: Date.now(), data: data };
-        localStorage.setItem(CACHE_KEY, JSON.stringify(store));
-      } catch {}
-    }
-
-    function loadFeedCache() {
-      try {
-        const dept = getSelectedDept();
-        const store = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-        const entry = store[dept];
-        if (entry && (Date.now() - entry.ts) < CACHE_TTL) return entry.data;
-      } catch {}
-      return null;
-    }
-
     async function loadAllData() {
       let backendOk = false;
       try {
@@ -2195,7 +2239,10 @@
       }
 
       const enriched = await enrichWithAI(data, backendOk);
-      saveFeedCache(enriched);
+      const cacheKey = 'all-sections:' + getSelectedDept();
+      FeedCache.set(cacheKey, enriched, 300000);
+      _feedCacheLastFetchTime = Date.now();
+      updateLastUpdatedIndicator();
       return enriched;
     }
 
@@ -2512,14 +2559,18 @@
       initDeptSelector();
       loadPersistedStoryCache();
 
-      // Instant render from localStorage cache
-      const cached = loadFeedCache();
+      // Stale-while-revalidate: render cached data instantly
+      const cacheKey = 'all-sections:' + getSelectedDept();
+      const cached = FeedCache.get(cacheKey);
       if (cached) {
         renderPage(cached);
+        const meta = FeedCache.meta(cacheKey);
+        if (meta) _feedCacheLastFetchTime = meta.cachedAt;
+        updateLastUpdatedIndicator();
         await warmStoryInsights(cached);
       }
 
-      // Fetch fresh data (fast — served from DB cache)
+      // Fetch fresh data in background (fast — served from DB cache)
       const data = await loadAllData();
       await warmStoryInsights(data);
       renderPage(data);

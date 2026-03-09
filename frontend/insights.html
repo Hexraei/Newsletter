@@ -666,6 +666,7 @@
       .trending-topics-pills { gap: 6px; }
       .topic-pill { padding: 5px 10px; font-size: 11px; }
     }
+    #fc-last-updated { font-size: 11px; color: #888; text-align: right; padding: 4px 24px 0; display: none; letter-spacing: 0.3px; }
   </style>
 </head>
 <body>
@@ -729,6 +730,8 @@
       Back to Home
     </a>
   </div>
+
+  <div id="fc-last-updated" style="display:none"></div>
 
   <!-- TRENDING TOPICS -->
   <div class="trending-topics" id="trending-topics" style="display:none;">
@@ -902,6 +905,69 @@
        CONFIG
     ================================================================ */
     const API = window.location.origin;
+
+    /* ================================================================
+       FEED CACHE — TTL-based localStorage with stale-while-revalidate
+    ================================================================ */
+    const FeedCache = {
+      get(key) {
+        try {
+          const item = localStorage.getItem('fc_' + key);
+          if (!item) return null;
+          const { data, cachedAt, ttl } = JSON.parse(item);
+          if (Date.now() - cachedAt > ttl) {
+            localStorage.removeItem('fc_' + key);
+            return null;
+          }
+          return data;
+        } catch { return null; }
+      },
+      set(key, data, ttlMs) {
+        try {
+          const item = JSON.stringify({ data, cachedAt: Date.now(), ttl: ttlMs });
+          localStorage.setItem('fc_' + key, item);
+        } catch (e) {
+          this.prune();
+          try { localStorage.setItem('fc_' + key, JSON.stringify({ data, cachedAt: Date.now(), ttl: ttlMs })); } catch {}
+        }
+      },
+      meta(key) {
+        try {
+          const item = localStorage.getItem('fc_' + key);
+          if (!item) return null;
+          const { cachedAt, ttl } = JSON.parse(item);
+          return { cachedAt, ttl };
+        } catch { return null; }
+      },
+      prune() {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('fc_'));
+        const now = Date.now();
+        for (const key of keys) {
+          try {
+            const { cachedAt, ttl } = JSON.parse(localStorage.getItem(key));
+            if (now - cachedAt > ttl) localStorage.removeItem(key);
+          } catch { localStorage.removeItem(key); }
+        }
+      },
+      clear() {
+        Object.keys(localStorage).filter(k => k.startsWith('fc_')).forEach(k => localStorage.removeItem(k));
+      }
+    };
+
+    let _feedCacheLastFetchTime = null;
+    function updateLastUpdatedIndicator() {
+      const el = document.getElementById('fc-last-updated');
+      if (!el || !_feedCacheLastFetchTime) { if (el) el.style.display = 'none'; return; }
+      const diff = Date.now() - _feedCacheLastFetchTime;
+      const sec = Math.floor(diff / 1000);
+      let text;
+      if (sec < 10) text = 'Updated just now';
+      else if (sec < 60) text = 'Updated ' + sec + 's ago';
+      else { const min = Math.floor(sec / 60); text = 'Updated ' + min + ' min ago'; }
+      el.textContent = text;
+      el.style.display = '';
+    }
+    setInterval(updateLastUpdatedIndicator, 30000);
 
     const PAGE_SECTION = 'insights';
 
@@ -1546,7 +1612,32 @@
     ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
       loadPersistedStoryCache();
+
+      // Stale-while-revalidate: render cached data instantly
+      const cacheKey = 'insights:' + getSelectedDept();
+      const cached = FeedCache.get(cacheKey);
+      if (cached) {
+        allFeedItems = cached.allFeedItems || [];
+        relatedItems = cached.relatedItems || [];
+        breakingItems = cached.breakingItems || [];
+        filteredItems = allFeedItems;
+        renderFeed(filteredItems);
+        renderSidebarItems($sidebarRecommended, relatedItems, 5);
+        renderSidebarItems($sidebarTrending, breakingItems, 5);
+        renderTrendingTopics(allFeedItems);
+        renderDeptPulse(allFeedItems);
+        const meta = FeedCache.meta(cacheKey);
+        if (meta) _feedCacheLastFetchTime = meta.cachedAt;
+        updateLastUpdatedIndicator();
+      }
+
+      // Fetch fresh data
       await loadData();
+
+      // Cache fresh data (10 min TTL)
+      FeedCache.set(cacheKey, { allFeedItems, relatedItems, breakingItems }, 600000);
+      _feedCacheLastFetchTime = Date.now();
+      updateLastUpdatedIndicator();
 
       filteredItems = allFeedItems;
       renderFeed(filteredItems);
