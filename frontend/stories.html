@@ -4,9 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Deep Reads — NEWS DAY</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="In-depth articles and editor's picks for thoughtful reading.">
+  <meta name="keywords" content="college news, engineering, technology, SRM, department news">
+  <meta name="author" content="NEWS DAY">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Deep Reads — NEWS DAY">
+  <meta property="og:description" content="In-depth articles and editor's picks for thoughtful reading.">
+  <meta property="og:site_name" content="NEWS DAY">
+  <meta property="og:locale" content="en_IN">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Deep Reads — NEWS DAY">
+  <meta name="twitter:description" content="In-depth articles and editor's picks for thoughtful reading.">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="/stories">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" as="style">
   <style>
     /* ===== RESET & BASE ===== */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1372,11 +1395,12 @@
 
       const hasImg = !!(item.featured_image_url || item.image);
       const imgUrl = item.featured_image_url || item.image || '';
-      const imgStyle = hasImg ? `style="background-image:url('${escapeHtml(imgUrl)}');background-size:cover;background-position:center;"` : '';
       const imgClass = hasImg ? ' has-image' : '';
-      const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
+      const imgInner = hasImg
+        ? `<img src="${escapeHtml(imgUrl)}" alt="" loading="lazy" decoding="async" style="aspect-ratio:3/2;object-fit:cover;">`
+        : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
-        <div class="feed-item-thumb${imgClass}" ${imgStyle}>${placeholder}</div>
+        <div class="feed-item-thumb${imgClass}">${imgInner}</div>
         <div class="feed-item-body">
           <div class="feed-item-category">${escapeHtml(category)}</div>
           <div class="feed-item-title">${escapeHtml(item.title)}</div>
@@ -1439,7 +1463,7 @@
         const imgUrl = item.featured_image_url || item.image || '';
         const imgClass = hasImg ? ' has-image' : '';
         const imgInner = hasImg
-          ? `<img src="${escapeHtml(imgUrl)}" alt="" loading="lazy" decoding="async">`
+          ? `<img src="${escapeHtml(imgUrl)}" alt="" loading="lazy" decoding="async" style="aspect-ratio:16/9;object-fit:cover;">`
           : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
         return `<a class="pick-card" href="#" data-story-id="${storyId}">
           <div class="pick-card-img${imgClass}">${imgInner}</div>
