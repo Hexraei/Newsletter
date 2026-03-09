@@ -8,6 +8,7 @@ from app.models import User
 from app.services.pipeline_service import PipelineService
 from app.services.content_processor import ContentProcessor
 from app.services.vector_service import VectorService
+from app.services.cache_service import invalidate_feed_caches, get_cache
 
 router = APIRouter()
 
@@ -101,3 +102,17 @@ async def get_processing_stats(
     
     service = ContentProcessor(db)
     return await service.get_processing_stats()
+
+
+@router.post("/cache/invalidate")
+async def invalidate_caches(
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Invalidate all feed caches (admin only)."""
+    removed = await invalidate_feed_caches()
+    stats = await get_cache().stats()
+    return {
+        "status": "ok",
+        "keys_removed": removed,
+        "cache_stats": stats
+    }

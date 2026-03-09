@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai_provider import AIProvider
 from app.models import ProcessedContent, RawContent, Source
+from app.services.cache_service import invalidate_feed_caches
 from app.services.dept_relevance import assign_departments, detect_category, score_article_departments
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,14 @@ class ContentProcessor:
                 raw.status = "failed"
                 raw.processing_error = str(e)[:500]
                 await self.db.commit()
+        
+        # Invalidate feed caches when new content is processed
+        if processed_count > 0:
+            try:
+                await invalidate_feed_caches()
+                logger.info("Feed caches invalidated after processing %d items", processed_count)
+            except Exception:
+                logger.warning("Failed to invalidate feed caches", exc_info=True)
         
         return {
             "processed": processed_count,

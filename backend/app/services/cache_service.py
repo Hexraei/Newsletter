@@ -1,12 +1,16 @@
-"""In-memory TTL cache service with async support."""
+"""In-memory TTL cache service with async support and optional Redis backend."""
 
 import asyncio
 import fnmatch
 import functools
 import inspect
+import json
+import logging
 import sys
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 
 class TTLCache:
@@ -72,6 +76,7 @@ class TTLCache:
             self._purge_expired()
             total = self._hits + self._misses
             return {
+                "backend": "in-memory",
                 "hits": self._hits,
                 "misses": self._misses,
                 "hit_rate": round(self._hits / total, 4) if total else 0.0,
@@ -97,17 +102,133 @@ class TTLCache:
             del self._store[k]
 
 
+class RedisCache:
+    """Redis-backed cache with the same API as ``TTLCache``.
+
+    All keys are prefixed with ``nc:`` (newsletter cache) to avoid
+    collisions with other Redis users (e.g. Celery).  Values are
+    JSON-serialised so only JSON-compatible types can be stored.
+    """
+
+    def __init__(self, redis_url: str) -> None:
+        import redis.asyncio as aioredis
+
+        self._redis = aioredis.from_url(redis_url, decode_responses=True)
+        self._hits: int = 0
+        self._misses: int = 0
+
+    _PREFIX = "nc:"
+
+    async def get(self, key: str) -> Any:
+        """Return cached value or ``None`` on miss."""
+        try:
+            value = await self._redis.get(f"{self._PREFIX}{key}")
+        except Exception:
+            logger.warning("Redis GET failed for key %s", key, exc_info=True)
+            self._misses += 1
+            return None
+        if value is None:
+            self._misses += 1
+            return None
+        self._hits += 1
+        return json.loads(value)
+
+    async def set(self, key: str, value: Any, ttl_seconds: int) -> None:
+        """Store *value* under *key* with the given TTL (seconds)."""
+        try:
+            await self._redis.setex(
+                f"{self._PREFIX}{key}",
+                ttl_seconds,
+                json.dumps(value, default=str),
+            )
+        except Exception:
+            logger.warning("Redis SETEX failed for key %s", key, exc_info=True)
+
+    async def delete(self, key: str) -> bool:
+        """Delete a single key.  Returns ``True`` if it existed."""
+        try:
+            return await self._redis.delete(f"{self._PREFIX}{key}") > 0
+        except Exception:
+            logger.warning("Redis DELETE failed for key %s", key, exc_info=True)
+            return False
+
+    async def invalidate(self, pattern: str) -> int:
+        """Remove all keys matching a glob *pattern*.  Returns count removed.
+
+        Uses ``SCAN`` instead of ``KEYS`` so this is production-safe.
+        """
+        try:
+            cursor: int = 0
+            count: int = 0
+            while True:
+                cursor, keys = await self._redis.scan(
+                    cursor, match=f"{self._PREFIX}{pattern}", count=100,
+                )
+                if keys:
+                    await self._redis.delete(*keys)
+                    count += len(keys)
+                if cursor == 0:
+                    break
+            return count
+        except Exception:
+            logger.warning("Redis SCAN/DELETE failed for pattern %s", pattern, exc_info=True)
+            return 0
+
+    async def clear(self) -> None:
+        """Drop every ``nc:*`` entry and reset hit/miss counters."""
+        await self.invalidate("*")
+        self._hits = 0
+        self._misses = 0
+
+    async def stats(self) -> Dict[str, Any]:
+        """Return hit/miss counts and Redis keyspace info."""
+        total = self._hits + self._misses
+        result: Dict[str, Any] = {
+            "backend": "redis",
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate": round(self._hits / total, 4) if total else 0.0,
+        }
+        try:
+            info = await self._redis.info("keyspace")
+            result["redis_info"] = info
+        except Exception:
+            logger.warning("Redis INFO failed", exc_info=True)
+            result["redis_info"] = None
+        return result
+
+
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
-_cache_instance: Optional[TTLCache] = None
+_cache_instance: Optional[Union[TTLCache, RedisCache]] = None
 
 
-def get_cache() -> TTLCache:
-    """Return the global singleton ``TTLCache`` instance."""
+def get_cache() -> Union[TTLCache, RedisCache]:
+    """Return the global cache singleton.
+
+    Tries to connect to Redis (configured via ``settings.REDIS_URL``).
+    Falls back to the in-memory ``TTLCache`` when Redis is unavailable.
+    """
     global _cache_instance
     if _cache_instance is None:
-        _cache_instance = TTLCache()
+        try:
+            from app.config import settings  # noqa: WPS433
+
+            if settings.REDIS_URL:
+                # Synchronous ping to verify the connection at startup
+                import redis as sync_redis
+
+                r = sync_redis.from_url(settings.REDIS_URL)
+                r.ping()
+                r.close()
+                _cache_instance = RedisCache(settings.REDIS_URL)
+                logger.info("Cache backend: Redis (%s)", settings.REDIS_URL)
+        except Exception:
+            logger.info("Redis unavailable – falling back to in-memory cache", exc_info=True)
+        if _cache_instance is None:
+            _cache_instance = TTLCache()
+            logger.info("Cache backend: in-memory TTLCache")
     return _cache_instance
 
 

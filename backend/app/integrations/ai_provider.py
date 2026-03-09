@@ -1,5 +1,6 @@
 """Unified AI provider - automatically selects best available service."""
 
+import hashlib
 from typing import List
 
 from app.config import settings
@@ -53,12 +54,46 @@ class AIProvider:
                 break
     
     async def summarize(self, title: str, content: str, category: str = "tech") -> dict:
-        """Summarize content."""
-        return await self.service.summarize_content(title, content, category)
+        """Summarize content, returning cached result when available.
+
+        Cache key is derived from a hash of (title + content + category).
+        AI summaries are immutable for the same input so TTL is 24 hours.
+        """
+        from app.services.cache_service import get_cache  # lazy to avoid circular import
+        cache = get_cache()
+        content_hash = hashlib.md5(
+            f"{title}|{content[:3000]}|{category}".encode()
+        ).hexdigest()
+        cache_key = f"ai:summarize:{content_hash}"
+
+        cached = await cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        result = await self.service.summarize_content(title, content, category)
+
+        if result:
+            await cache.set(cache_key, result, 86400)  # 24h TTL
+        return result
     
     async def headline(self, title: str, content: str) -> str:
-        """Generate headline."""
-        return await self.service.generate_headline(title, content)
+        """Generate headline, returning cached result when available."""
+        from app.services.cache_service import get_cache  # lazy to avoid circular import
+        cache = get_cache()
+        content_hash = hashlib.md5(
+            f"{title}|{content[:2000]}".encode()
+        ).hexdigest()
+        cache_key = f"ai:headline:{content_hash}"
+
+        cached = await cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        result = await self.service.generate_headline(title, content)
+
+        if result:
+            await cache.set(cache_key, result, 86400)  # 24h TTL
+        return result
     
     async def breaking_headline(self, title: str, content: str, source: str = "") -> str:
         """Generate breaking news headline with urgency.

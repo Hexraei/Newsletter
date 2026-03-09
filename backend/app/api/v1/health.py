@@ -1,4 +1,4 @@
-"""Health check endpoints for content freshness monitoring."""
+"""Health check endpoints for content freshness and cache monitoring."""
 
 from datetime import datetime, timezone, timedelta
 
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.models.content import RawContent
+from app.services.cache_service import get_cache, RedisCache
 
 router = APIRouter()
 
@@ -51,3 +52,12 @@ async def content_health(db: AsyncSession = Depends(get_db)):
             "checked_at": now.isoformat(),
         },
     }
+
+
+@router.get("/cache")
+async def cache_stats():
+    """Return cache backend type and hit/miss statistics."""
+    cache = get_cache()
+    stats = await cache.stats()
+    stats["backend_type"] = "redis" if isinstance(cache, RedisCache) else "in-memory"
+    return {"success": True, "data": stats}
