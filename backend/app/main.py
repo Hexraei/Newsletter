@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import uuid
 from pathlib import Path
 # Add scraper_platform to Python path
 scraper_path = str(Path(__file__).parent.parent.parent / "scraper_platform")
@@ -12,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -21,6 +23,39 @@ from slowapi.util import get_remote_address
 from app.api import router
 from app.config import settings
 from app.models import init_db
+
+
+def configure_logging():
+    """Configure structured logging based on environment."""
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+
+    if settings.LOG_FORMAT == "json":
+        from pythonjsonlogger import jsonlogger
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = jsonlogger.JsonFormatter(
+            fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
+            rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
+        )
+        handler.setFormatter(formatter)
+    else:
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(log_level)
+
+    # Quiet noisy libraries
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+
+configure_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +95,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-STATIC_EXTENSIONS = frozenset([
+# Compress responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+STATIC_EXTENSIONS= frozenset([
     '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg',
     '.woff', '.woff2', '.ico',
 ])
 USER_SPECIFIC_SEGMENTS = frozenset(["/save", "/read", "/feedback", "/search"])
+
+
+@app.middleware("http")
+async def add_correlation_id(request: Request, call_next):
+    """Add a unique correlation ID to each request for tracing."""
+    correlation_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
+    request.state.correlation_id = correlation_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = correlation_id
+    return response
 
 
 @app.middleware("http")
@@ -81,6 +129,32 @@ async def add_cache_headers(request: Request, call_next):
     elif path.startswith("/api/v1/ai/") and request.method == "GET":
         response.headers["Cache-Control"] = "public, max-age=3600"
 
+    return response
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Add security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+
+    # CSP for HTML responses - allows inline styles/scripts, Google Fonts, Unsplash images
+    if "text/html" in response.headers.get("content-type", ""):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https://images.unsplash.com https://source.unsplash.com https://*.openverse.org https://*.wikimedia.org https://*.wp.com blob:; "
+            "connect-src 'self' https://text.pollinations.ai https://api.unsplash.com; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
     return response
 
 

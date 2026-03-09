@@ -1027,6 +1027,10 @@
         .finally(() => clearTimeout(timer));
     }
 
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     function shortText(value, max = 110) {
       const text = String(value || '').replace(/\s+/g, ' ').trim();
       if (!text) return '';
@@ -1365,9 +1369,9 @@
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
         <div class="feed-item-thumb"></div>
         <div class="feed-item-body">
-          <div class="feed-item-category">${category}</div>
-          <div class="feed-item-title">${item.title || ''}</div>
-          <div class="feed-item-meta">${source}${ago ? ' <span>-</span> ' + ago : ''}</div>
+          <div class="feed-item-category">${escapeHtml(category)}</div>
+          <div class="feed-item-title">${escapeHtml(item.title || '')}</div>
+          <div class="feed-item-meta">${escapeHtml(source)}${ago ? ' <span>-</span> ' + escapeHtml(ago) : ''}</div>
         </div>
       </a>`;
     }
@@ -1388,7 +1392,7 @@
       $feed.innerHTML = sorted.map(([cat, catItems]) =>
         `<div class="category-group">
           <div class="category-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
-            <span><span class="category-group-title">${cat}</span><span class="category-group-count">(${catItems.length})</span></span>
+            <span><span class="category-group-title">${escapeHtml(cat)}</span><span class="category-group-count">(${catItems.length})</span></span>
             <span class="collapse-icon">▾</span>
           </div>
           <div class="category-group-body">
@@ -1413,7 +1417,7 @@
       $trendingTopicsPills.innerHTML =
         '<button class="topic-pill active" data-cat="all">All</button>' +
         top.map(([cat, count]) =>
-          `<button class="topic-pill" data-cat="${cat}">${cat} <span class="topic-count">(${count})</span></button>`
+          `<button class="topic-pill" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)} <span class="topic-count">(${count})</span></button>`
         ).join('');
     }
 
@@ -1429,7 +1433,7 @@
       $deptPulse.innerHTML = sorted.map(([cat, count]) => {
         const pct = Math.round((count / maxCount) * 100);
         return `<div class="dept-bar">
-          <span class="dept-name">${cat}</span>
+          <span class="dept-name">${escapeHtml(cat)}</span>
           <div class="bar-track"><div class="bar" style="width:${pct}%"></div></div>
           <span class="count">${count}</span>
         </div>`;
@@ -1451,9 +1455,9 @@
         return `<a class="sidebar-item" href="#" data-story-id="${storyId}">
           <div class="sidebar-item-num">${String(i + 1).padStart(2, '0')}</div>
           <div class="sidebar-item-body">
-            <div class="sidebar-item-cat">${cat}</div>
-            <div class="sidebar-item-title">${item.title || ''}</div>
-            <div class="sidebar-item-meta">${item.source || 'CS Desk'}${ago ? ' - ' + ago : ''}</div>
+            <div class="sidebar-item-cat">${escapeHtml(cat)}</div>
+            <div class="sidebar-item-title">${escapeHtml(item.title || '')}</div>
+            <div class="sidebar-item-meta">${escapeHtml(item.source || 'CS Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
           </div>
         </a>`;
       }).join('');

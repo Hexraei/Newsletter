@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>College Newsletter - Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <style>
         * {
             margin: 0;
@@ -652,6 +654,10 @@
         let currentCategory = 'all';
         let articles = [];
 
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadFeed('personalized');
@@ -690,8 +696,8 @@
                     <div class="empty-state">
                         <div class="empty-icon">😕</div>
                         <h3>Could not load feed</h3>
-                        <p>${e.message}</p>
-                        <button class="filter-tab" onclick="loadFeed('${type}')" style="margin-top: 16px;">
+                        <p>${escapeHtml(e.message)}</p>
+                        <button class="filter-tab" onclick="loadFeed('${escapeHtml(type)}')" style="margin-top: 16px;">
                             Try Again
                         </button>
                     </div>
@@ -722,23 +728,23 @@
                 
                 return `
                     <article class="news-card ${isBreaking ? 'breaking' : ''} ${isTrending ? 'trending' : ''}" 
-                             onclick="openArticle('${item.id}')">
+                             onclick="openArticle('${escapeHtml(item.id)}')">
                         <div class="card-header">
                             <div class="card-meta">
-                                <span class="category-tag ${item.category || 'general'}">${item.category || 'General'}</span>
+                                <span class="category-tag ${escapeHtml(item.category || 'general')}">${escapeHtml(item.category || 'General')}</span>
                                 <span>${formatDate(item.published_at)}</span>
                                 <span>${item.reading_time_minutes || 2} min read</span>
                             </div>
                             ${isBreaking ? '<span class="breaking-badge">BREAKING</span>' : ''}
                         </div>
                         
-                        <h2 class="card-title">${item.title}</h2>
-                        <p class="card-summary">${item.summary || 'No summary available'}</p>
+                        <h2 class="card-title">${escapeHtml(item.title)}</h2>
+                        <p class="card-summary">${escapeHtml(item.summary || 'No summary available')}</p>
                         
                         <div class="card-footer">
                             <div class="card-tags">
                                 ${(item.topic_tags || []).slice(0, 3).map(tag => 
-                                    `<span class="tag">${tag}</span>`
+                                    `<span class="tag">${escapeHtml(tag)}</span>`
                                 ).join('')}
                             </div>
                             <div class="card-stats">
@@ -769,9 +775,9 @@
                 }
                 
                 container.innerHTML = items.map((item, i) => `
-                    <div class="trending-item" onclick="openArticle('${item.id}')">
+                    <div class="trending-item" onclick="openArticle('${escapeHtml(item.id)}')">
                         <span class="trending-rank">${i + 1}</span>
-                        <span class="trending-title">${item.title}</span>
+                        <span class="trending-title">${escapeHtml(item.title)}</span>
                     </div>
                 `).join('');
             } catch (e) {
@@ -815,8 +821,8 @@
                 const items = data.items || data;
                 if (items && items.length > 0) {
                     document.getElementById('breaking-list').innerHTML = items.map(item => `
-                        <div class="trending-item" onclick="openArticle('${item.id}')">
-                            <span class="trending-title" style="color: var(--danger);">${item.title}</span>
+                        <div class="trending-item" onclick="openArticle('${escapeHtml(item.id)}')">
+                            <span class="trending-title" style="color: var(--danger);">${escapeHtml(item.title)}</span>
                         </div>
                     `).join('');
                 }
@@ -834,23 +840,23 @@
             
             document.getElementById('modal-content').innerHTML = `
                 <div class="card-meta" style="margin-bottom: 16px;">
-                    <span class="category-tag ${article.category || 'general'}">${article.category || 'General'}</span>
+                    <span class="category-tag ${escapeHtml(article.category || 'general')}">${escapeHtml(article.category || 'General')}</span>
                     <span>${formatDate(article.published_at)}</span>
                 </div>
                 
-                <h1 class="modal-title">${article.title}</h1>
+                <h1 class="modal-title">${escapeHtml(article.title)}</h1>
                 
                 ${blocks.hook ? `
                     <div class="content-block">
                         <h3>🎯 Hook</h3>
-                        <p>${blocks.hook}</p>
+                        <p>${escapeHtml(blocks.hook)}</p>
                     </div>
                 ` : ''}
                 
                 ${blocks.why_it_matters ? `
                     <div class="content-block">
                         <h3>💡 Why It Matters</h3>
-                        <p>${blocks.why_it_matters}</p>
+                        <p>${escapeHtml(blocks.why_it_matters)}</p>
                     </div>
                 ` : ''}
                 
@@ -858,7 +864,7 @@
                     <div class="content-block">
                         <h3>📝 Key Points</h3>
                         <ul>
-                            ${blocks.key_points.map(p => `<li>${p}</li>`).join('')}
+                            ${blocks.key_points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
                         </ul>
                     </div>
                 ` : ''}
@@ -866,14 +872,14 @@
                 ${blocks.action_step ? `
                     <div class="content-block">
                         <h3>⚡ Action Step</h3>
-                        <p>${blocks.action_step}</p>
+                        <p>${escapeHtml(blocks.action_step)}</p>
                     </div>
                 ` : ''}
                 
                 ${article.summary && !blocks.why_it_matters ? `
                     <div class="content-block">
                         <h3>Summary</h3>
-                        <p>${article.summary}</p>
+                        <p>${escapeHtml(article.summary)}</p>
                     </div>
                 ` : ''}
             `;

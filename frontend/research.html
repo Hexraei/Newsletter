@@ -1446,9 +1446,9 @@
         return `<a class="sidebar-item" href="#" data-story-id="${storyId}">
           <div class="sidebar-item-num">${String(i + 1).padStart(2, '0')}</div>
           <div class="sidebar-item-body">
-            <div class="sidebar-item-cat">${cat}</div>
-            <div class="sidebar-item-title">${item.title || ''}</div>
-            <div class="sidebar-item-meta">${item.source || 'CS Desk'}${ago ? ' - ' + ago : ''}</div>
+            <div class="sidebar-item-cat">${escapeHtml(cat)}</div>
+            <div class="sidebar-item-title">${escapeHtml(item.title || '')}</div>
+            <div class="sidebar-item-meta">${escapeHtml(item.source || 'CS Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
           </div>
         </a>`;
       }).join('');
