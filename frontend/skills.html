@@ -168,18 +168,29 @@
       .navbar-links { gap: 18px; }
       .navbar-links a { font-size: 11px; }
     }
+
+    /* Accessibility: visible focus indicators */
+    *:focus-visible {
+        outline: 2px solid #818cf8;
+        outline-offset: 2px;
+    }
+    a:focus-visible, button:focus-visible {
+        outline: 2px solid #818cf8;
+        outline-offset: 2px;
+    }
   </style>
 </head>
 <body>
 <div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
     ⚡ You're offline — showing cached content
 </div>
+<a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
-  <nav class="navbar">
+  <nav class="navbar" aria-label="Main navigation">
     <a class="navbar-brand" href="index.html">NEWS DAY</a>
     <div class="navbar-links">
       <div class="dept-selector" id="dept-selector">
-        <button class="dept-selector-btn" id="dept-btn">CSE</button>
+        <button class="dept-selector-btn" id="dept-btn" aria-label="Select department">CSE</button>
         <div class="dept-dropdown" id="dept-dropdown">
           <div class="dept-dropdown-item active" data-key="CSE"><span class="dept-abbr">CSE</span> Computer Science & Engineering</div>
           <div class="dept-dropdown-item" data-key="IT"><span class="dept-abbr">IT</span> Information Technology</div>
@@ -203,7 +214,7 @@
     </div>
   </nav>
 
-  <main class="page">
+  <main class="page" id="main-content">
     <div class="page-header">
       <h1 class="page-title">Best Skills to Learn for Placements</h1>
       <p class="page-summary" id="page-summary"></p>
@@ -514,7 +525,7 @@
 <!-- Cookie Consent Banner -->
 <div id="cookie-consent" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(30,30,30,0.97);color:#e0e0e0;padding:14px 24px;font-size:13px;z-index:9999;font-family:'DM Sans',sans-serif;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;">
     <span>We use cookies and localStorage for authentication and to improve your experience. <a href="/privacy" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a></span>
-    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">Accept</button>
+    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;" aria-label="Accept cookies">Accept</button>
 </div>
 <script>if(!localStorage.getItem('cc_accepted'))document.getElementById('cookie-consent').style.display='flex';</script>
 

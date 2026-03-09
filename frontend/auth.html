@@ -724,6 +724,16 @@
       }
     }
 
+
+    /* Accessibility: visible focus indicators */
+    *:focus-visible {
+        outline: 2px solid #818cf8;
+        outline-offset: 2px;
+    }
+    a:focus-visible, button:focus-visible {
+        outline: 2px solid #818cf8;
+        outline-offset: 2px;
+    }
     /* Focus visible for keyboard navigation */
     .submit-btn:focus-visible,
     .pw-toggle:focus-visible,
@@ -739,6 +749,7 @@
 <div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
     ⚡ You're offline — showing cached content
 </div>
+<a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
   <!-- Backdrop layers -->
   <div class="backdrop"></div>
@@ -764,7 +775,7 @@
     </aside>
 
     <!-- Right panel: Form -->
-    <main class="auth-panel">
+    <main class="auth-panel" id="main-content">
       <div class="form-container">
 
         <!-- Global message area -->
@@ -787,9 +798,11 @@
                 placeholder="you@university.edu"
                 autocomplete="email"
                 required
+                aria-required="true"
+                aria-describedby="login-email-error"
               >
               <label class="input-label" for="login-email">Email address</label>
-              <span class="input-error" id="login-email-error">Please enter a valid email</span>
+              <span class="input-error" role="alert" id="login-email-error">Please enter a valid email</span>
             </div>
 
             <div class="input-group" id="login-password-group">
@@ -801,13 +814,15 @@
                 placeholder="••••••••"
                 autocomplete="current-password"
                 required
+                aria-required="true"
+                aria-describedby="login-password-error"
               >
               <label class="input-label" for="login-password">Password</label>
               <button class="pw-toggle" type="button" aria-label="Toggle password visibility" data-target="login-password">
                 <svg class="eye-open" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24m-4.24-4.24 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
               </button>
-              <span class="input-error" id="login-password-error">Please enter your password</span>
+              <span class="input-error" role="alert" id="login-password-error">Please enter your password</span>
             </div>
 
             <div class="forgot-row">
@@ -842,9 +857,11 @@
                 placeholder="Alex Chen"
                 autocomplete="name"
                 required
+                aria-required="true"
+                aria-describedby="register-name-error"
               >
               <label class="input-label" for="register-name">Full name</label>
-              <span class="input-error" id="register-name-error">Please enter your name</span>
+              <span class="input-error" role="alert" id="register-name-error">Please enter your name</span>
             </div>
 
             <div class="input-group" id="register-email-group">
@@ -856,9 +873,11 @@
                 placeholder="you@university.edu"
                 autocomplete="email"
                 required
+                aria-required="true"
+                aria-describedby="register-email-error"
               >
               <label class="input-label" for="register-email">Email address</label>
-              <span class="input-error" id="register-email-error">Please enter a valid email</span>
+              <span class="input-error" role="alert" id="register-email-error">Please enter a valid email</span>
             </div>
 
             <div class="input-group" id="register-password-group">
@@ -871,13 +890,15 @@
                 autocomplete="new-password"
                 minlength="8"
                 required
+                aria-required="true"
+                aria-describedby="register-password-error"
               >
               <label class="input-label" for="register-password">Password</label>
               <button class="pw-toggle" type="button" aria-label="Toggle password visibility" data-target="register-password">
                 <svg class="eye-open" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24m-4.24-4.24 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
               </button>
-              <span class="input-error" id="register-password-error">Password must be at least 8 characters</span>
+              <span class="input-error" role="alert" id="register-password-error">Password must be at least 8 characters</span>
             </div>
 
             <div class="input-group" id="register-confirm-group">
@@ -890,13 +911,15 @@
                 autocomplete="new-password"
                 minlength="8"
                 required
+                aria-required="true"
+                aria-describedby="register-confirm-error"
               >
               <label class="input-label" for="register-confirm">Confirm password</label>
-              <span class="input-error" id="register-confirm-error">Passwords do not match</span>
+              <span class="input-error" role="alert" id="register-confirm-error">Passwords do not match</span>
             </div>
 
             <div class="input-group" id="register-dept-group">
-              <select class="input-field" id="register-dept" name="department" required style="cursor:pointer">
+              <select class="input-field" id="register-dept" name="department" required aria-required="true" aria-describedby="register-dept-error" style="cursor:pointer">
                 <option value="" disabled selected hidden></option>
                 <option value="CSE">Computer Science & Engineering</option>
                 <option value="IT">Information Technology</option>
@@ -912,7 +935,7 @@
                 <option value="PT">Production Technology</option>
               </select>
               <label class="input-label" for="register-dept">Department</label>
-              <span class="input-error" id="register-dept-error">Please select your department</span>
+              <span class="input-error" role="alert" id="register-dept-error">Please select your department</span>
             </div>
 
             <button type="submit" class="submit-btn" id="btn-register">
@@ -948,9 +971,11 @@
                 placeholder="you@university.edu"
                 autocomplete="email"
                 required
+                aria-required="true"
+                aria-describedby="reset-email-error"
               >
               <label class="input-label" for="reset-email">Email address</label>
-              <span class="input-error" id="reset-email-error">Please enter a valid email</span>
+              <span class="input-error" role="alert" id="reset-email-error">Please enter a valid email</span>
             </div>
 
             <button type="submit" class="submit-btn" id="btn-reset">
@@ -982,13 +1007,15 @@
                 autocomplete="new-password"
                 minlength="8"
                 required
+                aria-required="true"
+                aria-describedby="new-password-error"
               >
               <label class="input-label" for="new-password">New password</label>
               <button class="pw-toggle" type="button" aria-label="Toggle password visibility" data-target="new-password">
                 <svg class="eye-open" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24m-4.24-4.24 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
               </button>
-              <span class="input-error" id="new-password-error">Password must be at least 8 characters</span>
+              <span class="input-error" role="alert" id="new-password-error">Password must be at least 8 characters</span>
             </div>
 
             <div class="input-group" id="confirm-password-group">
@@ -1001,9 +1028,11 @@
                 autocomplete="new-password"
                 minlength="8"
                 required
+                aria-required="true"
+                aria-describedby="confirm-password-error"
               >
               <label class="input-label" for="confirm-password">Confirm password</label>
-              <span class="input-error" id="confirm-password-error">Passwords do not match</span>
+              <span class="input-error" role="alert" id="confirm-password-error">Passwords do not match</span>
             </div>
 
             <button type="submit" class="submit-btn" id="btn-new-password">
@@ -1022,7 +1051,7 @@
   </div>
 
   <!-- Footer -->
-  <footer class="auth-footer">
+  <footer class="auth-footer" role="contentinfo">
     <span>2026 NEWS DAY · <a href="index.html">Back to home</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
   </footer>
 
@@ -1382,7 +1411,7 @@
 <!-- Cookie Consent Banner -->
 <div id="cookie-consent" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(30,30,30,0.97);color:#e0e0e0;padding:14px 24px;font-size:13px;z-index:9999;font-family:'DM Sans',sans-serif;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;">
     <span>We use cookies and localStorage for authentication and to improve your experience. <a href="/privacy" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a></span>
-    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">Accept</button>
+    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;" aria-label="Accept cookies">Accept</button>
 </div>
 <script>if(!localStorage.getItem('cc_accepted'))document.getElementById('cookie-consent').style.display='flex';</script>
 
