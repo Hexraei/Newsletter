@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEWS DAY</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --white: #ffffff;
+      --black: #000000;
+      --gray-100: #f5f4f2;
+      --gray-200: #eae8e4;
+      --gray-300: #d4d1cc;
+      --gray-400: #a8a49e;
+      --gray-500: #888480;
+      --gray-600: #5c5955;
+      --gray-900: #1a1918;
+      --card-bg: #e8e5e0;
+      --page-margin: 33px;
+      --section-gap: 80px;
+    }
+
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      background: var(--white);
+      color: var(--black);
+      overflow-x: hidden;
+    }
+
+    /* ===== NAVBAR ===== */
+    .navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      height: 66px;
+      background: rgba(255,255,255,0.92);
+      border-bottom: 1px solid var(--black);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--page-margin);
+      backdrop-filter: blur(12px);
+    }
+
+    .navbar-brand {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      color: var(--black);
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .navbar-links {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+    }
+
+    .navbar-links a {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--black);
+      text-decoration: none;
+      transition: opacity 0.2s;
+      cursor: pointer;
+    }
+    .navbar-links a:hover { opacity: 0.5; }
+
+    /* Department selector */
+    .dept-selector {
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+    }
+    .dept-selector-btn {
+      background: var(--black);
+      color: var(--white);
+      border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    .dept-selector-btn:hover { opacity: 0.75; }
+    .dept-selector-btn::after {
+      content: '';
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--white);
+    }
+    .dept-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      min-width: 260px;
+      z-index: 200;
+      padding: 6px 0;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .dept-dropdown.open { display: block; }
+    .dept-dropdown-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--gray-500);
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dept-dropdown-item:hover { background: var(--gray-100); }
+    .dept-dropdown-item.active {
+      color: var(--black);
+      font-weight: 600;
+      background: var(--gray-100);
+    }
+    .dept-dropdown-item .dept-abbr {
+      font-weight: 700;
+      min-width: 42px;
+      font-size: 11px;
+      color: var(--black);
+    }
+
+    .navbar-avatar {
+      width: 31px; height: 31px;
+      border-radius: 50%;
+      background: #D9D9D9;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .navbar-avatar:hover { background: #bbb; }
+
+    /* ===== HERO ===== */
+    .hero {
+      position: relative;
+      width: 100%;
+      height: 590px;
+      margin-top: 66px;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .hero-text {
+      position: relative;
+      width: 50%; height: 100%;
+      border: 1px solid var(--black);
+      border-top: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 var(--page-margin) 40px;
+      background: var(--white);
+      overflow: hidden;
+    }
+
+    .hero-source {
+      font-size: 10px; font-weight: 400;
+      color: var(--gray-500);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      opacity: 0; transform: translateY(12px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .hero-title {
+      font-weight: 400;
+      font-size: 24px;
+      color: var(--black);
+      line-height: 1.35;
+      max-width: 420px;
+      margin-bottom: 8px;
+      opacity: 0; transform: translateY(20px);
+      transition: opacity 0.6s ease 0.05s, transform 0.6s ease 0.05s;
+    }
+
+    .hero-subtitle {
+      font-size: 12px; font-weight: 400;
+      color: var(--black);
+      margin-bottom: 32px;
+      opacity: 0; transform: translateY(14px);
+      transition: opacity 0.5s ease 0.12s, transform 0.5s ease 0.12s;
+    }
+
+    .hero-text.active .hero-source,
+    .hero-text.active .hero-title,
+    .hero-text.active .hero-subtitle { opacity: 1; transform: translateY(0); }
+
+    .hero-btn {
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      width: 153px; height: 38px;
+      border-radius: 50px;
+      background: var(--black); color: var(--white);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400; font-size: 12px;
+      border: none; cursor: pointer; text-decoration: none;
+      opacity: 0; transform: translateY(10px);
+      transition: opacity 0.5s ease 0.18s, transform 0.5s ease 0.18s, background 0.2s;
+    }
+    .hero-text.active .hero-btn { opacity: 1; transform: translateY(0); }
+    .hero-btn:hover { background: #333; }
+    .hero-btn:active { transform: scale(0.97) !important; }
+
+    .breaking-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      background: #e00; color: var(--white);
+      font-weight: 700; font-size: 9px;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      border-radius: 3px;
+      margin-bottom: 16px;
+      opacity: 0; transform: translateY(8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .hero-text.active .breaking-tag { opacity: 1; transform: translateY(0); }
+
+    /* Hero right — typographic fill */
+    .hero-visual {
+      position: relative;
+      width: 50%; height: 100%;
+      border: 1px solid var(--black);
+      border-top: none; border-left: none;
+      overflow: hidden;
+      background: var(--gray-900);
+    }
+
+    .hero-visual-inner {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Animated grain overlay */
+    .hero-grain {
+      position: absolute; inset: -50%;
+      width: 200%; height: 200%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+      opacity: 0.35;
+      animation: grainShift 0.5s steps(4) infinite;
+      pointer-events: none;
+    }
+    @keyframes grainShift {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(-2%, -3%); }
+      50% { transform: translate(1%, 2%); }
+      75% { transform: translate(-1%, 1%); }
+      100% { transform: translate(2%, -1%); }
+    }
+
+    /* Large typographic source label */
+    .hero-type-label {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 900;
+      font-size: clamp(72px, 10vw, 140px);
+      color: rgba(255,255,255,0.06);
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      white-space: nowrap;
+      user-select: none;
+      line-height: 1;
+      transition: opacity 0.6s ease;
+    }
+
+    /* Slide number overlay */
+    .hero-slide-num {
+      position: absolute;
+      bottom: 32px; right: 32px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 900;
+      font-size: 120px;
+      color: rgba(255,255,255,0.04);
+      line-height: 1;
+      user-select: none;
+    }
+
+    .slide-counter {
+      position: absolute;
+      top: 20px; right: 20px;
+      font-size: 11px; font-weight: 400;
+      color: rgba(255,255,255,0.4);
+      z-index: 10;
+      letter-spacing: 1px;
+    }
+
+    /* Nav arrows */
+    .nav-arrow {
+      position: absolute;
+      width: 43px; height: 43px;
+      border-radius: 50%;
+      background: rgba(21,21,21,0.83);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10;
+      top: 50%; transform: translateY(-50%);
+      transition: background 0.2s, transform 0.15s;
+    }
+    .nav-arrow:hover { background: rgba(21,21,21,0.95); }
+    .nav-arrow:active { transform: translateY(-50%) scale(0.93); }
+    .nav-arrow svg {
+      width: 16px; height: 16px;
+      fill: none; stroke: #fff;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .nav-arrow-left { left: var(--page-margin); }
+    .nav-arrow-right { right: var(--page-margin); }
+
+    /* Dots */
+    .hero-dots {
+      position: absolute;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      z-index: 10;
+    }
+    .hero-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #D9D9D9;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    .hero-dot.active { background: var(--black); transform: scale(1.3); }
+
+    /* Progress */
+    .hero-progress {
+      position: absolute;
+      bottom: 18px; left: 50%;
+      transform: translateX(-50%);
+      width: 63px; height: 3px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50px; overflow: hidden;
+      z-index: 10;
+    }
+    .hero-progress-bar {
+      height: 100%; width: 0%;
+      background: rgba(255,255,255,0.5);
+      border-radius: 50px;
+    }
+
+    /* ===== CONTENT SECTIONS ===== */
+    .content-section {
+      padding: 0 var(--page-margin);
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 0;
+      align-items: stretch;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    /* Every grid cell gets left border; first child is label with beige bg */
+    .section-grid > * {
+      border-left: 1px solid #1a1a1a;
+      padding: 40px 32px;
+    }
+    .section-grid > *:first-child {
+      border-left: none;
+      background: #f2efe9;
+    }
+
+    /* Label card (first column) */
+    .section-label-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 480px;
+    }
+
+    .section-label-title {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 28px;
+      color: #1a1a1a;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+
+    .section-label-desc {
+      font-size: 14px;
+      font-weight: 400;
+      color: #555;
+      line-height: 1.6;
+      margin-bottom: 40px;
+      max-width: 300px;
+    }
+
+    .section-label-btn {
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      padding: 12px 32px;
+      border: 1px solid #1a1a1a;
+      border-radius: 50px;
+      background: transparent;
+      color: #1a1a1a;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500; font-size: 14px;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+      width: fit-content;
+    }
+    .section-label-btn:hover { background: #1a1a1a; color: #fff; }
+
+    /* Research paper list */
+    .research-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 0 max(20px, calc((100% - 1200px)/2));
+    }
+    .research-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #eee;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.15s;
+    }
+    .research-row:hover { background: #f8f8f8; }
+    .research-row-body { flex: 1; min-width: 0; }
+    .research-row-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .research-row-meta {
+      font-size: 0.78rem;
+      color: #777;
+      line-height: 1.3;
+    }
+    .research-row-abstract {
+      font-size: 0.82rem;
+      color: #555;
+      line-height: 1.4;
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .research-cite-badge {
+      font-size: 0.72rem;
+      background: #f0f0f0;
+      color: #555;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      margin-top: 6px;
+      align-self: flex-start;
+    }
+
+    /* Article card */
+    .article-card {
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: opacity 0.2s;
+    }
+    .article-card:hover { opacity: 0.75; }
+
+    .article-card-visual {
+      width: 100%;
+      height: 180px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-size: cover;
+      background-position: center;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .article-card-visual.has-image { background-color: #e8e5e0; }
+    .article-card-visual .placeholder-icon {
+      font-size: 48px; opacity: 0.3; color: #fff;
+      font-family: 'DM Sans', sans-serif; font-weight: 700;
+    }
+
+    .article-card-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .image-credit {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      font-size: 9px; color: rgba(255,255,255,0.85);
+      background: linear-gradient(transparent, rgba(0,0,0,0.55));
+      padding: 12px 6px 4px; line-height: 1.3;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .image-credit a { color: inherit; text-decoration: underline; }
+
+    .article-card-title {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      color: #1a1a1a;
+      line-height: 1.4;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .article-card-meta {
+      font-size: 13px;
+      font-weight: 400;
+      color: #666;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ===== STORY MODAL ===== */
+    .story-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.42);
+      z-index: 2000;
+    }
+
+    .story-modal.open { display: flex; }
+
+    .story-modal-panel {
+      width: min(760px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #f7f4ee;
+      border: 1px solid #1a1a1a;
+      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.18);
+    }
+
+    .story-modal-head {
+      padding: 20px 24px;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .story-modal-title {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      line-height: 1.3;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+
+    .story-modal-meta {
+      font-size: 12px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .story-modal-close {
+      border: 1px solid #1a1a1a;
+      background: transparent;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    .story-modal-body {
+      padding: 24px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .story-insight {
+      border: 1px solid #1a1a1a;
+      background: #f2efe9;
+      padding: 14px 16px;
+    }
+
+    .story-insight-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      color: #333;
+      margin-bottom: 6px;
+    }
+
+    .story-insight-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #222;
+    }
+
+    .story-modal-footer {
+      padding: 16px 24px 24px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      border-top: 1px solid #1a1a1a;
+    }
+
+    .story-source-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 22px;
+      border: 1px solid #1a1a1a;
+      border-radius: 50px;
+      background: transparent;
+      color: #1a1a1a;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .story-source-link:hover {
+      background: #1a1a1a;
+      color: #fff;
+    }
+
+    .story-source-link[hidden] {
+      display: none;
+    }
+
+    body.modal-open { overflow: hidden; }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      margin-top: var(--section-gap);
+      border-top: 1px solid var(--black);
+      padding: 48px var(--page-margin) 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 24px;
+    }
+
+    .footer-brand {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      color: var(--black);
+      margin-bottom: 12px;
+    }
+
+    .footer-tagline {
+      font-size: 12px;
+      color: var(--gray-500);
+      line-height: 1.6;
+      max-width: 240px;
+    }
+
+    .footer-col-title {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--gray-400);
+      margin-bottom: 16px;
+    }
+
+    .footer-links {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-links a {
+      font-size: 13px;
+      color: var(--black);
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .footer-links a:hover { opacity: 0.5; }
+
+    .footer-bottom {
+      padding: 20px var(--page-margin);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--gray-200);
+    }
+
+    .footer-copy {
+      font-size: 11px;
+      color: var(--gray-400);
+    }
+
+    .footer-bottom-links {
+      display: flex; gap: 24px;
+    }
+    .footer-bottom-links a {
+      font-size: 11px;
+      color: var(--gray-400);
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .footer-bottom-links a:hover { opacity: 0.5; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1080px) {
+      .section-grid { grid-template-columns: 1fr 1fr; }
+      .section-grid > * { padding: 32px 24px; }
+      .section-grid > *:first-child { grid-column: 1 / -1; border-bottom: 1px solid #1a1a1a; }
+      .section-grid > *:nth-child(2) { border-left: none; }
+      .section-grid > *:nth-child(4) { border-left: none; border-top: 1px solid #1a1a1a; }
+      .section-label-card { min-height: auto; }
+      .footer { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      :root { --page-margin: 24px; }
+      .hero { flex-direction: column; height: auto; }
+      .hero-text { width: 100%; height: auto; min-height: 320px; padding: 32px var(--page-margin); }
+      .hero-visual { width: 100%; height: 300px; }
+      .navbar-links { gap: 20px; }
+      .navbar-links a:nth-child(1),
+      .navbar-links a:nth-child(2) { display: none; }
+      .nav-arrow-left { left: 12px; }
+      .nav-arrow-right { right: 12px; }
+    }
+
+    @media (max-width: 640px) {
+      :root { --page-margin: 16px; }
+      .section-grid { grid-template-columns: 1fr; }
+      .section-grid > * { border-left: none; border-top: none; padding: 24px 0; border-bottom: 1px solid #1a1a1a; }
+      .section-grid > *:last-child { border-bottom: none; }
+      .section-grid > *:first-child { background: #f2efe9; border-bottom: 1px solid #1a1a1a; }
+      .section-label-card { min-height: auto; }
+      .article-card-visual { aspect-ratio: 16 / 10; }
+      .story-modal { padding: 10px; }
+      .story-modal-title { font-size: 20px; }
+      .story-modal-head,
+      .story-modal-body,
+      .story-modal-footer { padding-left: 14px; padding-right: 14px; }
+      .navbar { padding: 0 16px; }
+      .navbar-links { gap: 14px; }
+      .navbar-links a { font-size: 11px; }
+      .hero-title { font-size: 20px; }
+      .footer { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+    }
+
+    @media (max-width: 380px) {
+      .navbar-links a:nth-child(3) { display: none; }
+    }
+
+    /* ===== LOADING SHIMMER ===== */
+    .shimmer {
+      background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+      background-size: 200% 100%;
+      animation: shimmerAnim 1.8s ease infinite;
+    }
+    @keyframes shimmerAnim {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    #fc-last-updated { font-size: 11px; color: #888; text-align: right; padding: 4px 24px 0; display: none; letter-spacing: 0.3px; }
+  </style>
+</head>
+<body>
+<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
+    ⚡ You're offline — showing cached content
+</div>
+
+  <!-- AUTH GATE — redirect to auth.html if not logged in -->
+  <script>
+    (function() {
+      try {
+        var raw = localStorage.getItem('newsday_session');
+        if (!raw) { window.location.replace('auth.html'); return; }
+        var s = JSON.parse(raw);
+        if (!s.authenticated || (s.expires_at && Date.now() > s.expires_at)) {
+          localStorage.removeItem('newsday_session');
+          window.location.replace('auth.html');
+          return;
+        }
+      } catch(e) {
+        window.location.replace('auth.html');
+        return;
+      }
+    })();
+  </script>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <span class="navbar-brand">NEWS DAY</span>
+    <div class="navbar-links">
+      <div class="dept-selector" id="dept-selector">
+        <button class="dept-selector-btn" id="dept-btn">CSE</button>
+        <div class="dept-dropdown" id="dept-dropdown">
+          <div class="dept-dropdown-item active" data-key="CSE"><span class="dept-abbr">CSE</span> Computer Science & Engineering</div>
+          <div class="dept-dropdown-item" data-key="IT"><span class="dept-abbr">IT</span> Information Technology</div>
+          <div class="dept-dropdown-item" data-key="AIDS"><span class="dept-abbr">AI&DS</span> Artificial Intelligence & Data Science</div>
+          <div class="dept-dropdown-item" data-key="ECE"><span class="dept-abbr">ECE</span> Electronics & Communication</div>
+          <div class="dept-dropdown-item" data-key="EEE"><span class="dept-abbr">EEE</span> Electrical & Electronics</div>
+          <div class="dept-dropdown-item" data-key="ME"><span class="dept-abbr">ME</span> Mechanical Engineering</div>
+          <div class="dept-dropdown-item" data-key="CE"><span class="dept-abbr">CE</span> Civil Engineering</div>
+          <div class="dept-dropdown-item" data-key="BT"><span class="dept-abbr">BT</span> Biotechnology Engineering</div>
+          <div class="dept-dropdown-item" data-key="CH"><span class="dept-abbr">CH</span> Chemical Engineering</div>
+          <div class="dept-dropdown-item" data-key="AE"><span class="dept-abbr">AE</span> Aeronautical / Aerospace</div>
+        </div>
+      </div>
+      <a href="department.html">Department news</a>
+      <a href="insights.html">Industrial insights</a>
+      <a href="research.html">Research Papers</a>
+      <a href="skills.html">Skills</a>
+      <a href="stories.html">Student Stories</a>
+      <a href="auth.html" id="nav-auth-link">Log In</a>
+      <div class="navbar-avatar" id="navbar-avatar" title="Account"></div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="hero">
+    <div class="hero-text active" id="hero-text">
+      <div class="breaking-tag" id="hero-breaking-tag" style="display:none">BREAKING</div>
+      <div class="hero-source" id="hero-source">HACKER NEWS</div>
+      <h1 class="hero-title" id="hero-title">Loading top stories...</h1>
+      <p class="hero-subtitle" id="hero-subtitle">Fetching the latest news</p>
+      <a class="hero-btn" id="hero-btn" href="#">Read AI Brief</a>
+    </div>
+
+    <div class="hero-visual" id="hero-visual">
+      <div class="hero-visual-inner">
+        <div class="hero-grain"></div>
+        <span class="hero-type-label" id="hero-type-label">NEWS</span>
+        <span class="hero-slide-num" id="hero-slide-num">01</span>
+      </div>
+      <div class="slide-counter" id="slide-counter">01 / 01</div>
+    </div>
+
+    <button class="nav-arrow nav-arrow-left" id="arrow-left" aria-label="Previous">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
+    </button>
+    <button class="nav-arrow nav-arrow-right" id="arrow-right" aria-label="Next">
+      <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18" /></svg>
+    </button>
+
+    <div class="hero-dots" id="hero-dots"></div>
+
+    <div class="hero-progress">
+      <div class="hero-progress-bar" id="hero-progress-bar"></div>
+    </div>
+  </section>
+
+  <div id="fc-last-updated" style="display:none"></div>
+
+  <!-- DEPARTMENT NEWS -->
+  <section class="content-section" id="department">
+    <div class="section-grid" id="department-grid">
+      <div class="section-label-card">
+        <div>
+          <h2 class="section-label-title" id="dept-section-title">Department News</h2>
+          <p class="section-label-desc" id="dept-section-desc">Latest updates for your department.</p>
+        </div>
+        <a class="section-label-btn" href="department.html">Read More</a>
+      </div>
+      <!-- cards injected by JS -->
+    </div>
+  </section>
+
+  <!-- CAREER & OPPORTUNITIES -->
+  <section class="content-section" id="insights">
+    <div class="section-grid" id="insights-grid">
+      <div class="section-label-card">
+        <div>
+          <h2 class="section-label-title" id="insights-section-title">Career &amp; Opportunities</h2>
+          <p class="section-label-desc" id="insights-section-desc">Jobs, internships, startups, and industry moves — opportunity signals for your future.</p>
+        </div>
+        <a class="section-label-btn" href="stories.html">Read More</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESEARCH PAPERS -->
+  <section class="content-section" id="research">
+    <div class="section-grid" id="research-featured-grid">
+      <div class="section-label-card">
+        <div>
+          <h2 class="section-label-title" id="research-section-title">Research Papers</h2>
+          <p class="section-label-desc" id="research-section-desc">Recently published and groundbreaking research relevant to your field — curated for students and early-career professionals.</p>
+        </div>
+        <a class="section-label-btn" href="research.html">Read More</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- STUDENT STORIES -->
+  <section class="content-section" id="stories">
+    <div class="section-grid" id="stories-grid">
+      <div class="section-label-card">
+        <div>
+          <h2 class="section-label-title">Student Stories</h2>
+          <p class="section-label-desc">Projects, launches, and community picks that caught attention this week.</p>
+        </div>
+        <button class="section-label-btn" onclick="scrollToSection('stories')">Read More</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="footer-brand">NEWS DAY</div>
+      <p class="footer-tagline">Your daily briefing on tech, AI, and everything shaping the future. Curated by AI, built for students.</p>
+    </div>
+    <div>
+      <div class="footer-col-title">Sections</div>
+      <ul class="footer-links">
+        <li><a href="department.html">Department News</a></li>
+        <li><a href="insights.html">Industrial Insights</a></li>
+        <li><a href="research.html">Research Papers</a></li>
+        <li><a href="skills.html">Skills</a></li>
+        <li><a href="stories.html">Student Stories</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">Sources</div>
+      <ul class="footer-links">
+        <li><a href="https://news.ycombinator.com" target="_blank">Hacker News</a></li>
+        <li><a href="https://reddit.com/r/technology" target="_blank">Reddit</a></li>
+        <li><a href="https://github.com/trending" target="_blank">GitHub</a></li>
+        <li><a href="https://medium.com" target="_blank">Medium</a></li>
+        <li><a href="https://producthunt.com" target="_blank">Product Hunt</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">About</div>
+      <ul class="footer-links">
+        <li><a href="#">How it works</a></li>
+        <li><a href="#">AI & Ethics</a></li>
+        <li><a href="#">Contact</a></li>
+      </ul>
+    </div>
+  </footer>
+  <div class="footer-bottom">
+    <span class="footer-copy">2026 NEWS DAY. All rights reserved.</span>
+    <div class="footer-bottom-links">
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+    </div>
+  </div>
+
+  <div class="story-modal" id="story-modal" aria-hidden="true">
+    <div class="story-modal-panel" role="dialog" aria-modal="true" aria-labelledby="story-modal-title">
+      <div class="story-modal-head">
+        <div>
+          <h3 class="story-modal-title" id="story-modal-title">Loading story...</h3>
+          <div class="story-modal-meta" id="story-modal-meta"></div>
+        </div>
+        <button class="story-modal-close" id="story-modal-close" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="story-modal-body">
+        <div class="story-insight">
+          <div class="story-insight-label">Quick Summary</div>
+          <div class="story-insight-text" id="story-quick-summary">Preparing summary...</div>
+        </div>
+        <div class="story-insight">
+          <div class="story-insight-label">Why It Matters</div>
+          <div class="story-insight-text" id="story-why-important">Preparing context...</div>
+        </div>
+        <div class="story-insight">
+          <div class="story-insight-label">How It Affects Us</div>
+          <div class="story-insight-text" id="story-impact">Preparing student impact...</div>
+        </div>
+        <div class="story-insight" id="story-full-article-block" hidden>
+          <div class="story-insight-label">Full AI Article (50-60 words)</div>
+          <div class="story-insight-text" id="story-full-article-text"></div>
+        </div>
+      </div>
+      <div class="story-modal-footer">
+        <button class="story-source-link" id="story-toggle-article" type="button">Show Full AI Article</button>
+        <a class="story-source-link" id="story-source-link" href="#" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ========================================================
+       CONFIG
+    ======================================================== */
+    const API = window.location.origin;
+
+    /* ================================================================
+       FEED CACHE — TTL-based localStorage with stale-while-revalidate
+    ================================================================ */
+    const FeedCache = {
+      get(key) {
+        try {
+          const item = localStorage.getItem('fc_' + key);
+          if (!item) return null;
+          const { data, cachedAt, ttl } = JSON.parse(item);
+          if (Date.now() - cachedAt > ttl) {
+            localStorage.removeItem('fc_' + key);
+            return null;
+          }
+          return data;
+        } catch { return null; }
+      },
+      set(key, data, ttlMs) {
+        try {
+          const item = JSON.stringify({ data, cachedAt: Date.now(), ttl: ttlMs });
+          localStorage.setItem('fc_' + key, item);
+        } catch (e) {
+          this.prune();
+          try { localStorage.setItem('fc_' + key, JSON.stringify({ data, cachedAt: Date.now(), ttl: ttlMs })); } catch {}
+        }
+      },
+      meta(key) {
+        try {
+          const item = localStorage.getItem('fc_' + key);
+          if (!item) return null;
+          const { cachedAt, ttl } = JSON.parse(item);
+          return { cachedAt, ttl };
+        } catch { return null; }
+      },
+      prune() {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('fc_'));
+        const now = Date.now();
+        for (const key of keys) {
+          try {
+            const { cachedAt, ttl } = JSON.parse(localStorage.getItem(key));
+            if (now - cachedAt > ttl) localStorage.removeItem(key);
+          } catch { localStorage.removeItem(key); }
+        }
+      },
+      clear() {
+        Object.keys(localStorage).filter(k => k.startsWith('fc_')).forEach(k => localStorage.removeItem(k));
+      }
+    };
+
+    let _feedCacheLastFetchTime = null;
+    function updateLastUpdatedIndicator() {
+      const el = document.getElementById('fc-last-updated');
+      if (!el || !_feedCacheLastFetchTime) { if (el) el.style.display = 'none'; return; }
+      const diff = Date.now() - _feedCacheLastFetchTime;
+      const sec = Math.floor(diff / 1000);
+      let text;
+      if (sec < 10) text = 'Updated just now';
+      else if (sec < 60) text = 'Updated ' + sec + 's ago';
+      else { const min = Math.floor(sec / 60); text = 'Updated ' + min + ' min ago'; }
+      el.textContent = text;
+      el.style.display = '';
+    }
+    setInterval(updateLastUpdatedIndicator, 30000);
+
+    /* ========================================================
+       UNSPLASH IMAGE LOADER
+       - Client-side only (access key is public/safe per Unsplash docs)
+       - Guidelines compliant: attribution, download trigger, hotlink, UTM
+       - Rate-limited: max 40 req/hr via localStorage tracker (50/hr limit)
+       - 24hr localStorage cache per search keyword
+    ======================================================== */
+    const UNSPLASH_KEY = 'FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM';
+    const UNSPLASH_UTM = '?utm_source=newsday&utm_medium=referral';
+
+    const UnsplashImageLoader = (() => {
+      const CACHE_KEY  = 'newsday_unsplash_cache_v1';
+      const RATE_KEY   = 'newsday_unsplash_rate_v1';
+      const MAX_REQ_HR = 40;
+
+      // Persistent cache: keyword → {url, name, profile, download_location, ts}
+      function _loadCache() {
+        try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
+      }
+      function _saveCache(c) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
+      }
+
+      // Rate tracker: {count, windowStart}
+      function _rateOK() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) {
+            localStorage.setItem(RATE_KEY, JSON.stringify({count: 0, windowStart: now}));
+            return true;
+          }
+          return raw.count < MAX_REQ_HR;
+        } catch { return true; }
+      }
+      function _incrementRate() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) {
+            localStorage.setItem(RATE_KEY, JSON.stringify({count: 1, windowStart: now}));
+          } else {
+            localStorage.setItem(RATE_KEY, JSON.stringify({count: (raw.count || 0) + 1, windowStart: raw.windowStart}));
+          }
+        } catch {}
+      }
+
+      // Derive a relevant Unsplash search query from article title
+      const STOP = new Set(['the','a','an','in','on','of','to','for','and','or','with','by','at','is','are','was','were','has','have','it','its','this','that','from','as','be','how','why','what','when','who','your','our','their','will','can','may','about','into','over','after','using','new','top','best','just','not','now','get','all','more','per','vs','via','says','been','being','would','could','should','they','them','which','but','first','last','both','here','there','also','even','only','ever','watch','look','see','show','take','give','keep','tell','know','come','goes','went','help','open','close','start','stop','together','every','between','through','while','during','without','hundreds','millions','thousands','several','many','much','work','find','think','make','does','want','need']);
+      const NOISE = new Set(['patch','tuesday','edition','january','february','march','april','may','june','july','august','september','october','november','december','2024','2025','2026','2027','heres','built','released','launches','announces','introduces','raises','million','billion','update','roundup','daily','weekly']);
+      function _getQuery(title, category) {
+        const words = (title || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9 ]/g, ' ')
+          .split(/\s+/)
+          .filter(w => w.length >= 3 && !STOP.has(w) && !NOISE.has(w));
+        // Prefer longer, more descriptive words (better Unsplash results)
+        words.sort((a, b) => b.length - a.length);
+        const titlePart = words.slice(0, 2).join(' ');
+        // Category-aware visual context
+        const CTX = {ai_ml:'artificial intelligence',backend:'programming code',webdev:'web development',security:'cybersecurity',career:'career workplace',startup:'startup business',devops:'cloud servers',mobile:'smartphone app',robotics:'robot technology',electronics:'circuit board',research:'scientific research',biotech:'biotechnology',energy:'renewable energy'};
+        const ctx = CTX[category] || 'technology';
+        return titlePart ? `${titlePart} ${ctx}` : ctx;
+      }
+
+      // Trigger Unsplash download event (required by guidelines when image is shown)
+      function _triggerDownload(download_location) {
+        if (!download_location) return;
+        fetch(download_location + (download_location.includes('?') ? '&' : '?') + 'client_id=' + UNSPLASH_KEY)
+          .catch(() => {});
+      }
+
+      // Apply image to a card element
+      function _applyImage(cardEl, data) {
+        const visual = cardEl.querySelector('.article-card-visual');
+        if (!visual) return;
+        visual.style.backgroundImage = `url('${data.url}')`;
+        visual.style.backgroundSize = 'cover';
+        visual.style.backgroundPosition = 'center';
+        visual.classList.add('has-image');
+        // Remove placeholder letter if present
+        const ph = visual.querySelector('.placeholder-icon');
+        if (ph) ph.remove();
+        // Add attribution overlay (required by Unsplash guidelines)
+        if (!visual.querySelector('.image-credit')) {
+          const credit = document.createElement('div');
+          credit.className = 'image-credit';
+          credit.innerHTML = `Photo by <a href="https://unsplash.com/@${encodeURIComponent(data.username)}${UNSPLASH_UTM}" target="_blank" rel="noopener">${escapeHtml(data.name)}</a> on <a href="https://unsplash.com/${UNSPLASH_UTM}" target="_blank" rel="noopener">Unsplash</a>`;
+          visual.appendChild(credit);
+        }
+        _triggerDownload(data.download_location);
+      }
+
+      // Fetch from Unsplash API (with cache)
+      async function _fetchImage(query) {
+        const cache = _loadCache();
+        const now = Date.now();
+        // Cache hit (valid for 24hr)
+        if (cache[query] && (now - cache[query].ts) < 86400000) {
+          return cache[query];
+        }
+        // Rate check
+        if (!_rateOK()) return null;
+        _incrementRate();
+        try {
+          const res = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape&client_id=${UNSPLASH_KEY}`);
+          if (!res.ok) return null;
+          const json = await res.json();
+          const photo = json.results && json.results[0];
+          if (!photo) return null;
+          const data = {
+            url: photo.urls.small,
+            name: photo.user.name,
+            username: photo.user.username,
+            download_location: photo.links.download_location,
+            ts: now,
+          };
+          cache[query] = data;
+          _saveCache(cache);
+          return data;
+        } catch { return null; }
+      }
+
+      // IntersectionObserver — one shared instance
+      let _observer = null;
+      const _pending = new Map(); // cardEl → query
+
+      function _getObserver() {
+        if (_observer) return _observer;
+        _observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const cardEl = entry.target;
+            const query = _pending.get(cardEl);
+            if (!query) return;
+            _pending.delete(cardEl);
+            _observer.unobserve(cardEl);
+            _fetchImage(query).then(data => {
+              if (data) _applyImage(cardEl, data);
+            });
+          });
+        }, { rootMargin: '200px' }); // preload 200px before visible
+        return _observer;
+      }
+
+      // Public: observe a card element for lazy image loading
+      function observe(cardEl) {
+        if (!cardEl) return;
+        // Skip if card already has a real background image set inline (from item.image)
+        const visual = cardEl.querySelector('.article-card-visual');
+        if (!visual) return;
+        if (visual.classList.contains('has-image')) return;
+        const query = cardEl.dataset.unsplashQuery;
+        if (!query) return;
+        _pending.set(cardEl, query);
+        _getObserver().observe(cardEl);
+      }
+
+      // Public: observe all unimaged cards in a container
+      function observeAll(containerEl) {
+        if (!containerEl) return;
+        containerEl.querySelectorAll('.article-card[data-unsplash-query]').forEach(observe);
+      }
+
+      return { observe, observeAll, getQuery: _getQuery, _fetchForHero: _fetchImage };
+    })();
+
+
+    const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE',RAE:'RAE',PT:'PT'};
+    const DEPT_NAMES = {
+      CSE:'Computer Science & Engineering', IT:'Information Technology',
+      AIDS:'Artificial Intelligence & Data Science', ECE:'Electronics & Communication',
+      EEE:'Electrical & Electronics', ME:'Mechanical Engineering',
+      CE:'Civil Engineering', BT:'Biotechnology', CH:'Chemical Engineering',
+      AE:'Aeronautical / Aerospace Engineering',
+      RAE:'Robotics & Automation Engineering', PT:'Production Technology'
+    };
+    const DEPT_DESCS = {
+      CSE:'AI, systems, software engineering, security, and open-source tools.',
+      IT:'Cloud computing, DevOps, cybersecurity, networking, and IT infrastructure.',
+      AIDS:'Machine learning, deep learning, NLP, computer vision, and data analytics.',
+      ECE:'Embedded systems, VLSI, signal processing, IoT, and telecommunications.',
+      EEE:'Power systems, renewable energy, control systems, and electrical machines.',
+      ME:'Thermodynamics, manufacturing, CAD/CAM, robotics, and automotive engineering.',
+      CE:'Structural, geotechnical, transportation, and construction engineering.',
+      BT:'Genetic engineering, bioinformatics, pharmaceuticals, and molecular biology.',
+      CH:'Process engineering, petrochemicals, polymers, and industrial chemistry.',
+      AE:'Aerodynamics, propulsion, avionics, space systems, and flight mechanics.',
+      RAE:'Industrial robots, autonomous systems, ROS, control theory, machine vision, and smart manufacturing.',
+      PT:'CNC machining, lean manufacturing, Industry 4.0, quality control, additive manufacturing, and process optimization.'
+    };
+
+    function getSelectedDept() {
+      return localStorage.getItem('newsday_dept') || 'CSE';
+    }
+    function setSelectedDept(key) {
+      localStorage.setItem('newsday_dept', key);
+    }
+
+    function initDeptSelector() {
+      const btn = document.getElementById('dept-btn');
+      const dropdown = document.getElementById('dept-dropdown');
+      if (!btn || !dropdown) return;
+
+      const current = getSelectedDept();
+      btn.textContent = DEPT_LABELS[current] || current;
+
+      // Update department section header
+      const sTitle = document.getElementById('dept-section-title');
+      const sDesc = document.getElementById('dept-section-desc');
+      const deptLabel = DEPT_LABELS[current] || current;
+      if (sTitle) sTitle.textContent = (DEPT_NAMES[current] || current) + ' News';
+      if (sDesc) sDesc.textContent = DEPT_DESCS[current] || 'Latest updates for your department.';
+
+      // Update insights section header — always career/opportunities, not dept-specific
+      const iTitle = document.getElementById('insights-section-title');
+      const iDesc = document.getElementById('insights-section-desc');
+      if (iTitle) iTitle.textContent = 'Career & Opportunities';
+      if (iDesc) iDesc.textContent = 'Jobs, internships, startups, and industry moves — opportunity signals for your future.';
+
+      // Update research section header
+      const rTitle = document.getElementById('research-section-title');
+      const rDesc = document.getElementById('research-section-desc');
+      if (rTitle) rTitle.textContent = deptLabel + ' Research Papers';
+      if (rDesc) rDesc.textContent = 'Recently published research relevant to ' + (DEPT_NAMES[current] || current) + ' — curated for students and early-career professionals.';
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+      });
+
+      dropdown.querySelectorAll('.dept-dropdown-item').forEach(item => {
+        if (item.dataset.key === current) item.classList.add('active');
+        else item.classList.remove('active');
+
+        item.addEventListener('click', () => {
+          const key = item.dataset.key;
+          setSelectedDept(key);
+          btn.textContent = DEPT_LABELS[key] || key;
+          dropdown.querySelectorAll('.dept-dropdown-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          dropdown.classList.remove('open');
+          location.reload();
+        });
+      });
+
+      document.addEventListener('click', () => dropdown.classList.remove('open'));
+    }
+
+    const SLIDE_INTERVAL = 6000;
+    const MAX_SLIDES = 8;
+
+    /* ========================================================
+       DEMO DATA
+    ======================================================== */
+    const DEMO = {
+      breaking: [
+        { title: 'Ministry of Justice Orders Deletion of UK\'s Largest Court Reporting Database', subtitle: 'Hacker News \u2022 241 upvotes \u2022 156 comments', source: 'Hacker News', url: '#', is_breaking: true },
+        { title: 'X Goes Down: Social Media Site Not Working for Thousands of Users', subtitle: 'Reddit \u2022 r/technology \u2022 Trending', source: 'Reddit', url: '#', is_breaking: true },
+        { title: 'AI Surgery Tool Blamed for Injuring Patients Instead of Helping', subtitle: 'Reddit \u2022 r/technology', source: 'Reddit', url: '#', is_breaking: true },
+        { title: 'Anthropic CEO Suggests OpenAI Doesn\'t Have a Real Lead in AI', subtitle: 'Reddit \u2022 r/technology \u2022 Industry', source: 'Reddit', url: '#', is_breaking: true },
+        { title: 'Japan Creates World\'s First Zero-Emission Hydrogen Engine', subtitle: 'Reddit \u2022 r/technology \u2022 Breakthrough', source: 'Reddit', url: '#', is_breaking: false },
+      ],
+      department: [
+        { title: 'Running My Own XMPP Server with Prosody and STUN/TURN', source: 'Hacker News', meta: 'Self-hosting \u2022 103 points', url: '#', category: 'infra' },
+        { title: 'Show HN: Open-source tool for real-time database replication', source: 'Hacker News', meta: 'Open Source \u2022 87 points', url: '#', category: 'tools' },
+        { title: 'The State of WebAssembly in 2026: What Changed', source: 'Medium', meta: 'Web Development \u2022 5 min read', url: '#', category: 'web' },
+      ],
+      insights: [
+        { title: 'A Stock Market Doom Loop Is Hitting Everything That Isn\'t AI', source: 'Reddit', meta: 'Finance & Tech \u2022 Trending', url: '#', category: 'market' },
+        { title: 'PS6 Could Be Delayed While Switch 2 Might Launch Early', source: 'Reddit', meta: 'Consumer Tech \u2022 2.1k upvotes', url: '#', category: 'consumer' },
+        { title: 'Parents Opt Kids Out of School Computers Over Privacy', source: 'Reddit', meta: 'Education & Privacy \u2022 860 upvotes', url: '#', category: 'privacy' },
+      ],
+      stories: [
+        { title: 'State Department Orders Nonprofit Libraries to Stop Operating', source: 'Reddit', meta: 'Policy \u2022 1.2k upvotes', url: '#', category: 'policy' },
+        { title: 'California\'s Billionaires Pour Cash Into Local Elections', source: 'Reddit', meta: 'Civic \u2022 Trending', url: '#', category: 'civic' },
+        { title: 'Hard Drives Already Sold Out for the Entire Year Due to AI', source: 'Reddit', meta: 'Supply Chain \u2022 AI Impact', url: '#', category: 'supply' },
+      ]
+    };
+
+    /* ========================================================
+       STATE
+    ======================================================== */
+    let slides = [];
+    let currentSlide = 0;
+    let slideTimer = null;
+    let progressTimer = null;
+    let progressStart = 0;
+    let allItems = [];
+    let backendIsLive = false;
+    let storySeq = 0;
+    const storyRegistry = new Map();
+    const storyDetailCache = new Map();
+
+    /* ========================================================
+       DOM REFS
+    ======================================================== */
+    const $ = id => document.getElementById(id);
+    const $heroText    = $('hero-text');
+    const $title       = $('hero-title');
+    const $subtitle    = $('hero-subtitle');
+    const $source      = $('hero-source');
+    const $btn         = $('hero-btn');
+    const $breakingTag = $('hero-breaking-tag');
+    const $typeLabel   = $('hero-type-label');
+    const $slideNum    = $('hero-slide-num');
+    const $dots        = $('hero-dots');
+    const $counter     = $('slide-counter');
+    const $progressBar = $('hero-progress-bar');
+    const $storyModal = $('story-modal');
+    const $storyModalTitle = $('story-modal-title');
+    const $storyModalMeta = $('story-modal-meta');
+    const $storyQuickSummary = $('story-quick-summary');
+    const $storyWhyImportant = $('story-why-important');
+    const $storyImpact = $('story-impact');
+    const $storyFullArticleBlock = $('story-full-article-block');
+    const $storyFullArticleText = $('story-full-article-text');
+    const $storyToggleArticle = $('story-toggle-article');
+    const $storySourceLink = $('story-source-link');
+    const $storyModalClose = $('story-modal-close');
+
+    /* ========================================================
+       CURATION + AI ENRICHMENT
+    ======================================================== */
+    const AI_SUMMARY_CACHE = new Map();
+    const STORY_DETAIL_STORAGE_KEY = 'newsletter_story_detail_cache_v2';
+
+    const CS_KEYWORDS = [
+      'computer science', 'software', 'programming', 'developer', 'coding',
+      'algorithm', 'data structure', 'system design', 'open source',
+      'github', 'api', 'backend', 'frontend', 'javascript', 'typescript',
+      'python', 'java', 'rust', 'go', 'react', 'fastapi', 'devops',
+      'kubernetes', 'cloud', 'database', 'security', 'cyber', 'ai',
+      'machine learning', 'llm', 'neural', 'career', 'interview', 'leetcode'
+    ];
+
+    const INSIGHT_KEYWORDS = [
+      'industry', 'market', 'funding', 'startup', 'acquisition', 'acquires',
+      'regulation', 'policy', 'privacy', 'lawsuit', 'ban', 'adoption',
+      'enterprise', 'revenue', 'valuation', 'launch', 'product', 'hardware',
+      'supply chain', 'chip', 'semiconductor', 'economy', 'trend', 'investment'
+    ];
+
+    const BREAKING_KEYWORDS = [
+      'breaking', 'outage', 'breach', 'critical', 'urgent', 'down',
+      'incident', 'attack', 'leak', 'announces', 'launches', 'acquires',
+      'ban', 'lawsuit', 'shutdown', 'zero-day'
+    ];
+
+    function normalizeText(value) {
+      return String(value || '').toLowerCase();
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function shortText(value, max = 110) {
+      const text = String(value || '').replace(/\s+/g, ' ').trim();
+      if (!text) return '';
+      return text.length > max ? text.slice(0, max - 3).trim() + '...' : text;
+    }
+
+    function parseMaybeJSON(value) {
+      if (!value) return {};
+      if (typeof value === 'object') return value;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return {};
+      }
+    }
+
+    function fetchWithTimeout(url, options = {}, timeout = 8000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+      return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(timer));
+    }
+
+    function extractEngagementScore(item) {
+      const engagement = parseMaybeJSON(item.engagement);
+      const contentText = String(item.content || '');
+      const scoreMatch = contentText.match(/score\s*:\s*(\d+)/i);
+      const commentsMatch = contentText.match(/comments\s*:\s*(\d+)/i);
+
+      const upvotes = Number(engagement.upvotes || scoreMatch?.[1] || 0);
+      const comments = Number(engagement.comments || commentsMatch?.[1] || 0);
+      const stars = Number(engagement.stars || 0);
+      const forks = Number(engagement.forks || 0);
+
+      return upvotes + comments * 2 + stars + forks * 2;
+    }
+
+    function recencyBoost(publishedAt) {
+      if (!publishedAt) return 0;
+      const ts = Date.parse(publishedAt);
+      if (Number.isNaN(ts)) return 0;
+
+      const hours = Math.max(0, (Date.now() - ts) / 36e5);
+      if (hours <= 2) return 35;
+      if (hours <= 6) return 26;
+      if (hours <= 12) return 18;
+      if (hours <= 24) return 10;
+      if (hours <= 48) return 4;
+      return 0;
+    }
+
+    function classifyItem(item) {
+      const text = normalizeText([
+        item.title,
+        item.summary,
+        item.content,
+        item.meta,
+        item.category,
+        item.source,
+      ].filter(Boolean).join(' '));
+      const source = normalizeText(item.source);
+
+      let csHits = 0;
+      let insightHits = 0;
+      let breakingHits = 0;
+
+      CS_KEYWORDS.forEach(k => { if (text.includes(k)) csHits += 1; });
+      INSIGHT_KEYWORDS.forEach(k => { if (text.includes(k)) insightHits += 1; });
+      BREAKING_KEYWORDS.forEach(k => { if (text.includes(k)) breakingHits += 1; });
+
+      const sourceCsBoost =
+        (source.includes('github') ? 12 : 0) +
+        (source.includes('hacker news') ? 9 : 0) +
+        (source.includes('medium') ? 4 : 0);
+
+      const sourceInsightBoost =
+        (source.includes('reddit') ? 8 : 0) +
+        (source.includes('product hunt') ? 8 : 0) +
+        (source.includes('medium') ? 3 : 0);
+
+      const engagementScore = extractEngagementScore(item);
+      const engagementBoost = Math.min(45, Math.round(Math.log10(engagementScore + 1) * 12));
+      const recency = recencyBoost(item.published_at || item.publishedAt);
+
+      return {
+        department: csHits * 6 + sourceCsBoost,
+        insights: insightHits * 6 + sourceInsightBoost,
+        breaking: breakingHits * 8 + engagementBoost + recency + (item.is_breaking ? 20 : 0),
+      };
+    }
+
+    function inferSourceLabel(item) {
+      if (item.source && item.source.trim()) return item.source;
+      if (item.category && item.category.trim()) return DEPT_LABELS[getSelectedDept()] || 'Dept';
+      return 'Campus Tech';
+    }
+
+    function normalizeCategory(raw, fallback) {
+      fallback = fallback || DEPT_LABELS[getSelectedDept()] || 'DEPT';
+      const text = String(raw || '').replace(/[_-]/g, ' ').trim();
+      if (!text) return fallback;
+      return text.slice(0, 12).toUpperCase();
+    }
+
+    function normalizeBackendItem(item, isBreakingList = false) {
+      const blocks = item.content_blocks || {};
+      const summary = item.summary || blocks.why_it_matters || blocks.hook || '';
+      return {
+        title: item.title || '',
+        url: item.original_url || item.url || '#',
+        source: item.source || item.source_name || 'CS Desk',
+        summary,
+        content: summary || item.title || '',
+        category: item.category || '',
+        published_at: item.published_at || null,
+        is_breaking: Boolean(item.is_breaking || isBreakingList),
+        featured_image_url: item.featured_image_url || '',
+        image_credit: item.image_credit || null,
+        engagement: {
+          upvotes: item.attractiveness_score || item.engagement_score || 0,
+          comments: item.breaking_score || item.urgency_score || 0,
+        },
+        final_score: Number(item.final_score || 0),
+        engagement_score: Number(item.engagement_score || 0),
+        recency_score: Number(item.recency_score || 0),
+        urgency_score: Number(item.urgency_score || 0),
+        relevance_score: Number(item.relevance_score || 0),
+      };
+    }
+
+    function normalizeScrapedItem(item) {
+      const metadata = parseMaybeJSON(item.metadata);
+      const source = item.source || 'Campus Tech';
+      const content = item.content || '';
+
+      return {
+        title: item.title || '',
+        url: item.url || '#',
+        source,
+        summary: !/^score\s*:/i.test(content) ? shortText(content, 180) : '',
+        content,
+        category: metadata.category || '',
+        published_at: item.published_at || null,
+        is_breaking: false,
+        engagement: parseMaybeJSON(item.engagement),
+      };
+    }
+
+    function uniqueByTitle(items) {
+      const seen = new Set();
+      const output = [];
+      for (const item of items) {
+        const key = `${item.title || ''}|${item.url || ''}`.toLowerCase();
+        if (!key.trim() || seen.has(key)) continue;
+        seen.add(key);
+        output.push(item);
+      }
+      return output;
+    }
+
+    function toBreakingSlide(item) {
+      const source = inferSourceLabel(item);
+      const line = shortText(item.summary || item.content || 'CS update in progress', 90);
+      return {
+        title: item.title || '',
+        subtitle: `${source} - ${line}`,
+        source,
+        url: item.url || '#',
+        is_breaking: true,
+        content: item.content || item.summary || item.title || '',
+        image: item.featured_image_url || item.image || '',
+        image_credit: item.image_credit || null,
+        category: item.category || 'general',
+      };
+    }
+
+    function toSectionCard(item, fallbackCategory = 'CS') {
+      const source = inferSourceLabel(item);
+      return {
+        title: item.title || '',
+        source,
+        url: item.url || '#',
+        category: normalizeCategory(item.category, fallbackCategory),
+        content: item.content || item.summary || item.title || '',
+        meta: shortText(item.summary || item.content || `${source} update for CS students.`, 120),
+        image: item.featured_image_url || item.image || '',
+        image_credit: item.image_credit || null,
+      };
+    }
+
+    function curateSections(rawItems) {
+      const items = uniqueByTitle(rawItems)
+        .filter(i => i.title)
+        .map(i => ({ ...i, _cls: classifyItem(i), _engagement: extractEngagementScore(i) }));
+
+      allItems = items;
+
+      const byBreaking = [...items].sort((a, b) => (b._cls.breaking + b._engagement) - (a._cls.breaking + a._engagement));
+      let breakingBase = byBreaking.filter(i => i._cls.breaking >= 18 || i.is_breaking).slice(0, MAX_SLIDES);
+      if (breakingBase.length < MAX_SLIDES) {
+        const seen = new Set(breakingBase.map(i => `${i.title}|${i.url}`));
+        for (const item of byBreaking) {
+          const key = `${item.title}|${item.url}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          breakingBase.push(item);
+          if (breakingBase.length >= MAX_SLIDES) break;
+        }
+      }
+
+      const used = new Set();
+      const takeFromPool = (pool, count, fallbackCategory) => {
+        const out = [];
+        for (const item of pool) {
+          const key = `${item.title}|${item.url}`;
+          if (used.has(key)) continue;
+          used.add(key);
+          out.push(toSectionCard(item, fallbackCategory));
+          if (out.length >= count) break;
+        }
+        return out;
+      };
+
+      const departmentPool = [...items]
+        .filter(i => i._cls.department >= 9)
+        .sort((a, b) => b._cls.department - a._cls.department || b._engagement - a._engagement);
+
+      const insightPool = [...items]
+        .filter(i => i._cls.insights >= 9)
+        .sort((a, b) => b._cls.insights - a._cls.insights || b._engagement - a._engagement);
+
+      const deptTag = DEPT_LABELS[getSelectedDept()] || 'DEPT';
+      let department = takeFromPool(departmentPool, 3, deptTag);
+      let insights = takeFromPool(insightPool, 3, 'INSIGHT');
+
+      if (department.length < 3) {
+        const refill = [...items]
+          .filter(i => i._cls.department >= 4)
+          .sort((a, b) => b._engagement - a._engagement);
+        department = department.concat(takeFromPool(refill, 3 - department.length, deptTag));
+      }
+
+      if (insights.length < 3) {
+        const refill = [...items]
+          .filter(i => i._cls.insights >= 4)
+          .sort((a, b) => b._engagement - a._engagement);
+        insights = insights.concat(takeFromPool(refill, 3 - insights.length, 'INSIGHT'));
+      }
+
+      const storiesPool = [...items].sort((a, b) => b._engagement - a._engagement);
+      const stories = takeFromPool(storiesPool, 3, 'TREND');
+
+      return {
+        breaking: breakingBase.map(toBreakingSlide),
+        department: department.slice(0, 3),
+        insights: insights.slice(0, 3),
+        stories: stories.slice(0, 3),
+      };
+    }
+
+    function fallbackSummary(item, section) {
+      const deptName = DEPT_NAMES[getSelectedDept()] || 'your department';
+      const source = item.source || (DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk';
+      const raw = item.meta || item.summary || item.subtitle || item.content || '';
+      if (raw) return shortText(raw, 110);
+      if (section === 'insights') return `${source} industry signal for ${deptName} students.`;
+      if (section === 'breaking') return `${source} breaking update for campus tech.`;
+      return `${source} update relevant to ${deptName} students.`;
+    }
+
+    function cleanAiLine(value) {
+      return String(value || '')
+        .replace(/\*\*/g, '')
+        .replace(/^#+\s*/g, '')
+        .replace(/^(hook|why it matters|key points|action step)\s*:\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function normalizeCompareText(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    const TITLE_STOPWORDS = new Set([
+      'the', 'a', 'an', 'and', 'or', 'to', 'of', 'for', 'in', 'on', 'at', 'with', 'from',
+      'is', 'are', 'was', 'were', 'be', 'being', 'been', 'this', 'that', 'these', 'those',
+      'they', 'their', 'them', 'you', 'your', 'we', 'our', 'it', 'its', 'as', 'by', 'about',
+      'news', 'update', 'says', 'say', 'report', 'reports', 'according', 'suggests', 'suggest'
+    ]);
+
+    function titleTerms(item) {
+      const tokens = normalizeCompareText(item.title || '')
+        .split(' ')
+        .filter(token => token.length >= 4 && !TITLE_STOPWORDS.has(token));
+      return Array.from(new Set(tokens)).slice(0, 8);
+    }
+
+    function stripSourcePrefix(text) {
+      let out = String(text || '').trim();
+      if (!out) return out;
+      out = out.replace(/^(reddit|hacker\s*news|github|medium|product\s*hunt|x|twitter|cs\s*desk|campus\s*tech)\s*[-|:]\s*/i, '');
+      out = out.replace(/^r\/[a-z0-9_]+\s*[-|:]\s*/i, '');
+      out = out.replace(/^(reddit|hacker\s*news|github|medium)\s*[-|:]\s*r\/[a-z0-9_]+\s*[-|:]\s*/i, '');
+      return out.trim();
+    }
+
+    function overlapCount(text, terms) {
+      const normalized = normalizeCompareText(text);
+      if (!normalized || !terms.length) return 0;
+      return terms.filter(term => normalized.includes(term)).length;
+    }
+
+    function isRelevantToStory(text, item) {
+      const clean = stripSourcePrefix(cleanAiLine(text));
+      if (!clean || countWords(clean) < 8) return false;
+      const terms = titleTerms(item);
+      if (!terms.length) return true;
+      const matched = overlapCount(clean, terms);
+      const minRequired = terms.length >= 4 ? 2 : 1;
+      return matched >= minRequired;
+    }
+
+    function titleAnchoredQuick(item) {
+      const title = cleanAiLine(item.title || 'This story');
+      return `${title}. This summary focuses on the core claim and immediate context students should evaluate carefully before drawing conclusions.`;
+    }
+
+    function titleAnchoredWhy(item) {
+      const terms = titleTerms(item).slice(0, 3).join(', ');
+      if (terms) {
+        return `It matters because this story influences how students interpret ${terms} developments, assess risk, and discuss responsible technical decisions.`;
+      }
+      return 'It matters because this story affects technical judgment, project choices, and informed conversations around current computing trends.';
+    }
+
+    function titleAnchoredImpact(item) {
+      const text = normalizeCompareText(`${item.title} ${item.category}`);
+      if (/risk|safety|security|breach|attack|privacy/.test(text)) {
+        return 'For students, this means prioritizing safe system design, better threat modeling, and stronger reasoning when evaluating AI claims in projects.';
+      }
+      if (/ai|model|openai|anthropic|llm/.test(text)) {
+        return 'For students, this is a signal to build practical AI literacy, compare model behavior critically, and explain tradeoffs clearly in interviews.';
+      }
+      return 'For students, use this update to refine your learning priorities, project framing, and evidence-based technical communication this semester.';
+    }
+
+    function isUsefulAiLine(value) {
+      const text = cleanAiLine(value);
+      if (!text) return false;
+      if (text.length < 16) return false;
+      if (/^\W+$/.test(text)) return false;
+      if (/^key points?$/i.test(text)) return false;
+      return /[a-zA-Z]{4,}/.test(text);
+    }
+
+    function countWords(text) {
+      return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function loadPersistedStoryCache() {
+      try {
+        const raw = localStorage.getItem(STORY_DETAIL_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return;
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (!value || typeof value !== 'object') return;
+          const titlePart = key.split('|')[0] || '';
+          const cacheItem = { title: titlePart };
+          const quickSummary = String(value.quickSummary || '').trim();
+          const whyImportant = String(value.whyImportant || '').trim();
+          const impact = String(value.impact || '').trim();
+          const fullArticle = String(value.fullArticle || '').trim();
+          if (!quickSummary || !whyImportant || !impact || !fullArticle) return;
+          if (countWords(quickSummary) <= 12) return;
+          if (countWords(whyImportant) <= 12) return;
+          if (countWords(impact) <= 12) return;
+          if (!isRelevantToStory(quickSummary, cacheItem)) return;
+          if (!isRelevantToStory(whyImportant, cacheItem)) return;
+          storyDetailCache.set(key, { quickSummary, whyImportant, impact, fullArticle });
+        });
+      } catch {}
+    }
+
+    function persistStoryCache() {
+      try {
+        const maxEntries = 250;
+        const entries = Array.from(storyDetailCache.entries()).slice(-maxEntries);
+        const payload = Object.fromEntries(entries);
+        localStorage.setItem(STORY_DETAIL_STORAGE_KEY, JSON.stringify(payload));
+      } catch {}
+    }
+
+    function setStoryCache(cacheKey, value) {
+      storyDetailCache.set(cacheKey, value);
+      persistStoryCache();
+    }
+
+    function trimToWordCount(text, maxWords) {
+      const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+      if (words.length <= maxWords) return words.join(' ');
+      return words.slice(0, maxWords).join(' ').replace(/[,:;\-]+$/, '') + '.';
+    }
+
+    function buildArticle50to60Words(parts) {
+      const cleanParts = parts
+        .map(cleanAiLine)
+        .filter(isUsefulAiLine)
+        .map(line => line.replace(/[.!?]+$/g, '').trim());
+
+      let article = cleanParts.join('. ');
+      if (!article) {
+        article = 'This update highlights a meaningful shift in technology that students should track closely. It explains what changed, why the change matters now, and what skills or decisions may be affected next. Use it as a quick signal for projects, interview preparation, and informed technical discussions this week.';
+      }
+
+      article = article.replace(/\s+/g, ' ').trim();
+      if (!/[.!?]$/.test(article)) article += '.';
+
+      const words = countWords(article);
+      if (words > 60) {
+        return trimToWordCount(article, 60);
+      }
+      if (words >= 50) {
+        return article;
+      }
+
+      const filler = 'For students, this is worth reading because it can shape project choices, internship conversations, and the technical priorities teams care about in the near term.';
+      let expanded = `${article.replace(/[.!?]$/, '')}. ${filler}`;
+      expanded = trimToWordCount(expanded, 60);
+      if (countWords(expanded) < 50) {
+        expanded += ' Keep this on your radar as you plan your next learning steps.';
+        expanded = trimToWordCount(expanded, 60);
+      }
+      return expanded;
+    }
+
+    async function summarizeWithAI(item, section, backendOk) {
+      const cacheKey = `${section}|${item.title}|${item.url}`;
+      if (AI_SUMMARY_CACHE.has(cacheKey)) return AI_SUMMARY_CACHE.get(cacheKey);
+
+      const fallback = fallbackSummary(item, section);
+      if (!backendOk) {
+        AI_SUMMARY_CACHE.set(cacheKey, fallback);
+        return fallback;
+      }
+
+      const category = section === 'insights' ? 'industrial-insight' : 'computer-science';
+      const content = item.content || item.meta || item.subtitle || item.title || '';
+
+      try {
+        const res = await fetchWithTimeout(API + '/api/v1/ai/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: item.title || '', content, category }),
+        }, 9000);
+
+        if (!res.ok) throw new Error(`AI summarize failed: ${res.status}`);
+        const payload = await res.json();
+        const data = payload.data || payload;
+        const summary = data.summary || {};
+
+        const keyPoints = Array.isArray(summary.key_points)
+          ? summary.key_points.map(cleanAiLine).filter(isUsefulAiLine)
+          : [];
+        const candidates = section === 'breaking'
+          ? [summary.hook, summary.why_it_matters, keyPoints[0]]
+          : [summary.why_it_matters, keyPoints[0], summary.hook];
+
+        let best = '';
+        for (const c of candidates) {
+          if (isUsefulAiLine(c)) {
+            best = cleanAiLine(c);
+            break;
+          }
+        }
+
+        const finalText = shortText(best || fallback, 110);
+        AI_SUMMARY_CACHE.set(cacheKey, finalText);
+        return finalText;
+      } catch {
+        AI_SUMMARY_CACHE.set(cacheKey, fallback);
+        return fallback;
+      }
+    }
+
+    async function enrichWithAI(data, backendOk) {
+      const maxPerSection = { breaking: 3, department: 3, insights: 3 };
+      const jobs = [];
+
+      data.breaking.slice(0, maxPerSection.breaking).forEach(item => {
+        jobs.push(summarizeWithAI(item, 'breaking', backendOk).then(text => {
+          item.subtitle = `${item.source || 'CS Desk'} - ${text}`;
+        }));
+      });
+
+      data.department.slice(0, maxPerSection.department).forEach(item => {
+        jobs.push(summarizeWithAI(item, 'department', backendOk).then(text => {
+          item.meta = text;
+        }));
+      });
+
+      data.insights.slice(0, maxPerSection.insights).forEach(item => {
+        jobs.push(summarizeWithAI(item, 'insights', backendOk).then(text => {
+          item.meta = text;
+        }));
+      });
+
+      await Promise.all(jobs);
+      return data;
+    }
+
+    function registerStory(item) {
+      storySeq += 1;
+      const id = `story-${storySeq}`;
+      const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
+      storyRegistry.set(id, {
+        title: item.title || '',
+        source: item.source || 'CS Desk',
+        url: item.url || '#',
+        category: item.category || '',
+        content: item.content || item.meta || item.subtitle || item.title || '',
+        summary: cleanSummary,
+      });
+      return id;
+    }
+
+    function buildStoryPackage(item, summary, points) {
+      const fallbackQuick = shortText(item.summary || item.content || item.title || '', 170);
+      // Support both old (hook) and new (what_happened) AI field names
+      let quickSeed = stripSourcePrefix(cleanAiLine(summary.what_happened || summary.hook || points[0] || summary.why_it_matters || fallbackQuick))
+        || fallbackSummary(item, 'department')
+        || fallbackQuick;
+      let whySeed = stripSourcePrefix(cleanAiLine(summary.why_it_matters || points[1] || ''))
+        || shortText(item.summary || item.content || '', 190);
+      // Support both old (action_step) and new (key_facts as impact source)
+      let impactSeed = stripSourcePrefix(cleanAiLine(summary.action_step || points[2] || ''))
+        || shortText(item.summary || '', 190);
+
+      // Only apply relevance check if the seed is generic filler, not factual content
+      if (quickSeed && !isRelevantToStory(quickSeed, item) && countWords(quickSeed) < 15) quickSeed = titleAnchoredQuick(item);
+      if (whySeed && !isRelevantToStory(whySeed, item) && countWords(whySeed) < 15) whySeed = titleAnchoredWhy(item);
+
+      const quickSummary = shortText(quickSeed || item.title || '', 170);
+      const whyImportant = shortText(whySeed || '', 190);
+      const impact = shortText(impactSeed || '', 190);
+      const fullArticle = buildArticle50to60Words([
+        quickSummary,
+        whyImportant,
+        impact,
+        item.summary,
+      ]);
+      return { quickSummary, whyImportant, impact, fullArticle };
+    }
+
+    function buildHeuristicStoryPackage(item) {
+      const title = cleanAiLine(item.title || 'This story');
+      const base = stripSourcePrefix(item.content || item.summary || '');
+      const quickSeed = base ? `${title}. ${base}` : title;
+      const whySeed = base || title;
+      const impactSeed = base || '';
+
+      const quickSummary = shortText(quickSeed, 170);
+      const whyImportant = shortText(whySeed, 190);
+      const impact = shortText(impactSeed, 190);
+      const fullArticle = buildArticle50to60Words([quickSummary, whyImportant, impact, base]);
+      return { quickSummary, whyImportant, impact, fullArticle };
+    }
+
+    function isValidStoryPackage(pkg, item) {
+      if (!pkg || typeof pkg !== 'object') return false;
+      const quickSummary = String(pkg.quickSummary || '').trim();
+      const whyImportant = String(pkg.whyImportant || '').trim();
+      // Package is valid if it has at least a quickSummary with real content
+      if (!quickSummary || countWords(quickSummary) < 5) return false;
+      return true;
+    }
+
+    async function getStoryInsights(item) {
+      const cacheKey = `${item.title}|${item.url}`;
+      if (storyDetailCache.has(cacheKey)) return storyDetailCache.get(cacheKey);
+
+      const fallback = buildStoryPackage(item, {}, []);
+      const heuristic = buildHeuristicStoryPackage(item);
+      if (!backendIsLive) {
+        const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
+        setStoryCache(cacheKey, result);
+        return result;
+      }
+
+      // Send full content when available (from feed API), fall back to summary
+      const text = item.content || item.summary || item.title || '';
+      const category = /market|policy|industry|regulation/i.test(item.category || item.title || text)
+        ? 'industrial-insight'
+        : 'computer-science';
+
+      try {
+        const res = await fetchWithTimeout(API + '/api/v1/ai/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: item.title || '', content: text, category }),
+        }, 10000);
+        if (!res.ok) throw new Error(`AI summarize failed: ${res.status}`);
+
+        const payload = await res.json();
+        const data = payload.data || payload;
+        const summary = data.summary || {};
+        // Support both old (key_points) and new (key_facts) field names
+        const rawPoints = Array.isArray(summary.key_facts) ? summary.key_facts
+          : Array.isArray(summary.key_points) ? summary.key_points : [];
+        const points = rawPoints.map(cleanAiLine).filter(isUsefulAiLine);
+
+        const aiResult = buildStoryPackage(item, summary, points);
+        if (isValidStoryPackage(aiResult, item)) {
+          setStoryCache(cacheKey, aiResult);
+          return aiResult;
+        }
+
+        const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
+        setStoryCache(cacheKey, result);
+        return result;
+      } catch {
+        const result = isValidStoryPackage(heuristic, item) ? heuristic : fallback;
+        setStoryCache(cacheKey, result);
+        return result;
+      }
+    }
+
+    async function warmStoryInsights(data) {
+      const pool = [
+        ...(Array.isArray(data.breaking) ? data.breaking : []),
+        ...(Array.isArray(data.department) ? data.department : []),
+        ...(Array.isArray(data.insights) ? data.insights : []),
+        ...(Array.isArray(data.stories) ? data.stories : []),
+      ];
+      const seen = new Set();
+      const uniqueItems = [];
+      for (const item of pool) {
+        const key = `${item.title || ''}|${item.url || ''}`.toLowerCase();
+        if (!key.trim() || seen.has(key)) continue;
+        seen.add(key);
+        uniqueItems.push(item);
+      }
+      const missing = uniqueItems.filter(item => !storyDetailCache.has(`${item.title}|${item.url}`));
+      if (!missing.length) return;
+      await Promise.allSettled(missing.map(item => getStoryInsights(item)));
+    }
+
+    async function openStoryModal(item) {
+      if (!item) return;
+
+      $storyModalTitle.textContent = item.title || 'Story';
+      $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+      $storyQuickSummary.textContent = 'Preparing summary...';
+      $storyWhyImportant.textContent = 'Preparing context...';
+      $storyImpact.textContent = 'Preparing student impact...';
+      $storyFullArticleBlock.hidden = true;
+      $storyFullArticleText.textContent = '';
+      $storyToggleArticle.textContent = 'Show Full AI Article';
+      $storyToggleArticle.setAttribute('aria-expanded', 'false');
+      $storySourceLink.href = item.url || '#';
+
+      $storyModal.classList.add('open');
+      $storyModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+
+      const insights = await getStoryInsights(item);
+      $storyQuickSummary.textContent = insights.quickSummary;
+      $storyWhyImportant.textContent = insights.whyImportant;
+      $storyImpact.textContent = insights.impact;
+      $storyFullArticleText.textContent = insights.fullArticle;
+      $storyToggleArticle.hidden = !insights.fullArticle;
+    }
+
+    function closeStoryModal() {
+      $storyModal.classList.remove('open');
+      $storyModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      $storyFullArticleBlock.hidden = true;
+      $storyToggleArticle.textContent = 'Show Full AI Article';
+      $storyToggleArticle.setAttribute('aria-expanded', 'false');
+    }
+
+    /* ========================================================
+       RENDER ARTICLE CARD
+    ======================================================== */
+    function renderCard(item) {
+      const storyId = registerStory(item);
+      const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
+
+      const hasImg = !!(item.image);
+      const imgStyle = hasImg ? `background-image:url('${escapeHtml(item.image)}');` : '';
+      const imgClass = hasImg ? ' has-image' : '';
+      const placeholder = hasImg ? '' : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
+      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(item.title, item.category))}"`;      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
+        <div class="article-card-visual${imgClass}" style="${imgStyle}">${placeholder}</div>
+        <div class="article-card-title">${escapeHtml(item.title)}</div>
+        <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
+      </a>`;
+    }
+
+    /* ========================================================
+       POPULATE SECTIONS
+    ======================================================== */
+    function populateSection(gridId, items) {
+      const grid = $(gridId);
+      if (!grid) return;
+      const label = grid.querySelector('.section-label-card');
+      grid.innerHTML = '';
+      grid.appendChild(label);
+      items.slice(0, 3).forEach(item => {
+        grid.insertAdjacentHTML('beforeend', renderCard(item));
+      });
+      // Lazy-load Unsplash images for cards without existing images
+      UnsplashImageLoader.observeAll(grid);
+    }
+
+    /* ========================================================
+       RESEARCH PAPERS — render helpers
+    ======================================================== */
+    function renderResearchCard(paper) {
+      const storyId = registerStory(paper);
+      const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
+      const cite = paper.citations ? paper.citations + ' citations' : '';
+      const hasImg = !!(paper.featured_image_url);
+      const imgStyle = hasImg ? `background-image:url('${escapeHtml(paper.featured_image_url)}');background-size:cover;background-position:center;` : 'background:#f4f0ff';
+      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(paper.title, 'research'))}"`;
+      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
+        <div class="article-card-visual" style="${imgStyle}"></div>
+        <div class="article-card-title">${escapeHtml(paper.title)}</div>
+        <div class="article-card-meta">${escapeHtml(meta)}${cite ? ' · ' + escapeHtml(cite) : ''}</div>
+      </a>`;
+    }
+
+    function renderResearchRow(paper) {
+      const url = paper.url || paper.original_url || '#';
+      const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
+      const cite = paper.citations ? `<span class="research-cite-badge">${paper.citations} citations</span>` : '';
+      const abstract = shortText(paper.summary || paper.meta || '', 180);
+      return `<a class="research-row" href="${escapeHtml(url)}" target="_blank" rel="noopener">
+        <div class="research-row-body">
+          <div class="research-row-title">${escapeHtml(paper.title)}</div>
+          <div class="research-row-meta">${escapeHtml(meta)}</div>
+          ${abstract ? '<div class="research-row-abstract">' + escapeHtml(abstract) + '</div>' : ''}
+        </div>
+        ${cite}
+      </a>`;
+    }
+
+    function populateResearch(data) {
+      const rp = data.research_papers || {};
+      const featured = Array.isArray(rp.featured) ? rp.featured : [];
+      // Featured cards in grid (top 3 only on homepage)
+      const grid = $('research-featured-grid');
+      if (grid) {
+        const label = grid.querySelector('.section-label-card');
+        grid.innerHTML = '';
+        if (label) grid.appendChild(label);
+        featured.forEach(p => grid.insertAdjacentHTML('beforeend', renderResearchCard(p)));
+        UnsplashImageLoader.observeAll(grid);
+      }
+      // Show/hide section
+      const section = $('research');
+      if (section) {
+        section.style.display = featured.length ? '' : 'none';
+      }
+    }
+
+    /* ========================================================
+       DATA LOADING
+    ======================================================== */
+    async function loadAllData() {
+      let backendOk = false;
+      try {
+        const res = await fetchWithTimeout(API + '/health', {}, 3000);
+        backendOk = res.ok;
+      } catch {}
+      backendIsLive = backendOk;
+
+      let data = null;
+      if (backendOk) {
+        data = await loadFromBackendAll();
+      }
+
+      if (!data) {
+        data = await loadFromScrapedFile();
+      }
+
+      if (!data) {
+        data = JSON.parse(JSON.stringify(DEMO));
+      }
+
+      const enriched = await enrichWithAI(data, backendOk);
+      const cacheKey = 'all-sections:' + getSelectedDept();
+      FeedCache.set(cacheKey, enriched, 300000);
+      _feedCacheLastFetchTime = Date.now();
+      updateLastUpdatedIndicator();
+      return enriched;
+    }
+
+    async function loadFromBackendAll() {
+      try {
+        const dept = getSelectedDept();
+        const res = await fetchWithTimeout(
+          API + '/api/v1/feed/all-sections?breaking_limit=8&department_limit=15&trending_limit=10&department=' + encodeURIComponent(dept),
+          {},
+          6000
+        );
+        if (!res.ok) return null;
+
+        const data = await res.json();
+        const payload = data.data || {};
+
+        const breaking = Array.isArray(payload.breaking) ? payload.breaking : [];
+        const department = Array.isArray(payload.department) ? payload.department : [];
+        const trending = Array.isArray(payload.trending) ? payload.trending : [];
+        const career = Array.isArray(payload.career) ? payload.career : [];
+        const research_papers = payload.research_papers || { featured: [], papers: [] };
+
+        if (!breaking.length && !department.length && !trending.length) {
+          // Backend is live but no content for this department — show empty state, not CS demo data
+          const deptName = DEPT_NAMES[dept] || dept;
+          const emptyCard = {
+            title: 'No ' + deptName + ' news yet',
+            subtitle: 'Content for this department is being collected. Check back soon!',
+            source: DEPT_LABELS[dept] || dept,
+            url: '#',
+            category: DEPT_LABELS[dept] || dept,
+          };
+          return {
+            breaking: [toBreakingSlide({
+              title: 'Welcome to ' + deptName,
+              subtitle: 'News for your department will appear here as sources are scraped.',
+              source: 'NEWS DAY', url: '#', is_breaking: false
+            })],
+            department: [toSectionCard(emptyCard, DEPT_LABELS[dept])],
+            insights: [],
+            stories: [],
+            research_papers: research_papers,
+          };
+        }
+
+        const deptLabel = DEPT_LABELS[dept] || dept;
+        return {
+          breaking: breaking.map(item => toBreakingSlide(normalizeBackendItem(item, true))),
+          department: department.map(item => toSectionCard(normalizeBackendItem(item), deptLabel)),
+          insights: (career.length ? career : trending).map(item => toSectionCard(normalizeBackendItem(item), 'CAREER')),
+          stories: [],
+          research_papers: research_papers,
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    async function loadFromScrapedFile() {
+      const files = [
+        '../scraper_platform/data/scraped_20260216_220517.json',
+        '../scraper_platform/data/scraped_20260216_205603.json',
+        '../scraper_platform/data/scraped_20260216_204339.json',
+        '../scraper_platform/data/scraped_20260216_204229.json',
+        '../scraper_platform/data/scraped_20260216_203951.json',
+      ];
+
+      for (const file of files) {
+        try {
+          const res = await fetchWithTimeout(file, {}, 5000);
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (!data.items || !data.items.length) continue;
+
+          const normalized = data.items.map(normalizeScrapedItem).filter(i => i.title);
+          if (!normalized.length) continue;
+
+          return curateSections(normalized);
+        } catch {}
+      }
+
+      return null;
+    }
+
+    /* ========================================================
+       HERO SLIDESHOW
+    ======================================================== */
+    function showSlide(index) {
+      if (!slides.length) return;
+      currentSlide = ((index % slides.length) + slides.length) % slides.length;
+      const slide = slides[currentSlide];
+
+      $heroText.classList.remove('active');
+
+      setTimeout(() => {
+        $title.textContent = slide.title;
+        $subtitle.textContent = slide.subtitle || '';
+        $source.textContent = (slide.source || '').toUpperCase();
+        const heroStoryId = `hero-${currentSlide}`;
+        storyRegistry.set(heroStoryId, {
+          title: slide.title || '',
+          source: slide.source || 'CS Desk',
+          url: slide.url || '#',
+          category: 'breaking',
+          content: slide.content || slide.subtitle || slide.title || '',
+          summary: slide.subtitle || '',
+        });
+        $btn.href = '#';
+        $btn.dataset.storyId = heroStoryId;
+        $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
+
+        // Hero image — use featured_image_url, then try Unsplash fallback
+        const $visual = $('hero-visual');
+        if ($visual) {
+          if (slide.image) {
+            $visual.style.backgroundImage = `url('${slide.image}')`;
+            $visual.style.backgroundSize = 'cover';
+            $visual.style.backgroundPosition = 'center';
+          } else {
+            $visual.style.backgroundImage = '';
+            // Unsplash fallback for hero slides
+            const heroQuery = UnsplashImageLoader.getQuery(slide.title, slide.category);
+            if (heroQuery) {
+              UnsplashImageLoader._fetchForHero(heroQuery).then(data => {
+                if (data && $visual) {
+                  $visual.style.backgroundImage = `url('${data.url}')`;
+                  $visual.style.backgroundSize = 'cover';
+                  $visual.style.backgroundPosition = 'center';
+                }
+              });
+            }
+          }
+        }
+
+        // Update typographic fill
+        $typeLabel.textContent = (slide.source || 'NEWS').toUpperCase().split(' - ')[0];
+        $slideNum.textContent = String(currentSlide + 1).padStart(2, '0');
+        $counter.textContent = String(currentSlide + 1).padStart(2, '0') + ' / ' + String(slides.length).padStart(2, '0');
+
+        $dots.querySelectorAll('.hero-dot').forEach((d, i) => {
+          d.classList.toggle('active', i === currentSlide);
+        });
+
+        requestAnimationFrame(() => $heroText.classList.add('active'));
+      }, 280);
+
+      resetProgress();
+    }
+
+    function buildDots() {
+      $dots.innerHTML = '';
+      slides.forEach((_, i) => {
+        const dot = document.createElement('div');
+        dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
+        dot.addEventListener('click', () => goToSlide(i));
+        $dots.appendChild(dot);
+      });
+    }
+
+    function resetProgress() {
+      $progressBar.style.width = '0%';
+      progressStart = Date.now();
+      cancelAnimationFrame(progressTimer);
+      tickProgress();
+    }
+
+    function tickProgress() {
+      const elapsed = Date.now() - progressStart;
+      const pct = Math.min((elapsed / SLIDE_INTERVAL) * 100, 100);
+      $progressBar.style.width = pct + '%';
+      if (pct < 100) progressTimer = requestAnimationFrame(tickProgress);
+    }
+
+    function startAutoplay() {
+      stopAutoplay();
+      slideTimer = setInterval(() => showSlide(currentSlide + 1), SLIDE_INTERVAL);
+      resetProgress();
+    }
+
+    function stopAutoplay() {
+      clearInterval(slideTimer);
+      cancelAnimationFrame(progressTimer);
+    }
+
+    function goToSlide(i) {
+      stopAutoplay();
+      showSlide(i);
+      startAutoplay();
+    }
+
+    $btn.addEventListener('click', e => {
+      e.preventDefault();
+      const storyId = $btn.dataset.storyId;
+      if (!storyId) return;
+      openStoryModal(storyRegistry.get(storyId));
+    });
+
+    document.addEventListener('click', e => {
+      if (!(e.target instanceof Element)) return;
+      const card = e.target.closest('.article-card[data-story-id]');
+      if (!card) return;
+      e.preventDefault();
+      const storyId = card.dataset.storyId;
+      openStoryModal(storyRegistry.get(storyId));
+    });
+
+    $storyModalClose.addEventListener('click', closeStoryModal);
+    $storyToggleArticle.addEventListener('click', () => {
+      const opening = $storyFullArticleBlock.hidden;
+      $storyFullArticleBlock.hidden = !opening;
+      $storyToggleArticle.textContent = opening ? 'Hide Full AI Article' : 'Show Full AI Article';
+      $storyToggleArticle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    });
+    $storyModal.addEventListener('click', e => {
+      if (e.target === $storyModal) closeStoryModal();
+    });
+
+    $('arrow-left').addEventListener('click', () => goToSlide(currentSlide - 1));
+    $('arrow-right').addEventListener('click', () => goToSlide(currentSlide + 1));
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && $storyModal.classList.contains('open')) {
+        closeStoryModal();
+        return;
+      }
+      if ($storyModal.classList.contains('open')) return;
+      if (e.key === 'ArrowLeft') goToSlide(currentSlide - 1);
+      if (e.key === 'ArrowRight') goToSlide(currentSlide + 1);
+    });
+    $('hero').addEventListener('mouseenter', stopAutoplay);
+    $('hero').addEventListener('mouseleave', startAutoplay);
+
+    function scrollToSection(id) {
+      const el = $(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ========================================================
+       SESSION-AWARE NAVBAR
+    ======================================================== */
+    function initNavbarAuth() {
+      const navLink = $('nav-auth-link');
+      const avatar = $('navbar-avatar');
+      try {
+        const raw = localStorage.getItem('newsday_session');
+        if (!raw) return;
+        const session = JSON.parse(raw);
+        if (!session.authenticated) return;
+
+        // Logged in — swap "Log In" to "Log Out"
+        navLink.textContent = 'Log Out';
+        navLink.href = '#';
+        navLink.addEventListener('click', async e => {
+          e.preventDefault();
+          try { await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }); } catch (_) {}
+          localStorage.removeItem('newsday_session');
+          window.location.href = 'auth.html';
+        });
+
+        // Set avatar initials
+        const user = session.user;
+        if (user) {
+          const name = (user.user_metadata && user.user_metadata.full_name) || user.email || '';
+          const initials = name.includes('@')
+            ? name.charAt(0).toUpperCase()
+            : name.split(' ').map(w => w.charAt(0)).join('').toUpperCase().slice(0, 2);
+          if (initials) {
+            avatar.textContent = initials;
+            avatar.style.display = 'flex';
+            avatar.style.alignItems = 'center';
+            avatar.style.justifyContent = 'center';
+            avatar.style.fontSize = '11px';
+            avatar.style.fontWeight = '700';
+            avatar.style.fontFamily = "'Inter', sans-serif";
+            avatar.style.color = '#1a1918';
+            avatar.style.background = '#e8e5e0';
+          }
+        }
+      } catch {}
+    }
+
+    /* ========================================================
+       INIT
+    ======================================================== */
+    function renderPage(data) {
+      storyRegistry.clear();
+      storySeq = 0;
+
+      // Hero — use trending as fallback when no breaking
+      const heroFallback = (data.insights && data.insights.length)
+        ? data.insights.map(item => ({
+            title: item.title || 'Latest Update',
+            subtitle: item.meta || item.subtitle || '',
+            source: item.source || (DEPT_LABELS[getSelectedDept()] || 'News'),
+            url: item.url || '#',
+            is_breaking: false,
+          }))
+        : DEMO.breaking;
+      slides = data.breaking.length ? data.breaking : heroFallback;
+      buildDots();
+      showSlide(0);
+      setTimeout(() => $heroText.classList.add('active'), 50);
+      startAutoplay();
+
+      // Sections
+      const deptLabel = DEPT_LABELS[getSelectedDept()] || 'DEPT';
+      const emptyCard = { title: 'More ' + (DEPT_NAMES[getSelectedDept()] || '') + ' news coming soon', meta: 'Sources are being collected for this department.', source: deptLabel, url: '#', category: deptLabel };
+      populateSection('department-grid', data.department.length ? data.department : (backendIsLive ? [emptyCard] : DEMO.department));
+      populateSection('insights-grid',   data.insights.length   ? data.insights   : (backendIsLive ? [emptyCard] : DEMO.insights));
+      populateResearch(data);
+      populateSection('stories-grid',    data.stories.length    ? data.stories    : (backendIsLive ? [emptyCard] : DEMO.stories));
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      initNavbarAuth();
+      initDeptSelector();
+      loadPersistedStoryCache();
+
+      // Stale-while-revalidate: render cached data instantly
+      const cacheKey = 'all-sections:' + getSelectedDept();
+      const cached = FeedCache.get(cacheKey);
+      if (cached) {
+        renderPage(cached);
+        const meta = FeedCache.meta(cacheKey);
+        if (meta) _feedCacheLastFetchTime = meta.cachedAt;
+        updateLastUpdatedIndicator();
+        await warmStoryInsights(cached);
+      }
+
+      // Fetch fresh data in background (fast — served from DB cache)
+      const data = await loadAllData();
+      await warmStoryInsights(data);
+      renderPage(data);
+    });
+  </script>
+<!-- Cookie Consent Banner -->
+<div id="cookie-consent" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(30,30,30,0.97);color:#e0e0e0;padding:14px 24px;font-size:13px;z-index:9999;font-family:'DM Sans',sans-serif;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <span>We use cookies and localStorage for authentication and to improve your experience. <a href="/privacy" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a></span>
+    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">Accept</button>
+</div>
+<script>if(!localStorage.getItem('cc_accepted'))document.getElementById('cookie-consent').style.display='flex';</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+window.addEventListener('online', () => {
+    document.getElementById('offline-banner').style.display = 'none';
+});
+window.addEventListener('offline', () => {
+    document.getElementById('offline-banner').style.display = 'block';
+});
+if (!navigator.onLine) {
+    document.getElementById('offline-banner').style.display = 'block';
+}
+</script>
+</body>
+</html>
+

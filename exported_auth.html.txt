@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEWS DAY — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Inter:wght@400;450;500;550&display=swap" rel="stylesheet">
+  <style>
+    /* ===== DESIGN SYSTEM =====
+       Material: Warm archival paper
+       Grid: B01 Asymmetric 5/7 editorial split
+       Spacing: 8pt system with 4pt micro-adjustments
+       Typography: Fluid scale, DM Sans display, Inter body
+    */
+    
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      /* Warm paper palette — no cool grays */
+      --paper-50: #fffcf8;
+      --paper-100: #fdf9f3;
+      --paper-200: #faf5ec;
+      --paper-300: #f5efe4;
+      --paper-400: #ede5d6;
+      --paper-500: #e3d9c6;
+      --paper-600: #d4c9b2;
+      
+      /* Ink tones — warm blacks */
+      --ink-900: #1a1816;
+      --ink-800: #2d2925;
+      --ink-700: #4a4540;
+      --ink-600: #6b655d;
+      --ink-500: #8b847a;
+      --ink-400: #a9a299;
+      --ink-300: #c9c2b8;
+      --ink-200: #e5ded4;
+      --ink-100: #f5f0e8;
+      
+      /* Semantic */
+      --accent: var(--ink-900);
+      --error: #9c3b3b;
+      --error-bg: #fdf5f5;
+      --success: #3d6b4a;
+      --success-bg: #f5faf6;
+      
+      /* Spacing — 8pt system */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+      --space-7: 48px;
+      --space-8: 64px;
+      --space-9: 96px;
+      --space-10: 128px;
+      
+      /* Typography — fluid scale */
+      --font-display: 'DM Sans', system-ui, sans-serif;
+      --font-body: 'Inter', system-ui, sans-serif;
+      
+      --text-xs: clamp(11px, 0.65vw + 9px, 12px);
+      --text-sm: clamp(12px, 0.7vw + 10px, 14px);
+      --text-base: clamp(14px, 0.8vw + 11px, 16px);
+      --text-lg: clamp(16px, 1vw + 12px, 20px);
+      --text-xl: clamp(22px, 2vw + 14px, 32px);
+      --text-2xl: clamp(28px, 3vw + 16px, 48px);
+      
+      /* Motion */
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+      --duration-fast: 150ms;
+      --duration-base: 250ms;
+      --duration-slow: 400ms;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-weight: 400;
+      color: var(--ink-900);
+      background: var(--paper-50);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== BACKDROP LAYERS ===== */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        /* Warm radial glows */
+        radial-gradient(ellipse 80vw 60vh at 15% 20%, var(--paper-300) 0%, transparent 50%),
+        radial-gradient(ellipse 60vw 50vh at 85% 80%, var(--paper-400) 0%, transparent 40%),
+        radial-gradient(ellipse 40vw 30vh at 50% 50%, var(--paper-200) 0%, transparent 50%),
+        /* Base paper gradient */
+        linear-gradient(165deg, var(--paper-50) 0%, var(--paper-100) 40%, var(--paper-200) 70%, var(--paper-300) 100%);
+    }
+
+    .grain {
+      position: fixed;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.12;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      animation: grainMove 8s steps(10) infinite;
+    }
+    @keyframes grainMove {
+      0%, 100% { transform: translate(0, 0); }
+      10% { transform: translate(-1%, -1%); }
+      20% { transform: translate(1%, 1%); }
+      30% { transform: translate(-1%, 1%); }
+      40% { transform: translate(1%, -1%); }
+      50% { transform: translate(-1%, 0%); }
+      60% { transform: translate(1%, 0%); }
+      70% { transform: translate(0%, 1%); }
+      80% { transform: translate(0%, -1%); }
+      90% { transform: translate(1%, 1%); }
+    }
+
+    /* ===== GRID LAYOUT: B01 Asymmetric Split ===== */
+    .auth-grid {
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 5fr 7fr;
+      gap: 0;
+    }
+
+    /* Left rail — brand statement */
+    .auth-rail {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: var(--space-6) var(--space-7);
+      border-right: 1px solid var(--ink-200);
+    }
+
+    .rail-brand {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-900);
+      text-decoration: none;
+    }
+
+    .rail-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+
+    .rail-eyebrow {
+      font-family: var(--font-body);
+      font-size: var(--text-xs);
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--ink-500);
+    }
+
+    .rail-heading {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: var(--text-2xl);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--ink-900);
+      max-width: 360px;
+    }
+
+    .rail-body {
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: 1.6;
+      color: var(--ink-600);
+      max-width: 340px;
+    }
+
+    .rail-meta {
+      font-size: var(--text-xs);
+      color: var(--ink-400);
+      letter-spacing: 0.02em;
+    }
+
+    /* Right panel — form */
+    .auth-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-7) var(--space-6);
+      min-height: 100vh;
+    }
+
+    .form-container {
+      width: 100%;
+      max-width: 400px;
+      animation: formEnter var(--duration-slow) var(--ease-out-expo) forwards;
+    }
+
+    @keyframes formEnter {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ===== FORM HEADER ===== */
+    .form-header {
+      margin-bottom: var(--space-6);
+    }
+
+    .form-header h1 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: var(--text-xl);
+      letter-spacing: -0.02em;
+      color: var(--ink-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .form-header p {
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--ink-500);
+      line-height: 1.5;
+    }
+
+    /* ===== FLOATING LABEL INPUTS ===== */
+    .input-group {
+      position: relative;
+      margin-bottom: var(--space-5);
+    }
+
+    .input-field {
+      width: 100%;
+      height: 56px;
+      padding: var(--space-5) var(--space-4) var(--space-2);
+      border: 1px solid var(--ink-200);
+      border-radius: 8px;
+      background: var(--paper-50);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      font-weight: 450;
+      color: var(--ink-900);
+      outline: none;
+      transition: 
+        border-color var(--duration-fast) var(--ease-out-quart),
+        box-shadow var(--duration-fast) var(--ease-out-quart),
+        background var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .input-field::placeholder {
+      color: transparent;
+    }
+
+    .input-field:hover {
+      border-color: var(--ink-300);
+    }
+
+    .input-field:focus {
+      border-color: var(--ink-900);
+      background: var(--paper-50);
+      box-shadow: 0 0 0 3px rgba(26, 24, 22, 0.04);
+    }
+
+    .input-field:autofill,
+    .input-field:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px var(--paper-50) inset;
+      -webkit-text-fill-color: var(--ink-900);
+    }
+
+    /* Floating label */
+    .input-label {
+      position: absolute;
+      left: var(--space-4);
+      top: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      font-weight: 400;
+      color: var(--ink-500);
+      pointer-events: none;
+      transition: 
+        top var(--duration-base) var(--ease-out-expo),
+        height var(--duration-base) var(--ease-out-expo),
+        font-size var(--duration-base) var(--ease-out-expo),
+        color var(--duration-base) var(--ease-out-expo);
+    }
+
+    .input-field:focus + .input-label,
+    .input-field:not(:placeholder-shown) + .input-label {
+      top: 8px;
+      height: 16px;
+      font-size: var(--text-xs);
+      color: var(--ink-600);
+    }
+
+    .input-field:focus + .input-label {
+      color: var(--ink-900);
+    }
+
+    /* Select field — floating label stays up when value is selected */
+    select.input-field:valid + .input-label,
+    select.input-field:focus + .input-label {
+      top: 8px;
+      height: 16px;
+      font-size: var(--text-xs);
+      color: var(--ink-600);
+    }
+    select.input-field:focus + .input-label {
+      color: var(--ink-900);
+    }
+    select.input-field {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23888'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+    }
+
+    /* Password toggle */
+    .pw-toggle {
+      position: absolute;
+      right: var(--space-4);
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--ink-400);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: color var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .pw-toggle:hover {
+      color: var(--ink-700);
+    }
+
+    .pw-toggle svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Error state */
+    .input-group.has-error .input-field {
+      border-color: var(--error);
+      background: var(--error-bg);
+    }
+
+    .input-group.has-error .input-label {
+      color: var(--error);
+    }
+
+    .input-error {
+      display: none;
+      margin-top: var(--space-2);
+      font-size: var(--text-xs);
+      color: var(--error);
+    }
+
+    .input-group.has-error .input-error {
+      display: block;
+    }
+
+    /* ===== FORGOT LINK ===== */
+    .forgot-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: calc(var(--space-4) * -1) 0 var(--space-5);
+    }
+
+    .forgot-link {
+      font-size: var(--text-sm);
+      color: var(--ink-600);
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-weight: 450;
+      transition: color var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .forgot-link:hover {
+      color: var(--ink-900);
+    }
+
+    /* ===== SUBMIT BUTTON ===== */
+    .submit-btn {
+      width: 100%;
+      height: 52px;
+      border: none;
+      border-radius: 8px;
+      background: var(--ink-900);
+      color: var(--paper-50);
+      font-family: var(--font-body);
+      font-weight: 550;
+      font-size: var(--text-base);
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: 
+        background var(--duration-fast) var(--ease-out-quart),
+        transform var(--duration-fast) var(--ease-out-quart),
+        box-shadow var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .submit-btn:hover {
+      background: var(--ink-800);
+      box-shadow: 0 4px 12px rgba(26, 24, 22, 0.15);
+    }
+
+    .submit-btn:active {
+      transform: scale(0.985);
+    }
+
+    .submit-btn:disabled {
+      background: var(--ink-300);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Loading state */
+    .submit-btn .spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 252, 248, 0.3);
+      border-top-color: var(--paper-50);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    .submit-btn.loading .btn-text {
+      display: none;
+    }
+
+    .submit-btn.loading .spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===== TOGGLE BETWEEN VIEWS ===== */
+    .form-toggle {
+      margin-top: var(--space-6);
+      text-align: center;
+      font-size: var(--text-sm);
+      color: var(--ink-500);
+    }
+
+    .form-toggle button {
+      background: none;
+      border: none;
+      color: var(--ink-900);
+      font-family: var(--font-body);
+      font-weight: 550;
+      font-size: var(--text-sm);
+      cursor: pointer;
+      padding: 0;
+      margin-left: 2px;
+      transition: opacity var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .form-toggle button:hover {
+      opacity: 0.6;
+    }
+
+    /* ===== VIEW MANAGEMENT ===== */
+    .auth-view {
+      display: none;
+    }
+
+    .auth-view.active {
+      display: block;
+      animation: viewEnter var(--duration-base) var(--ease-out-expo) forwards;
+    }
+
+    @keyframes viewEnter {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ===== BACK LINK FOR RESET ===== */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--ink-500);
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-weight: 450;
+      margin-bottom: var(--space-6);
+      transition: color var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .back-link:hover {
+      color: var(--ink-900);
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .back-link:hover svg {
+      transform: translateX(-2px);
+    }
+
+    /* ===== MESSAGES ===== */
+    .auth-message {
+      display: none;
+      padding: var(--space-3) var(--space-4);
+      border-radius: 8px;
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      margin-bottom: var(--space-5);
+      animation: messageEnter var(--duration-base) var(--ease-out-expo);
+    }
+
+    @keyframes messageEnter {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+    }
+
+    .auth-message.error {
+      display: block;
+      background: var(--error-bg);
+      color: var(--error);
+      border: 1px solid rgba(156, 59, 59, 0.12);
+    }
+
+    .auth-message.success {
+      display: block;
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid rgba(61, 107, 74, 0.12);
+    }
+
+    /* ===== FOOTER ===== */
+    .auth-footer {
+      position: fixed;
+      bottom: var(--space-5);
+      left: var(--space-7);
+      z-index: 20;
+      font-size: var(--text-xs);
+      color: var(--ink-400);
+    }
+
+    .auth-footer a {
+      color: var(--ink-500);
+      text-decoration: none;
+      transition: color var(--duration-fast) var(--ease-out-quart);
+    }
+
+    .auth-footer a:hover {
+      color: var(--ink-900);
+    }
+
+    /* ===== MOBILE RESPONSIVE ===== */
+    @media (max-width: 900px) {
+      .auth-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-rail {
+        position: relative;
+        height: auto;
+        min-height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--ink-200);
+        padding: var(--space-6) var(--space-5);
+        gap: var(--space-6);
+      }
+
+      .rail-content {
+        gap: var(--space-4);
+      }
+
+      .rail-heading {
+        max-width: none;
+        font-size: clamp(24px, 6vw, 36px);
+      }
+
+      .rail-body {
+        max-width: none;
+      }
+
+      .auth-panel {
+        min-height: auto;
+        padding: var(--space-6) var(--space-5);
+        align-items: flex-start;
+      }
+
+      .form-container {
+        max-width: 100%;
+      }
+
+      .auth-footer {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        padding: var(--space-4) var(--space-5);
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 480px) {
+      :root {
+        --space-6: 24px;
+        --space-7: 32px;
+      }
+
+      .rail-heading {
+        font-size: 28px;
+      }
+
+      .input-field {
+        height: 52px;
+      }
+
+      .submit-btn {
+        height: 48px;
+      }
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .grain {
+        animation: none;
+      }
+    }
+
+    /* Focus visible for keyboard navigation */
+    .submit-btn:focus-visible,
+    .pw-toggle:focus-visible,
+    .forgot-link:focus-visible,
+    .form-toggle button:focus-visible,
+    .back-link:focus-visible {
+      outline: 2px solid var(--ink-900);
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body>
+<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
+    ⚡ You're offline — showing cached content
+</div>
+
+  <!-- Backdrop layers -->
+  <div class="backdrop"></div>
+  <div class="grain"></div>
+
+  <!-- Main grid -->
+  <div class="auth-grid">
+    
+    <!-- Left rail: Brand statement -->
+    <aside class="auth-rail">
+      <a href="auth.html" class="rail-brand">NEWS DAY</a>
+      
+      <div class="rail-content">
+        <span class="rail-eyebrow">Student Briefing Platform</span>
+        <h2 class="rail-heading">Stay ahead of what's next.</h2>
+        <p class="rail-body">
+          Curated intelligence for the next generation of builders, researchers, and thinkers. 
+          Join thousands of students accessing AI-summarized insights daily.
+        </p>
+      </div>
+
+      <p class="rail-meta">Est. 2026</p>
+    </aside>
+
+    <!-- Right panel: Form -->
+    <main class="auth-panel">
+      <div class="form-container">
+
+        <!-- Global message area -->
+        <div class="auth-message" id="auth-message" role="alert"></div>
+
+        <!-- ===== LOGIN VIEW ===== -->
+        <div class="auth-view active" id="view-login">
+          <div class="form-header">
+            <h1>Welcome back</h1>
+            <p>Sign in to continue your briefing</p>
+          </div>
+
+          <form id="form-login" autocomplete="on" novalidate>
+            <div class="input-group" id="login-email-group">
+              <input
+                class="input-field"
+                type="email"
+                id="login-email"
+                name="email"
+                placeholder="you@university.edu"
+                autocomplete="email"
+                required
+              >
+              <label class="input-label" for="login-email">Email address</label>
+              <span class="input-error" id="login-email-error">Please enter a valid email</span>
+            </div>
+
+            <div class="input-group" id="login-password-group">
+              <input
+                class="input-field"
+                type="password"
+                id="login-password"
+                name="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                required
+              >
+              <label class="input-label" for="login-password">Password</label>
+              <button class="pw-toggle" type="button" aria-label="Toggle password visibility" data-target="login-password">
+                <svg class="eye-open" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24m-4.24-4.24 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+              </button>
+              <span class="input-error" id="login-password-error">Please enter your password</span>
+            </div>
+
+            <div class="forgot-row">
+              <button type="button" class="forgot-link" id="show-reset">Forgot password?</button>
+            </div>
+
+            <button type="submit" class="submit-btn" id="btn-login">
+              <span class="btn-text">Sign in</span>
+              <span class="spinner"></span>
+            </button>
+          </form>
+
+          <div class="form-toggle">
+            Don't have an account? <button type="button" id="switch-to-register">Create one</button>
+          </div>
+        </div>
+
+        <!-- ===== REGISTER VIEW ===== -->
+        <div class="auth-view" id="view-register">
+          <div class="form-header">
+            <h1>Create account</h1>
+            <p>Join the briefing community</p>
+          </div>
+
+          <form id="form-register" autocomplete="on" novalidate>
+            <div class="input-group" id="register-name-group">
+              <input
+                class="input-field"
+                type="text"
+                id="register-name"
+                name="name"
+                placeholder="Alex Chen"
+                autocomplete="name"
+                required
+              >
+              <label class="input-label" for="register-name">Full name</label>
+              <span class="input-error" id="register-name-error">Please enter your name</span>
+            </div>
+
+            <div class="input-group" id="register-email-group">
+              <input
+                class="input-field"
+                type="email"
+                id="register-email"
+                name="email"
+                placeholder="you@university.edu"
+                autocomplete="email"
+                required
+              >
+              <label class="input-label" for="register-email">Email address</label>
+              <span class="input-error" id="register-email-error">Please enter a valid email</span>
+            </div>
+
+            <div class="input-group" id="register-password-group">
+              <input
+                class="input-field"
+                type="password"
+                id="register-password"
+                name="password"
+                placeholder="Min. 8 characters"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              >
+              <label class="input-label" for="register-password">Password</label>
+              <button class="pw-toggle" type="button" aria-label="Toggle password visibility" data-target="register-password">
+                <svg class="eye-open" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24m-4.24-4.24 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+              </button>
+              <span class="input-error" id="register-password-error">Password must be at least 8 characters</span>
+            </div>
+
+            <div class="input-group" id="register-confirm-group">
+              <input
+                class="input-field"
+                type="password"
+                id="register-confirm"
+                name="confirm"
+                placeholder="••••••••"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              >
+              <label class="input-label" for="register-confirm">Confirm password</label>
+              <span class="input-error" id="register-confirm-error">Passwords do not match</span>
+            </div>
+
+            <div class="input-group" id="register-dept-group">
+              <select class="input-field" id="register-dept" name="department" required style="cursor:pointer">
+                <option value="" disabled selected hidden></option>
+                <option value="CSE">Computer Science & Engineering</option>
+                <option value="IT">Information Technology</option>
+                <option value="AIDS">AI & Data Science</option>
+                <option value="ECE">Electronics & Communication</option>
+                <option value="EEE">Electrical & Electronics</option>
+                <option value="ME">Mechanical Engineering</option>
+                <option value="CE">Civil Engineering</option>
+                <option value="BT">Biotechnology</option>
+                <option value="CH">Chemical Engineering</option>
+                <option value="AE">Aeronautical / Aerospace</option>
+                <option value="RAE">Robotics & Automation</option>
+                <option value="PT">Production Technology</option>
+              </select>
+              <label class="input-label" for="register-dept">Department</label>
+              <span class="input-error" id="register-dept-error">Please select your department</span>
+            </div>
+
+            <button type="submit" class="submit-btn" id="btn-register">
+              <span class="btn-text">Create account</span>
+              <span class="spinner"></span>
+            </button>
+          </form>
+
+          <div class="form-toggle">
+            Already have an account? <button type="button" id="switch-to-login">Sign in</button>
+          </div>
+        </div>
+
+        <!-- ===== RESET VIEW ===== -->
+        <div class="auth-view" id="view-reset">
+          <button type="button" class="back-link" id="back-to-login">
+            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            Back to sign in
+          </button>
+
+          <div class="form-header">
+            <h1>Reset password</h1>
+            <p>We'll send you a link to reset your password</p>
+          </div>
+
+          <form id="form-reset" autocomplete="on" novalidate>
+            <div class="input-group" id="reset-email-group">
+              <input
+                class="input-field"
+                type="email"
+                id="reset-email"
+                name="email"
+                placeholder="you@university.edu"
+                autocomplete="email"
+                required
+              >
+              <label class="input-label" for="reset-email">Email address</label>
+              <span class="input-error" id="reset-email-error">Please enter a valid email</span>
+            </div>
+
+            <button type="submit" class="submit-btn" id="btn-reset">
+              <span class="btn-text">Send reset link</span>
+              <span class="spinner"></span>
+            </button>
+          </form>
+
+          <div class="form-toggle">
+            Remember your password? <button type="button" id="reset-to-login">Sign in</button>
+          </div>
+        </div>
+
+        <!-- ===== NEW PASSWORD VIEW ===== -->
+        <div class="auth-view" id="view-new-password">
+          <div class="form-header">
+            <h1>Set new password</h1>
+            <p>Enter your new password below</p>
+          </div>
+
+          <form id="form-new-password" autocomplete="off" novalidate>
+            <div class="input-group" id="new-password-group">
+              <input
+                class="input-field"
+                type="password"
+                id="new-password"
+                name="new_password"
+                placeholder="••••••••"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              >
+              <label class="input-label" for="new-password">New password</label>
+              <button class="pw-toggle" type="button" aria-label="Toggle password visibility" data-target="new-password">
+                <svg class="eye-open" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24m-4.24-4.24 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+              </button>
+              <span class="input-error" id="new-password-error">Password must be at least 8 characters</span>
+            </div>
+
+            <div class="input-group" id="confirm-password-group">
+              <input
+                class="input-field"
+                type="password"
+                id="confirm-password"
+                name="confirm_password"
+                placeholder="••••••••"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              >
+              <label class="input-label" for="confirm-password">Confirm password</label>
+              <span class="input-error" id="confirm-password-error">Passwords do not match</span>
+            </div>
+
+            <button type="submit" class="submit-btn" id="btn-new-password">
+              <span class="btn-text">Reset password</span>
+              <span class="spinner"></span>
+            </button>
+          </form>
+
+          <div class="form-toggle">
+            <button type="button" id="newpw-to-login">Back to sign in</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="auth-footer">
+    <span>2026 NEWS DAY · <a href="index.html">Back to home</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
+  </footer>
+
+  <script>
+    /* ====================================================================
+       NEWS DAY — AUTH PAGE
+       Uses FastAPI /api/v1/auth for login/register/reset
+    ==================================================================== */
+
+    const API_BASE = window.location.origin + '/api/v1';
+
+    /* ===== DOM ===== */
+    const $ = id => document.getElementById(id);
+
+    const views = {
+      login: $('view-login'),
+      register: $('view-register'),
+      reset: $('view-reset'),
+      'new-password': $('view-new-password'),
+    };
+
+    const msgBox = $('auth-message');
+    let currentView = 'login';
+
+    /* ===== VIEW SWITCHING ===== */
+    function showView(name) {
+      currentView = name;
+      clearMessage();
+      
+      // Clear errors
+      document.querySelectorAll('.input-group.has-error').forEach(el => el.classList.remove('has-error'));
+
+      Object.values(views).forEach(v => v.classList.remove('active'));
+      views[name].classList.add('active');
+
+      // Focus first input after animation
+      setTimeout(() => {
+        const firstInput = views[name].querySelector('.input-field');
+        if (firstInput) firstInput.focus();
+      }, 100);
+    }
+
+    /* Toggle bindings */
+    $('switch-to-register').addEventListener('click', () => showView('register'));
+    $('switch-to-login').addEventListener('click', () => showView('login'));
+    $('show-reset').addEventListener('click', () => showView('reset'));
+    $('back-to-login').addEventListener('click', () => showView('login'));
+    $('reset-to-login').addEventListener('click', () => showView('login'));
+    $('newpw-to-login').addEventListener('click', () => showView('login'));
+
+    /* ===== PASSWORD VISIBILITY TOGGLE ===== */
+    document.querySelectorAll('.pw-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = $(btn.dataset.target);
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        btn.querySelector('.eye-open').style.display = isPassword ? 'none' : '';
+        btn.querySelector('.eye-closed').style.display = isPassword ? '' : 'none';
+      });
+    });
+
+    /* ===== FORM VALIDATION ===== */
+    function validateEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function showFieldError(fieldId, show) {
+      const group = $(fieldId + '-group');
+      if (show) {
+        group.classList.add('has-error');
+      } else {
+        group.classList.remove('has-error');
+      }
+    }
+
+    function clearFieldErrors() {
+      document.querySelectorAll('.input-group.has-error').forEach(el => el.classList.remove('has-error'));
+    }
+
+    /* ===== MESSAGES ===== */
+    function showMessage(text, type) {
+      msgBox.textContent = text;
+      msgBox.className = 'auth-message ' + type;
+    }
+
+    function clearMessage() {
+      msgBox.textContent = '';
+      msgBox.className = 'auth-message';
+    }
+
+    /* ===== BUTTON LOADING ===== */
+    function setLoading(btn, loading) {
+      if (loading) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    /* ===== SESSION HELPERS ===== */
+    function saveSession(data) {
+      const session = {
+        user: data.user || null,
+        expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+        authenticated: true,
+      };
+      localStorage.setItem('newsday_session', JSON.stringify(session));
+    }
+
+    function getSession() {
+      try {
+        const raw = localStorage.getItem('newsday_session');
+        if (!raw) return null;
+        const session = JSON.parse(raw);
+        if (session.expires_at && Date.now() > session.expires_at) {
+          localStorage.removeItem('newsday_session');
+          return null;
+        }
+        return session;
+      } catch {
+        return null;
+      }
+    }
+
+    /* ===== LOGIN ===== */
+    $('form-login').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearMessage();
+      clearFieldErrors();
+
+      const email = $('login-email').value.trim();
+      const password = $('login-password').value;
+      let hasError = false;
+
+      if (!email || !validateEmail(email)) {
+        showFieldError('login-email', true);
+        hasError = true;
+      }
+
+      if (!password) {
+        showFieldError('login-password', true);
+        hasError = true;
+      }
+
+      if (hasError) return;
+
+      const btn = $('btn-login');
+      setLoading(btn, true);
+
+      try {
+        const res = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Invalid email or password.');
+        }
+        saveSession(data);
+
+        // Fetch user profile to get department preference
+        try {
+          const meRes = await fetch(API_BASE + '/auth/me', {
+            credentials: 'include',
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            const userDept = (meData.data && meData.data.department_key) || (meData.data && meData.data.department);
+            if (userDept) localStorage.setItem('newsday_dept', userDept.toUpperCase());
+          }
+        } catch (_) { /* non-critical */ }
+
+        showMessage('Welcome back. Redirecting...', 'success');
+        setTimeout(() => { window.location.href = 'index.html'; }, 800);
+      } catch (err) {
+        showMessage(err.message || 'Invalid email or password. Please try again.', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    /* ===== REGISTER ===== */
+    $('form-register').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearMessage();
+      clearFieldErrors();
+
+      const name = $('register-name').value.trim();
+      const email = $('register-email').value.trim();
+      const password = $('register-password').value;
+      const confirm = $('register-confirm').value;
+      const dept = $('register-dept').value;
+      let hasError = false;
+
+      if (!name) {
+        showFieldError('register-name', true);
+        hasError = true;
+      }
+
+      if (!email || !validateEmail(email)) {
+        showFieldError('register-email', true);
+        hasError = true;
+      }
+
+      if (password.length < 8) {
+        showFieldError('register-password', true);
+        hasError = true;
+      }
+
+      if (password !== confirm) {
+        showFieldError('register-confirm', true);
+        hasError = true;
+      }
+
+      if (!dept) {
+        showFieldError('register-dept', true);
+        hasError = true;
+      }
+
+      if (hasError) return;
+
+      const btn = $('btn-register');
+      setLoading(btn, true);
+
+      try {
+        const res = await fetch(API_BASE + '/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, full_name: name, department: dept }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Could not create account.');
+        }
+
+        // Save department preference and auto-login
+        if (dept) localStorage.setItem('newsday_dept', dept);
+
+        // Register succeeded — now log in to get tokens
+        const loginRes = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await loginRes.json();
+        if (loginRes.ok) {
+          saveSession(loginData);
+          showMessage('Account created successfully. Redirecting...', 'success');
+          setTimeout(() => { window.location.href = 'index.html'; }, 800);
+        } else {
+          showMessage('Account created. Please sign in.', 'success');
+          setTimeout(() => showView('login'), 2000);
+        }
+      } catch (err) {
+        showMessage(err.message || 'Could not create account. Please try again.', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    /* ===== PASSWORD RESET ===== */
+    $('form-reset').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearMessage();
+      clearFieldErrors();
+
+      const email = $('reset-email').value.trim();
+
+      if (!email || !validateEmail(email)) {
+        showFieldError('reset-email', true);
+        return;
+      }
+
+      const btn = $('btn-reset');
+      setLoading(btn, true);
+
+      try {
+        const resp = await fetch(API_BASE + '/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await resp.json();
+        showMessage(data.message || 'If an account exists, a reset link has been sent.', 'success');
+      } catch (err) {
+        showMessage('If an account exists, a reset link has been sent.', 'success');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    /* ===== SET NEW PASSWORD ===== */
+    $('form-new-password').addEventListener('submit', async e => {
+      e.preventDefault();
+      clearMessage();
+      clearFieldErrors();
+
+      const password = $('new-password').value;
+      const confirm = $('confirm-password').value;
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('reset_token');
+
+      if (!password || password.length < 8) {
+        showFieldError('new-password', true);
+        return;
+      }
+      if (password !== confirm) {
+        showFieldError('confirm-password', true);
+        return;
+      }
+
+      const btn = $('btn-new-password');
+      setLoading(btn, true);
+
+      try {
+        const resp = await fetch(API_BASE + '/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, new_password: password }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showMessage(data.message || 'Password has been reset successfully.', 'success');
+          setTimeout(() => showView('login'), 2000);
+        } else {
+          showMessage(data.detail || 'Invalid or expired reset token.', 'error');
+        }
+      } catch (err) {
+        showMessage('Something went wrong. Please try again.', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    /* ===== INIT ===== */
+    (function init() {
+      // Check for reset token in URL
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('reset_token')) {
+        showView('new-password');
+        return;
+      }
+
+      // Check if already logged in
+      const session = getSession();
+      if (session && session.authenticated) {
+        window.location.href = 'index.html';
+        return;
+      }
+    })();
+  </script>
+<!-- Cookie Consent Banner -->
+<div id="cookie-consent" style="display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(30,30,30,0.97);color:#e0e0e0;padding:14px 24px;font-size:13px;z-index:9999;font-family:'DM Sans',sans-serif;border-top:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <span>We use cookies and localStorage for authentication and to improve your experience. <a href="/privacy" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a></span>
+    <button onclick="document.getElementById('cookie-consent').style.display='none';localStorage.setItem('cc_accepted','1');" style="background:#818cf8;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">Accept</button>
+</div>
+<script>if(!localStorage.getItem('cc_accepted'))document.getElementById('cookie-consent').style.display='flex';</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+window.addEventListener('online', () => {
+    document.getElementById('offline-banner').style.display = 'none';
+});
+window.addEventListener('offline', () => {
+    document.getElementById('offline-banner').style.display = 'block';
+});
+if (!navigator.onLine) {
+    document.getElementById('offline-banner').style.display = 'block';
+}
+</script>
+</body>
+</html>

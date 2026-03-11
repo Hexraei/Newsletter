@@ -5,6 +5,11 @@ Uses PostgreSQL-native types (JSONB, ARRAY, UUID) when running against Postgres,
 falls back to generic SQLAlchemy equivalents for SQLite local dev.
 """
 import os
+from pathlib import Path
+
+# Load .env early so DATABASE_URL is available before models import
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 _DB_URL = os.environ.get("DATABASE_URL", "")
 _IS_SQLITE = _DB_URL.startswith("sqlite")

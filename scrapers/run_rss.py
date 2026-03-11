@@ -74,10 +74,15 @@ async def main():
 
             total_scraped += len(items)
             stored = 0
+            seen_hashes = set()
 
             for item in items:
                 content_str = f"{item.title}{item.url}{item.author}"
                 content_hash = hashlib.sha256(content_str.encode()).hexdigest()[:32]
+
+                if content_hash in seen_hashes:
+                    continue
+                seen_hashes.add(content_hash)
 
                 dup = await db.execute(
                     select(RawContent).where(RawContent.content_hash == content_hash)
