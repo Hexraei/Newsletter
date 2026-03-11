@@ -1622,27 +1622,29 @@
       if (backendOk) {
         try {
           // Load student stories (up to 30)
+          const dept = getSelectedDept();
           const [storiesRes, deptRes, trendRes] = await Promise.allSettled([
-            fetchWithTimeout(API + '/api/v1/feed/student-stories?limit=30', {}, 6000),
-            fetchWithTimeout(API + '/api/v1/feed/department?limit=10', {}, 6000),
-            fetchWithTimeout(API + '/api/v1/feed/trending?limit=10', {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/personalized?limit=30&department=' + encodeURIComponent(dept), {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/personalized?limit=10&department=' + encodeURIComponent(dept), {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/trending?limit=10&department=' + encodeURIComponent(dept), {}, 6000),
           ]);
 
           if (storiesRes.status === 'fulfilled' && storiesRes.value.ok) {
             const storiesData = await storiesRes.value.json();
-            const items = (storiesData.data?.items || []).map(normalizeBackendItem);
+            const items = (storiesData.items || storiesData.data?.items || []).map(normalizeBackendItem);
             if (items.length) allFeedItems = items;
           }
 
           if (deptRes.status === 'fulfilled' && deptRes.value.ok) {
             const deptData = await deptRes.value.json();
-            const items = (deptData.data?.items || []).map(normalizeBackendItem);
+            const items = (deptData.items || deptData.data?.items || []).map(normalizeBackendItem);
             if (items.length) relatedItems = items;
           }
 
           if (trendRes.status === 'fulfilled' && trendRes.value.ok) {
             const trendData = await trendRes.value.json();
-            const items = (trendData.data?.items || []).map(normalizeBackendItem);
+            const rawItems = Array.isArray(trendData) ? trendData : (trendData.items || trendData.data?.items || []);
+            const items = rawItems.map(normalizeBackendItem);
             if (items.length) trendingItems = items;
           }
         } catch {}

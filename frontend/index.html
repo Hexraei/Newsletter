@@ -540,12 +540,14 @@
 
     .image-credit {
       position: absolute; bottom: 0; left: 0; right: 0;
-      font-size: 9px; color: rgba(255,255,255,0.85);
-      background: linear-gradient(transparent, rgba(0,0,0,0.55));
-      padding: 12px 6px 4px; line-height: 1.3;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      font-size: 10px; color: rgba(255,255,255,0.95);
+      background: linear-gradient(transparent, rgba(0,0,0,0.6));
+      padding: 14px 8px 5px; line-height: 1.4;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      letter-spacing: 0.2px;
+      z-index: 2;
     }
-    .image-credit a { color: inherit; text-decoration: underline; }
+    .image-credit a, .image-credit .credit-link { color: inherit; text-decoration: underline; text-underline-offset: 1px; cursor: pointer; }
 
     .article-card-title {
       font-family: 'DM Sans', sans-serif;
@@ -1213,7 +1215,7 @@
         if (!visual.querySelector('.image-credit')) {
           const credit = document.createElement('div');
           credit.className = 'image-credit';
-          credit.innerHTML = `Photo by <a href="https://unsplash.com/@${encodeURIComponent(data.username)}${UNSPLASH_UTM}" target="_blank" rel="noopener">${escapeHtml(data.name)}</a> on <a href="https://unsplash.com/${UNSPLASH_UTM}" target="_blank" rel="noopener">Unsplash</a>`;
+          credit.innerHTML = `Photo by <span class="credit-link" data-href="https://unsplash.com/@${encodeURIComponent(data.username)}${UNSPLASH_UTM}">${escapeHtml(data.name)}</span> on <span class="credit-link" data-href="https://unsplash.com/${UNSPLASH_UTM}">Unsplash</span>`;
           visual.appendChild(credit);
         }
         _triggerDownload(data.download_location);
@@ -2483,6 +2485,15 @@
       if (!storyId) return;
       openStoryModal(storyRegistry.get(storyId));
     });
+
+    // Credit links inside cards — stop propagation so card modal doesn't open
+    document.addEventListener('click', e => {
+      const link = e.target.closest('.credit-link[data-href]');
+      if (!link) return;
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(link.dataset.href, '_blank', 'noopener');
+    }, true);
 
     document.addEventListener('click', e => {
       if (!(e.target instanceof Element)) return;

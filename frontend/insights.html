@@ -1618,25 +1618,27 @@
           // plus department for sidebar recommendations, and breaking for sidebar
           const [trendRes, deptRes, breakRes] = await Promise.allSettled([
             fetchWithTimeout(API + '/api/v1/feed/trending?limit=30', {}, 6000),
-            fetchWithTimeout(API + '/api/v1/feed/department?limit=5', {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/personalized?limit=5&department=' + encodeURIComponent(getSelectedDept()), {}, 6000),
             fetchWithTimeout(API + '/api/v1/feed/breaking?limit=5', {}, 6000),
           ]);
 
           if (trendRes.status === 'fulfilled' && trendRes.value.ok) {
             const data = await trendRes.value.json();
-            const items = (data.data?.items || []).map(normalizeBackendItem);
+            const rawItems = Array.isArray(data) ? data : (data.items || data.data?.items || []);
+            const items = rawItems.map(normalizeBackendItem);
             if (items.length) allFeedItems = items;
           }
 
           if (deptRes.status === 'fulfilled' && deptRes.value.ok) {
             const data = await deptRes.value.json();
-            const items = (data.data?.items || []).map(normalizeBackendItem);
+            const items = (data.items || data.data?.items || []).map(normalizeBackendItem);
             if (items.length) relatedItems = items;
           }
 
           if (breakRes.status === 'fulfilled' && breakRes.value.ok) {
             const data = await breakRes.value.json();
-            const items = (data.data?.items || []).map(normalizeBackendItem);
+            const rawItems = Array.isArray(data) ? data : (data.items || data.data?.items || []);
+            const items = rawItems.map(normalizeBackendItem);
             if (items.length) breakingItems = items;
           }
         } catch {}
