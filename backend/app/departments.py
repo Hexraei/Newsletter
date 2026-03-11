@@ -460,12 +460,33 @@ INDIA_COMMON_RSS: List[Dict[str, str]] = [
     # ─ Indian govt / STEM policy ─
     {"name": "PIB India", "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3", "type": "india-policy"},
     {"name": "ET Govt", "url": "https://government.economictimes.indiatimes.com/rss/topstories", "type": "india-policy"},
+    # ─ South India tech ecosystem ─
+    {"name": "The News Minute Tech", "url": "https://www.thenewsminute.com/topic/technology/feed", "type": "india-south"},
+    {"name": "Citizen Matters Bengaluru", "url": "https://citizenmatters.in/bengaluru/feed", "type": "india-south"},
+    {"name": "Citizen Matters Chennai", "url": "https://citizenmatters.in/chennai/feed", "type": "india-south"},
+    {"name": "The Hindu Business Line Tech", "url": "https://www.thehindubusinessline.com/info-tech/feeder/default.rss", "type": "india-south"},
+    # ─ Jobs, placements, career ─
+    {"name": "Freshersworld Blog", "url": "https://www.freshersworld.com/jobs/blog/feed", "type": "india-career"},
+    {"name": "Internshala Blog", "url": "https://blog.internshala.com/feed/", "type": "india-career"},
+    {"name": "GeeksforGeeks Jobs", "url": "https://www.geeksforgeeks.org/feed/", "type": "india-career"},
+    {"name": "Naukri Blog", "url": "https://www.naukri.com/blog/feed/", "type": "india-career"},
+    # ─ Indian research & innovation ─
+    {"name": "DST India", "url": "https://dst.gov.in/rss/latest-news/rss.xml", "type": "india-research"},
+    {"name": "CSIR News", "url": "https://www.csir.res.in/rss.xml", "type": "india-research"},
+    {"name": "IIT Madras News", "url": "https://www.iitm.ac.in/feed", "type": "india-research"},
+    {"name": "Vigyan Prasar", "url": "https://vigyanprasar.gov.in/feed/", "type": "india-research"},
+    # ─ Hackathons, competitions, opportunities ─
+    {"name": "Devfolio Blog", "url": "https://blog.devfolio.co/rss/", "type": "india-events"},
+    {"name": "Unstop Blog", "url": "https://unstop.com/blog/feed", "type": "india-events"},
+    {"name": "NPTEL Announcements", "url": "https://nptel.ac.in/rss/new_courses.xml", "type": "india-events"},
 ]
 
 # India-specific Reddit subs shared across departments
 INDIA_COMMON_REDDIT: List[str] = [
     "india", "Indian_Academia", "developersIndia", "Btechtards",
     "Indian_Startups", "chennai", "TamilNadu",
+    "Indian_Jobs", "GATE", "gradadmissions",
+    "IndianGaming",
 ]
 
 # Department-specific Indian sources (only added to matching department)
@@ -473,14 +494,17 @@ INDIA_DEPT_RSS: Dict[str, List[Dict[str, str]]] = {
     "CSE": [
         {"name": "Trak.in", "url": "https://trak.in/feed/", "type": "india-startup"},
         {"name": "ET CIO", "url": "https://cio.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "GeeksforGeeks", "url": "https://www.geeksforgeeks.org/feed/", "type": "india-career"},
     ],
     "IT": [
         {"name": "ETTelecom", "url": "https://telecom.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
         {"name": "CIO India", "url": "https://www.cio.com/in/feed/", "type": "india-industry"},
         {"name": "ET HR", "url": "https://hr.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "NASSCOM Blog", "url": "https://nasscom.in/knowledge-center/rss.xml", "type": "india-industry"},
     ],
     "AIDS": [
         {"name": "Analytics Vidhya Blog", "url": "https://www.analyticsvidhya.com/feed/", "type": "india-tech"},
+        {"name": "IIIT Hyderabad ML", "url": "https://ml.iiit.ac.in/feed/", "type": "india-research"},
     ],
     "ECE": [
         {"name": "Electronics For You", "url": "https://www.electronicsforu.com/feed", "type": "india-tech"},
@@ -497,11 +521,15 @@ INDIA_DEPT_RSS: Dict[str, List[Dict[str, str]]] = {
     "CE": [
         {"name": "ETInfra", "url": "https://infra.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
         {"name": "EPC World", "url": "https://www.epcworld.in/feed", "type": "india-industry"},
+        {"name": "Smart Cities Mission", "url": "https://smartcities.gov.in/rss.xml", "type": "india-policy"},
+        {"name": "NHAI News", "url": "https://nhai.gov.in/rss.xml", "type": "india-industry"},
     ],
     "BT": [
         {"name": "BioVoice News", "url": "https://www.biovoicenews.com/feed/", "type": "india-industry"},
         {"name": "Express Pharma", "url": "https://www.expresspharma.in/feed/", "type": "india-industry"},
         {"name": "ET Health", "url": "https://health.economictimes.indiatimes.com/rss/topstories", "type": "india-industry"},
+        {"name": "DBT India", "url": "https://dbtindia.gov.in/rss.xml", "type": "india-research"},
+        {"name": "BIRAC News", "url": "https://birac.nic.in/rss.xml", "type": "india-research"},
     ],
     "CH": [
         {"name": "Chemical Industry Digest", "url": "https://www.chemindigest.com/feed/", "type": "india-industry"},

@@ -92,8 +92,9 @@ class ContentProcessor:
         # Extra bonus for India-specific source types
         india_type_bonus = {
             "india-news": 6, "india-tech": 7, "india-startup": 6,
-            "india-education": 7, "india-career": 8, "india-policy": 5,
+            "india-education": 8, "india-career": 12, "india-policy": 5,
             "india-industry": 6, "india-energy": 6, "india-defence": 5,
+            "india-south": 10, "india-research": 9, "india-events": 12,
         }
         source_result = await self.db.execute(
             select(Source).where(Source.id == raw.source_id)
@@ -216,6 +217,9 @@ class ContentProcessor:
         _cat = detect_category(raw.original_title or "", raw.original_content or "")
         if _cat and _cat != "general": _rel += 15
         else: _rel += 3
+        # Career and opportunity content gets extra relevance
+        if _cat in ("career", "opportunity"):
+            _rel += 20  # High relevance for actionable career content
         # Department relevance
         _rel += min(35, int(max_dept_score * 3.5))
         # Source quality
@@ -225,7 +229,7 @@ class ContentProcessor:
         elif score >= 20: _rel += 5
         relevance_score = max(5, min(100, _rel))
 
-        # Determine if this is breaking news using quality + recency + urgency rules
+        # Determine if this is breaking newsusing quality + recency + urgency rules
         is_breaking = self._is_breaking_candidate(raw, score)
         breaking_score = self._calculate_breaking_score(raw, score) if is_breaking else None
         
@@ -373,6 +377,9 @@ class ContentProcessor:
         _cat = detect_category(title, content)
         if _cat and _cat != "general": _rel += 15
         else: _rel += 3
+        # Career and opportunity content gets extra relevance
+        if _cat in ("career", "opportunity"):
+            _rel += 20  # High relevance for actionable career content
         _rel += min(35, int(max_dept_score * 3.5))
         if score >= 50: _rel += 20
         elif score >= 40: _rel += 15

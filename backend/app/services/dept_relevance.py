@@ -256,6 +256,44 @@ DEPARTMENT_PROFILES: Dict[str, dict] = {
     },
 }
 
+# ── Cross-department keywords (applied to ALL departments) ────────────────
+# Career, opportunities, and South India signals that boost relevance for all students
+COMMON_CAREER_KEYWORDS = [
+    # Jobs & placements
+    ("hiring", 3), ("placement", 3), ("campus placement", 3), ("internship", 3),
+    ("fresher", 3), ("freshers", 3), ("walk-in", 2), ("recruitment", 2),
+    ("job opening", 3), ("off-campus", 3), ("on-campus", 3),
+    ("package", 2), ("salary", 1), ("lpa", 2), ("ctc", 2),
+    # Exams & certifications
+    ("gate exam", 3), ("gate 2026", 3), ("gate 2027", 3),
+    ("gre", 2), ("toefl", 1), ("ielts", 1),
+    ("nptel", 3), ("nptel certificate", 3), ("swayam", 2),
+    ("aws certified", 2), ("google certified", 2), ("certification", 1),
+    # Events & competitions
+    ("hackathon", 3), ("coding contest", 3), ("programming contest", 3),
+    ("workshop", 2), ("bootcamp", 2), ("webinar", 1),
+    ("scholarship", 3), ("fellowship", 3), ("competition", 2),
+    ("ideathon", 3), ("makeathon", 3), ("smart india hackathon", 3),
+    # South India institutional
+    ("chennai", 2), ("tamil nadu", 2), ("bangalore", 2), ("bengaluru", 2),
+    ("hyderabad", 2), ("kerala", 1), ("coimbatore", 1), ("madurai", 1),
+    ("srm", 3), ("srm university", 3), ("anna university", 3),
+    ("vit", 2), ("iit madras", 3), ("iit hyderabad", 2),
+    ("iiit hyderabad", 2), ("nit trichy", 2), ("nit surathkal", 2),
+    ("bits pilani", 2), ("psg tech", 2),
+    # Indian tech companies (hiring signals)
+    ("infosys hiring", 3), ("tcs hiring", 3), ("wipro hiring", 3),
+    ("zoho", 2), ("freshworks", 2), ("chargebee", 2), ("swiggy", 2),
+    ("flipkart", 2), ("razorpay", 2), ("cred", 2),
+    ("india tech", 2), ("startup india", 2), ("make in india", 2),
+]
+
+COMMON_NEGATIVE_KEYWORDS = [
+    # Reduce false positives from non-engineering content
+    "cricket", "bollywood", "movie review", "film", "ipl",
+    "political party", "election rally", "astrology", "horoscope",
+]
+
 # Minimum score to assign an article to a department
 RELEVANCE_THRESHOLD = 3
 
@@ -287,16 +325,19 @@ def score_article_departments(
 
     results = []
     for dept, profile in DEPARTMENT_PROFILES.items():
+        # Merge department-specific and common keywords/negatives
+        all_keywords = profile["keywords"] + COMMON_CAREER_KEYWORDS
+        all_negatives = profile.get("negative", []) + COMMON_NEGATIVE_KEYWORDS
+
         # Check negative keywords first
-        negatives = profile.get("negative", [])
-        neg_count = sum(1 for neg in negatives if neg in text)
+        neg_count = sum(1 for neg in all_negatives if neg in text)
         if neg_count >= 2:
             continue  # strong negative signal, skip this dept
 
         # Score positive keywords
         score = 0
         matched = 0
-        for keyword, weight in profile["keywords"]:
+        for keyword, weight in all_keywords:
             if keyword in text:
                 # Use word boundary check for short keywords (<=3 chars)
                 if len(keyword) <= 3:
@@ -312,6 +353,11 @@ def score_article_departments(
         if source_dept_tags and dept in source_dept_tags:
             if source_type not in GENERAL_SOURCE_TYPES:
                 score += 3  # source tagging bonus for specific sources
+
+        # Career/event/South India source type bonuses
+        india_career_types = {"india-career", "india-events", "india-south", "india-research"}
+        if source_type in india_career_types:
+            score += 2  # Boost career/event/local content
 
         if score >= RELEVANCE_THRESHOLD and matched >= 1:
             results.append((dept, score))
@@ -401,11 +447,30 @@ CATEGORY_KEYWORDS = {
         "vmware", "sre",
     ],
     "career": [
-        "job opening", "hiring", "interview", "salary", "career",
-        "placement", "internship", "recruitment", "campus placement",
-        "job fair", "resume", "job market",
+        "campus placement", "placement drive", "job opening", "walk-in interview",
+        "off campus", "on campus hiring", "fresher job", "entry level",
+        "internship opportunity", "summer internship", "winter internship",
+        "hiring drive", "recruitment drive", "pool campus",
+        "career opportunity", "job fair", "career fair",
+        "hiring", "placement", "internship", "recruiter", "recruitment",
+        "resume", "fresher", "freshers", "vacancy", "vacancies",
+        "ctc", "lpa", "salary", "package", "shortlist", "walk-in",
+        "openings", "positions",
+        "interview", "career", "job market",
         "job", "layoff", "recruit", "headcount", "workforce",
         "employee", "leadership", "workplace", "talent",
+    ],
+    "opportunity": [
+        "hackathon", "coding contest", "programming competition",
+        "scholarship program", "fellowship program", "research grant",
+        "coding challenge", "innovation challenge",
+        "smart india hackathon", "topcoder", "codeforces",
+        "google summer of code", "gsoc", "mlh fellowship",
+        "gate exam", "gate preparation", "nptel course",
+        "workshop registration", "certification program",
+        "competition", "scholarship", "fellowship",
+        "bootcamp", "workshop", "webinar", "certificate",
+        "challenge", "olympiad", "contest",
     ],
     "startup": [
         "startup", "funding round", "venture capital", "series a",
