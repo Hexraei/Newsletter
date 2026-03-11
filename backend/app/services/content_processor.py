@@ -68,6 +68,12 @@ class ContentProcessor:
         "SpaceNews": 15, "AWS Blog": 15, "Google Cloud Blog": 15,
         "Renewable Energy World": 15, "Construction Dive": 15,
         "3D Printing Industry": 15, "Engineering.com": 15,
+        "Waymo Blog": 20, "Figure AI Blog": 15,
+        "Agility Robotics Blog": 15, "A3 Automate News": 15,
+        "Robohub": 15, "Mobile Robot Guide": 15,
+        "Clearpath Robotics Blog": 15, "Franka Robotics Blog": 15,
+        "Yaskawa News": 15, "Omron Automation Blog": 15,
+        "Nuro Blog": 15,
         # Tier 4 (10 pts) — General platforms, community sources
         "Hacker News": 10, "Reddit": 10, "Medium": 10, "Product Hunt": 10,
         "GitHub Trending": 10,
@@ -85,6 +91,30 @@ class ContentProcessor:
         "srm university", "srm", "anna university", "vit", "iit madras",
         "iit hyderabad", "nit trichy", "psg tech", "iiitdm", "sastra",
         "bits pilani hyderabad", "iiit bangalore",
+    }
+
+    # Career-impact keywords — detect signals useful for student growth
+    CAREER_DIRECT = {
+        # Each keyword worth 5 pts (max 10 from this tier)
+        "hiring", "recruitment", "fresher", "freshers", "internship",
+        "campus placement", "walk-in", "job opening", "careers page",
+        "salary", "compensation", "lpa", "ctc", "package",
+        "workshop", "bootcamp", "certification", "training program",
+        "free course", "scholarship", "fellowship",
+    }
+    CAREER_LEARNING = {
+        # Each keyword worth 3 pts (max 9 from this tier)
+        "tutorial", "hands-on", "getting started", "how to build",
+        "project idea", "open source", "open-source",
+        "skill demand", "trending skill", "must-learn", "roadmap",
+        "breakthrough", "first-ever", "world record", "patent", "launched",
+    }
+    CAREER_TREND = {
+        # Each keyword worth 2 pts (max 6 from this tier)
+        "funding", "acquisition", "ipo", "valuation", "series a",
+        "series b", "series c", "partnership", "collaboration",
+        "mou", "contract awarded", "expansion", "new factory",
+        "new facility", "production line",
     }
 
     async def calculate_attractiveness_score(self, raw: RawContent) -> int:
@@ -174,8 +204,16 @@ class ContentProcessor:
         }
         score += india_type_bonus.get(source_type, 0)
 
-        # ── Locality multiplier ──
+        # ── Career-impact scoring (max 15 pts) ──
         text = ((raw.original_title or "") + " " + (raw.original_content or "")[:2000]).lower()
+
+        direct_pts = sum(5 for kw in self.CAREER_DIRECT if kw in text)
+        learning_pts = sum(3 for kw in self.CAREER_LEARNING if kw in text)
+        trend_pts = sum(2 for kw in self.CAREER_TREND if kw in text)
+        career_pts = min(10, direct_pts) + min(9, learning_pts) + min(6, trend_pts)
+        score += min(15, career_pts)
+
+        # ── Locality multiplier ──
         locality_hits = sum(1 for kw in self.LOCALITY_KEYWORDS if kw in text)
         if locality_hits >= 3:
             score = int(score * 1.35)

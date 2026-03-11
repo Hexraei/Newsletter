@@ -380,6 +380,20 @@ DEPARTMENT_SOURCES: Dict[str, Dict[str, Any]] = {
             {"name": "Siemens Digital Industries", "url": "https://blogs.sw.siemens.com/feed/", "type": "industry"},
             {"name": "FANUC News", "url": "https://www.fanucamerica.com/news-events/feed/rss", "type": "industry"},
             {"name": "KUKA News", "url": "https://www.kuka.com/en-de/press/news/feed.rss", "type": "industry"},
+            # Autonomous vehicles & humanoid startups
+            {"name": "Waymo Blog", "url": "https://blog.waymo.com/feeds/posts/default?alt=rss", "type": "industry"},
+            {"name": "Nuro Blog", "url": "https://www.nuro.ai/blog/rss.xml", "type": "industry"},
+            {"name": "Figure AI Blog", "url": "https://www.figure.ai/news/rss.xml", "type": "industry"},
+            {"name": "Agility Robotics Blog", "url": "https://agilityrobotics.com/blog/rss.xml", "type": "industry"},
+            # Industrial & research robotics
+            {"name": "Yaskawa News", "url": "https://www.yaskawa.com/news-events/news-releases?p_l_id=23914&p_p_cacheability=cacheable&p_p_id=com_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_newsReleases&p_p_lifecycle=2&p_p_resource_id=%2Frss", "type": "industry"},
+            {"name": "Omron Automation Blog", "url": "https://automation.omron.com/en/us/blog/rss", "type": "industry"},
+            {"name": "Franka Robotics Blog", "url": "https://franka.de/blog.rss", "type": "industry"},
+            {"name": "Clearpath Robotics Blog", "url": "https://clearpathrobotics.com/blog/feed/", "type": "industry"},
+            # Industry associations & aggregators
+            {"name": "A3 Automate News", "url": "https://www.automate.org/news/rss", "type": "industry"},
+            {"name": "Mobile Robot Guide", "url": "https://mobilerobotguide.com/feed/", "type": "news"},
+            {"name": "Robohub", "url": "https://robohub.org/feed/", "type": "news"},
             # Research papers
             {"name": "ArXiv Robotics", "url": "https://rss.arxiv.org/rss/cs.RO", "type": "academic"},
             {"name": "ArXiv Systems & Control", "url": "https://rss.arxiv.org/rss/eess.SY", "type": "academic"},

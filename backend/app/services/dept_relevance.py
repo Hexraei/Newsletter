@@ -228,7 +228,10 @@ DEPARTMENT_PROFILES: Dict[str, dict] = {
             ("drone", 2), ("uav", 2), ("ros", 2),
             ("machine vision", 2), ("lidar", 2),
             ("boston dynamics", 2), ("fanuc", 2), ("abb robotics", 2),
-            ("kuka", 2),
+            ("kuka", 2), ("waymo", 2), ("nuro", 2), ("figure ai", 2),
+            ("agility robotics", 2), ("intuitive surgical", 2),
+            ("yaskawa", 2), ("omron", 2), ("clearpath", 2),
+            ("franka", 2), ("universal robots", 2),
         ],
         "negative": [
             "pharmacy", "law", "judiciary",
