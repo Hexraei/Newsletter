@@ -10,6 +10,7 @@ class AIProvider:
     """Unified AI provider - automatically selects best available service."""
     
     PRIORITY = [
+        ("Gemini", "GEMINI_API_KEY"),
         ("Groq", "GROQ_API_KEY"),
         ("OpenAI", "OPENAI_API_KEY"),
         ("HuggingFace", "HUGGINGFACE_API_KEY"),
@@ -25,7 +26,12 @@ class AIProvider:
         for provider_name, key_name in self.PRIORITY:
             if key_name and getattr(settings, key_name, None):
                 # Provider with API key configured
-                if provider_name == "Groq":
+                if provider_name == "Gemini":
+                    from app.integrations.gemini_service import GeminiService
+                    self.service = GeminiService()
+                    self.provider = "Gemini Flash"
+                    break
+                elif provider_name == "Groq":
                     from app.integrations.groq_service import GroqService
                     self.service = GroqService()
                     self.provider = "Groq (Free Tier)"
@@ -135,6 +141,14 @@ class AIProvider:
 async def check_ai_status() -> dict:
     """Check AI service status - tries all providers."""
     
+    # Check Gemini
+    if getattr(settings, 'GEMINI_API_KEY', None):
+        from app.integrations.gemini_service import check_gemini_status
+        return await check_gemini_status(
+            settings.GEMINI_API_KEY,
+            getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        )
+    
     # Check Groq
     if getattr(settings, 'GROQ_API_KEY', None):
         from app.integrations.groq_service import check_groq_status
@@ -179,6 +193,22 @@ async def check_ai_status() -> dict:
 def get_ai_provider_options() -> dict:
     """Get available AI provider options."""
     options = []
+    
+    if getattr(settings, 'GEMINI_API_KEY', None):
+        options.append({
+            "name": "Gemini",
+            "status": "configured",
+            "speed": "Very Fast",
+            "cost": "Free tier (1500 req/day)"
+        })
+    else:
+        options.append({
+            "name": "Gemini",
+            "status": "available",
+            "speed": "Very Fast",
+            "cost": "Free tier",
+            "setup_url": "https://aistudio.google.com/apikey"
+        })
     
     if getattr(settings, 'GROQ_API_KEY', None):
         options.append({
@@ -253,7 +283,9 @@ def get_ai_provider_options() -> dict:
     
     # Determine which one will be used
     active = None
-    if getattr(settings, 'GROQ_API_KEY', None):
+    if getattr(settings, 'GEMINI_API_KEY', None):
+        active = "Gemini"
+    elif getattr(settings, 'GROQ_API_KEY', None):
         active = "Groq"
     elif getattr(settings, 'OPENAI_API_KEY', None):
         active = "OpenAI"
@@ -267,5 +299,5 @@ def get_ai_provider_options() -> dict:
     return {
         "providers": options,
         "active": active,
-        "recommendation": "Add GROQ_API_KEY for best experience, or use Pollinations AI for no signup"
+        "recommendation": "Gemini Flash is active — fast, free, generous limits"
     }

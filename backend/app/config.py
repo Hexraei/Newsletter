@@ -149,9 +149,13 @@ class Settings(BaseSettings):
     STORAGE_TYPE: str = "local"
     STORAGE_PATH: str = "./data/storage"
     
-    # AI Services - Priority: Groq > OpenAI > HuggingFace > Free > Ollama
+    # AI Services - Priority: Gemini > Groq > OpenAI > HuggingFace > Free > Ollama
     
-    # Groq (RECOMMENDED - FREE, Fast, No credit card)
+    # Gemini (Fast, generous free tier)
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-3.1-flash-lite-preview"
+    
+    # Groq (FREE, Fast, No credit card)
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     
