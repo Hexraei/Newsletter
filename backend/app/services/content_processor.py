@@ -22,88 +22,170 @@ class ContentProcessor:
         self.db = db
         self.ai_provider = AIProvider()
     
+    # ── Source Reputation Tiers ─────────────────────────────────────────
+    # Named sources get tiered scores based on editorial quality and
+    # relevance to engineering students. This replaces the flat platform bonus.
+    SOURCE_REPUTATION = {
+        # Tier 1 (25 pts) — Top academic, govt research, premier institutions
+        "IEEE Spectrum": 25, "ACM TechNews": 25, "ISRO News": 25,
+        "ArXiv CS": 25, "ArXiv AI": 25, "ArXiv ML": 25, "ArXiv CV": 25,
+        "ArXiv NLP": 25, "ArXiv Robotics": 25, "ArXiv Signal Processing": 25,
+        "ArXiv Systems": 25, "ArXiv Systems & Control": 25,
+        "ArXiv Quantitative Biology": 25, "ArXiv Chemical Physics": 25,
+        "ArXiv Astrophysics": 25, "ArXiv Space Physics": 25,
+        "ArXiv Fluid Dynamics": 25, "ArXiv Geophysics": 25,
+        "ArXiv Materials Science": 25, "ArXiv Applied Physics": 25,
+        "ArXiv Human-Robot Interaction": 25,
+        "Science Robotics": 25, "Papers With Code": 25,
+        "Google AI Blog": 25, "Microsoft Research": 25, "OpenAI Blog": 25,
+        "NASA Blog": 25, "IIT Madras News": 25, "DST India": 25,
+        "CSIR News": 25, "Vigyan Prasar": 25, "DRDO News": 25,
+        "NIST News": 25, "ASCE News": 25, "SAE International": 25,
+        # Tier 2 (20 pts) — Reputed tech media, Indian career/education, govt
+        "TechCrunch": 20, "Ars Technica": 20, "MIT Tech Review AI": 20,
+        "The Hindu Sci-Tech": 20, "The Hindu Education": 20,
+        "Indian Express Technology": 20, "Economic Times Tech": 20,
+        "NPTEL Announcements": 20, "NASSCOM Blog": 20,
+        "Internshala Blog": 20, "Freshersworld Blog": 20,
+        "Analytics Vidhya Blog": 20, "Electronics For You": 20,
+        "PIB India": 20, "ET Govt": 20, "Hugging Face Blog": 20,
+        "NVIDIA Robotics Blog": 20, "VentureBeat AI": 20,
+        "Krebs on Security": 20, "InfoQ": 20, "Devfolio Blog": 20,
+        "Unstop Blog": 20, "The News Minute Tech": 20,
+        "TOI Education": 20, "Naukri Blog": 20,
+        "ETAuto": 20, "ETEnergyWorld": 20, "ETInfra": 20,
+        "ET CIO": 20, "ETTelecom": 20,
+        # Tier 3 (15 pts) — Quality blogs, Indian startup/tech, niche industry
+        "Dev.to": 15, "GeeksforGeeks Jobs": 15, "GeeksforGeeks": 15,
+        "YourStory": 15, "Inc42": 15, "MediaNama": 15, "Trak.in": 15,
+        "The Wire Science": 15, "Livemint Technology": 15,
+        "The Verge": 15, "ZDNet": 15, "Bleeping Computer": 15,
+        "Dark Reading": 15, "Hackaday": 15, "EE Times": 15,
+        "Citizen Matters Bengaluru": 15, "Citizen Matters Chennai": 15,
+        "Manufacturing Today India": 15, "BioVoice News": 15,
+        "Mercom India Solar": 15, "The Robot Report": 15,
+        "Boston Dynamics Blog": 15, "GEN News": 15, "STAT News": 15,
+        "SpaceNews": 15, "AWS Blog": 15, "Google Cloud Blog": 15,
+        "Renewable Energy World": 15, "Construction Dive": 15,
+        "3D Printing Industry": 15, "Engineering.com": 15,
+        # Tier 4 (10 pts) — General platforms, community sources
+        "Hacker News": 10, "Reddit": 10, "Medium": 10, "Product Hunt": 10,
+        "GitHub Trending": 10,
+    }
+    # Fallback by platform for sources not in the named dict
+    PLATFORM_TIER_FALLBACK = {
+        "research": 20, "rss": 8, "hackernews": 10, "github": 10,
+        "reddit": 7, "medium": 7, "producthunt": 7,
+    }
+
+    # Locality keywords — presence in title/content triggers multiplier
+    LOCALITY_KEYWORDS = {
+        "chennai", "tamil nadu", "bangalore", "bengaluru", "hyderabad",
+        "coimbatore", "madurai", "kochi", "trivandrum", "mysore",
+        "srm university", "srm", "anna university", "vit", "iit madras",
+        "iit hyderabad", "nit trichy", "psg tech", "iiitdm", "sastra",
+        "bits pilani hyderabad", "iiit bangalore",
+    }
+
     async def calculate_attractiveness_score(self, raw: RawContent) -> int:
-        """Calculate attractiveness score (0-100) for content."""
+        """Calculate attractiveness score (0-100) for content.
+
+        Uses source reputation tiers, capped engagement, freshness,
+        content quality, and locality multipliers to prioritize content
+        relevant to South Indian engineering students.
+        """
         score = 0
-        
+
         # Base score
-        score += 20
-        
-        # Engagement bonus (from metadata)
-        metadata = raw.raw_metadata or {}
+        score += 15
+
+        # ── Engagement bonus (capped at 15 total) ──
         engagement = raw.raw_metadata.get("engagement", {}) if raw.raw_metadata else {}
-        
+        engagement_pts = 0
         if engagement:
-            # Hacker News: upvotes + comments
             upvotes = engagement.get("upvotes", 0)
             if upvotes > 500:
-                score += 30
+                engagement_pts += 10
             elif upvotes > 100:
-                score += 20
+                engagement_pts += 7
             elif upvotes > 50:
-                score += 10
-            
-            # GitHub: stars
+                engagement_pts += 4
             stars = engagement.get("stars", 0)
             if stars > 1000:
-                score += 30
+                engagement_pts += 10
             elif stars > 500:
-                score += 20
+                engagement_pts += 7
             elif stars > 100:
-                score += 10
-        
-        # Freshness bonus (published today)
+                engagement_pts += 4
+        score += min(15, engagement_pts)
+
+        # ── Freshness bonus (max 20) ──
         if raw.published_at:
             try:
-                # Handle both timezone-aware and naive datetimes
                 published = raw.published_at
                 now = datetime.now(timezone.utc)
                 if published.tzinfo is None:
-                    # Naive datetime, assume UTC
                     published = published.replace(tzinfo=timezone.utc)
                 age_hours = (now - published).total_seconds() / 3600
-                if age_hours < 24:
-                    score += 15
+                if age_hours < 12:
+                    score += 20
+                elif age_hours < 24:
+                    score += 16
                 elif age_hours < 48:
                     score += 10
                 elif age_hours < 72:
                     score += 5
             except Exception:
-                # Skip freshness bonus if date comparison fails
                 pass
-        
-        # Content length bonus
+
+        # ── Content length bonus (max 15) ──
         content_length = len(raw.original_content or "")
-        if content_length > 1000:
-            score += 10
+        if content_length > 2000:
+            score += 15
+        elif content_length > 1000:
+            score += 12
         elif content_length > 500:
-            score += 5
-        
-        # Source reliability bonus
-        source_bonus = {
-            "hackernews": 10,
-            "github": 10,
-            "reddit": 5,
-            "medium": 5,
-            "producthunt": 5,
-            "rss": 8,
-            "research": 10,
-        }
-        # Extra bonus for India-specific source types
-        india_type_bonus = {
-            "india-news": 6, "india-tech": 7, "india-startup": 6,
-            "india-education": 8, "india-career": 12, "india-policy": 5,
-            "india-industry": 6, "india-energy": 6, "india-defence": 5,
-            "india-south": 10, "india-research": 9, "india-events": 12,
-        }
+            score += 8
+        elif content_length > 200:
+            score += 4
+
+        # ── Source reputation tier (replaces flat platform bonus) ──
         source_result = await self.db.execute(
             select(Source).where(Source.id == raw.source_id)
         )
         source = source_result.scalar_one_or_none()
-        if source:
-            score += source_bonus.get(source.platform, 0)
-            score += india_type_bonus.get(source.source_type, 0)
-        
+        source_name = source.name if source else ""
+        source_type = source.source_type if source else ""
+        platform = source.platform if source else ""
+
+        # Named source lookup → platform fallback → 5 (unknown)
+        reputation_pts = self.SOURCE_REPUTATION.get(
+            source_name,
+            self.PLATFORM_TIER_FALLBACK.get(platform, 5)
+        )
+        score += reputation_pts
+
+        # India source type bonus (stacks with reputation)
+        india_type_bonus = {
+            "india-news": 4, "india-tech": 5, "india-startup": 4,
+            "india-education": 6, "india-career": 8, "india-policy": 3,
+            "india-industry": 4, "india-energy": 4, "india-defence": 3,
+            "india-south": 8, "india-research": 7, "india-events": 8,
+        }
+        score += india_type_bonus.get(source_type, 0)
+
+        # ── Locality multiplier ──
+        text = ((raw.original_title or "") + " " + (raw.original_content or "")[:2000]).lower()
+        locality_hits = sum(1 for kw in self.LOCALITY_KEYWORDS if kw in text)
+        if locality_hits >= 3:
+            score = int(score * 1.35)
+        elif locality_hits >= 1:
+            score = int(score * 1.2)
+
+        # Career/opportunity source type boost
+        if source_type in ("india-career", "india-events"):
+            score = int(score * 1.15)
+
         return min(100, score)
     
     async def process_pending_items(self, limit: int = 10) -> Dict:
