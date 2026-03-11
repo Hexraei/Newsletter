@@ -23,6 +23,16 @@ def _dept_filter(department: str):
     return ProcessedContent.department_tags.contains([department])
 
 
+_image_priority = case(
+    (
+        (ProcessedContent.featured_image_url != None) &
+        (ProcessedContent.featured_image_url != ''),
+        1,
+    ),
+    else_=0,
+).desc()
+
+
 class FeedService:
     """Service for curating personalized content feeds."""
     
@@ -62,12 +72,14 @@ class FeedService:
         # Order by relevance (if filtering by dept) then attractiveness and recency
         if department:
             query = query.order_by(
+                _image_priority,
                 ProcessedContent.relevance_score.desc().nullslast(),
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.published_at.desc()
             )
         else:
             query = query.order_by(
+                _image_priority,
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.published_at.desc()
             )
@@ -92,6 +104,7 @@ class FeedService:
                     ProcessedContent.id.not_in(existing_ids)
                 )
             xdept_query = xdept_query.order_by(
+                _image_priority,
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.published_at.desc()
             ).limit(limit - len(items)).offset(offset)
@@ -153,6 +166,7 @@ class FeedService:
             query = query.where(_dept_filter(department))
         
         query = query.order_by(
+            _image_priority,
             ProcessedContent.attractiveness_score.desc(),
             ProcessedContent.view_count.desc()
         ).limit(limit)
@@ -171,6 +185,7 @@ class FeedService:
                     ProcessedContent.id.not_in(existing_ids)
                 )
             xdept_query = xdept_query.order_by(
+                _image_priority,
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.view_count.desc()
             ).limit(limit - len(items))
@@ -326,7 +341,7 @@ class FeedService:
         primary_query = (
             query
             .where(total_score >= 40)
-            .order_by(total_score.desc())
+            .order_by(_image_priority, total_score.desc())
             .limit(limit)
         )
         result = await self.db.execute(primary_query)
@@ -350,6 +365,7 @@ class FeedService:
                     ProcessedContent.id.not_in(existing_ids)
                 )
             fallback_query = fallback_query.order_by(
+                _image_priority,
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.published_at.desc(),
             ).limit(limit - len(items))
@@ -370,6 +386,7 @@ class FeedService:
                     ProcessedContent.id.not_in(existing_ids)
                 )
             xdept_query = xdept_query.order_by(
+                _image_priority,
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.published_at.desc(),
             ).limit(limit - len(items))
