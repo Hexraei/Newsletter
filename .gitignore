@@ -107,3 +107,6 @@ SCRAPER_RESULTS.md
 
 # Database backups
 backups/
+*_temp.txt
+COMPLETE_*.txt
+exported_*.txt
