@@ -10,8 +10,11 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.config import Settings, get_settings
+from app.api.v1.auth import limiter as auth_limiter
 from app.main import app
 from app.models import Base, get_db
 
@@ -48,6 +51,10 @@ async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # Override the get_db dependency
 app.dependency_overrides[get_db] = override_get_db
+
+# Disable rate limits in tests to avoid cross-test interference.
+app.state.limiter = Limiter(key_func=get_remote_address, enabled=False)
+auth_limiter.enabled = False
 
 
 @pytest_asyncio.fixture(scope="session")

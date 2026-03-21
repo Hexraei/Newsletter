@@ -716,22 +716,18 @@
 </div>
 <a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
+  <script src="auth_session.js?v=20260319"></script>
   <!-- AUTH GATE -->
   <script>
-    (function() {
-      try {
-        var raw = localStorage.getItem('newsday_session');
-        if (!raw) { window.location.replace('auth.html'); return; }
-        var s = JSON.parse(raw);
-        if (!s.authenticated || (s.expires_at && Date.now() > s.expires_at)) {
-          localStorage.removeItem('newsday_session');
-          window.location.replace('auth.html');
-          return;
-        }
-      } catch(e) {
+    window.__newsdayAuthReady = (async function () {
+      if (!window.NewsdayAuth) {
         window.location.replace('auth.html');
-        return;
+        return false;
       }
+      return window.NewsdayAuth.ensureAuthenticated({
+        redirectTo: 'auth.html',
+        syncProfileOnSuccess: true,
+      });
     })();
   </script>
 
@@ -755,12 +751,13 @@
           <div class="dept-dropdown-item" data-key="RAE"><span class="dept-abbr">RAE</span> Robotics & Automation</div>
           <div class="dept-dropdown-item" data-key="PT"><span class="dept-abbr">PT</span> Production Technology</div>
       </div>
+      </div>
       <a href="department.html">Department news</a>
       <a href="insights.html">Industrial insights</a>
       <a href="research.html">Research Papers</a>
       <a href="skills.html">Skills</a>
-      <a href="stories.html" class="active">Deep Reads</a>
-      <a href="auth.html">Log In</a>
+      <a href="stories.html" class="active">Student Stories</a>
+      <a href="auth.html" id="nav-auth-link">Log In</a>
     </div>
   </nav>
 
@@ -873,17 +870,17 @@
         <li><a href="insights.html">Industrial Insights</a></li>
         <li><a href="research.html">Research Papers</a></li>
         <li><a href="skills.html">Skills</a></li>
-        <li><a href="stories.html">Deep Reads</a></li>
+        <li><a href="stories.html">Student Stories</a></li>
       </ul>
     </div>
     <div>
       <div class="footer-col-title">Sources</div>
       <ul class="footer-links">
-        <li><a href="https://news.ycombinator.com" target="_blank">Hacker News</a></li>
-        <li><a href="https://reddit.com/r/technology" target="_blank">Reddit</a></li>
-        <li><a href="https://github.com/trending" target="_blank">GitHub</a></li>
-        <li><a href="https://medium.com" target="_blank">Medium</a></li>
-        <li><a href="https://producthunt.com" target="_blank">Product Hunt</a></li>
+        <li><a href="https://www.thehindu.com/education/" target="_blank">The Hindu Education</a></li>
+        <li><a href="https://timesofindia.indiatimes.com/education" target="_blank">TOI Education</a></li>
+        <li><a href="https://blog.internshala.com/" target="_blank">Internshala</a></li>
+        <li><a href="https://www.iitm.ac.in/" target="_blank">IIT Madras</a></li>
+        <li><a href="https://nptel.ac.in/" target="_blank">NPTEL</a></li>
       </ul>
     </div>
     <div>
@@ -1006,6 +1003,106 @@
       el.style.display = '';
     }
     setInterval(updateLastUpdatedIndicator, 30000);
+
+    const UNSPLASH_KEY =
+      window.NEWSDAY_UNSPLASH_KEY ||
+      localStorage.getItem('newsday_unsplash_key') ||
+      'FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM';
+
+    const UnsplashImageLoader = (() => {
+      const CACHE_KEY = 'newsday_unsplash_cache_v1';
+      const RATE_KEY = 'newsday_unsplash_rate_v1';
+      const configuredMax = Number(localStorage.getItem('newsday_unsplash_max_req_hr') || '4800');
+      const MAX_REQ_HR = Number.isFinite(configuredMax) && configuredMax > 0 ? configuredMax : 4800;
+      const STOP = new Set(['the','a','an','in','on','of','to','for','and','or','with','by','at','is','are','was','were','has','have','it','its','this','that','from','as','be','how','why','what','when','who','your','our','their','will','can','may','about','into','over','after','using','new','top','best','just','not','now','get','all','more','per','vs','via']);
+      const NOISE = new Set(['patch','tuesday','edition','january','february','march','april','may','june','july','august','september','october','november','december','2024','2025','2026','2027','update','roundup','daily','weekly']);
+
+      function _loadCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } }
+      function _saveCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {} }
+      function _rateOK() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) {
+            localStorage.setItem(RATE_KEY, JSON.stringify({ count: 0, windowStart: now }));
+            return true;
+          }
+          return raw.count < MAX_REQ_HR;
+        } catch { return true; }
+      }
+      function _incRate() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) localStorage.setItem(RATE_KEY, JSON.stringify({ count: 1, windowStart: now }));
+          else localStorage.setItem(RATE_KEY, JSON.stringify({ count: (raw.count || 0) + 1, windowStart: raw.windowStart }));
+        } catch {}
+      }
+      function _getQuery(title, category) {
+        const words = (title || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w) && !NOISE.has(w));
+        words.sort((a, b) => b.length - a.length);
+        const titlePart = words.slice(0, 2).join(' ');
+        const ctx = ({ ai_ml:'artificial intelligence', backend:'programming code', webdev:'web development', security:'cybersecurity', career:'career workplace', startup:'startup business', devops:'cloud servers', mobile:'smartphone app', robotics:'robot technology', electronics:'circuit board', research:'scientific research', biotech:'biotechnology', energy:'renewable energy' })[category] || 'technology';
+        return titlePart ? `${titlePart} ${ctx}` : ctx;
+      }
+      async function _fetchImage(query) {
+        if (!UNSPLASH_KEY) return null;
+        const cache = _loadCache();
+        const now = Date.now();
+        if (cache[query] && (now - cache[query].ts) < 86400000) return cache[query];
+        if (!_rateOK()) return null;
+        _incRate();
+        try {
+          const res = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape&client_id=${UNSPLASH_KEY}`);
+          if (!res.ok) return null;
+          const json = await res.json();
+          const photo = json.results && json.results[0];
+          if (!photo) return null;
+          const data = { url: photo.urls.small, ts: now };
+          cache[query] = data;
+          _saveCache(cache);
+          return data;
+        } catch { return null; }
+      }
+      function _target(cardEl) { return cardEl.querySelector('.js-unsplash-target'); }
+      function _apply(cardEl, url) {
+        const target = _target(cardEl);
+        if (!target || !url) return;
+        target.style.backgroundImage = `url('${url}')`;
+        target.style.backgroundSize = 'cover';
+        target.style.backgroundPosition = 'center';
+        target.classList.add('has-image');
+        const ph = target.querySelector('.placeholder-icon');
+        if (ph) ph.remove();
+      }
+      let _observer = null;
+      const _pending = new Map();
+      function _getObserver() {
+        if (_observer) return _observer;
+        _observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const cardEl = entry.target;
+            const query = _pending.get(cardEl);
+            if (!query) return;
+            _pending.delete(cardEl);
+            _observer.unobserve(cardEl);
+            _fetchImage(query).then(data => _apply(cardEl, (data && data.url) || cardEl.dataset.fallbackImage || ''));
+          });
+        }, { rootMargin: '200px' });
+        return _observer;
+      }
+      function observeAll(containerEl) {
+        if (!containerEl) return;
+        containerEl.querySelectorAll('[data-unsplash-query]').forEach(cardEl => {
+          const query = cardEl.dataset.unsplashQuery;
+          if (!query) return;
+          _pending.set(cardEl, query);
+          _getObserver().observe(cardEl);
+        });
+      }
+      return { observeAll, getQuery: _getQuery };
+    })();
 
     const PAGE_SECTION = 'student_stories';
 
@@ -1193,7 +1290,7 @@
       const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
         title: item.title || '',
-        source: item.source || 'CS Desk',
+        source: item.source || 'India Student Desk',
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
@@ -1347,7 +1444,7 @@
     async function openStoryModal(item) {
       if (!item) return;
       $storyModalTitle.textContent = item.title || 'Story';
-      $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+      $storyModalMeta.textContent = `${(item.source || 'India Student Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
       $storyQuickSummary.textContent = 'Preparing summary...';
       $storyWhyImportant.textContent = 'Preparing context...';
       $storyImpact.textContent = 'Preparing student impact...';
@@ -1401,17 +1498,16 @@
       const category = formatCategory(item);
       const ago = timeAgo(item.published_at);
       const fullSummary = stripSourcePrefix(item.summary || item.content || item.meta || '');
-      const source = item.source || 'CS Desk';
+      const source = item.source || 'India Student Desk';
       const mins = readingTime(fullSummary);
 
-      const hasImg = !!(item.featured_image_url || item.image);
-      const imgUrl = item.featured_image_url || item.image || '';
-      const imgClass = hasImg ? ' has-image' : '';
-      const imgInner = hasImg
-        ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(item.title || 'Article image')}" loading="lazy" decoding="async" style="aspect-ratio:3/2;object-fit:cover;">`
-        : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-      return `<a class="feed-item" href="#" data-story-id="${storyId}">
-        <div class="feed-item-thumb${imgClass}">${imgInner}</div>
+      const fallbackImage = item.featured_image_url || item.image || '';
+      const query = UnsplashImageLoader.getQuery(item.title, item.category);
+      const unsplashAttr = query ? ` data-unsplash-query="${escapeHtml(query)}"` : '';
+      const fallbackAttr = fallbackImage ? ` data-fallback-image="${escapeHtml(fallbackImage)}"` : '';
+      const imgInner = `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
+      return `<a class="feed-item" href="#" data-story-id="${storyId}"${unsplashAttr}${fallbackAttr}>
+        <div class="feed-item-thumb js-unsplash-target">${imgInner}</div>
         <div class="feed-item-body">
           <div class="feed-item-category">${escapeHtml(category)}</div>
           <div class="feed-item-title">${escapeHtml(item.title)}</div>
@@ -1430,6 +1526,7 @@
         return;
       }
       $feed.innerHTML = items.map(renderFeedItem).join('');
+      UnsplashImageLoader.observeAll($feed);
     }
 
     /* ================================================================
@@ -1449,7 +1546,7 @@
           <div class="sidebar-item-body">
             <div class="sidebar-item-cat">${escapeHtml(cat)}</div>
             <div class="sidebar-item-title">${escapeHtml(item.title)}</div>
-            <div class="sidebar-item-meta">${escapeHtml(item.source || 'CS Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
+            <div class="sidebar-item-meta">${escapeHtml(item.source || 'India Student Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
           </div>
         </a>`;
       }).join('');
@@ -1470,23 +1567,23 @@
         const ago = timeAgo(item.published_at);
         const summary = stripSourcePrefix(item.summary || item.content || '');
         const mins = readingTime(summary);
-        const hasImg = !!(item.featured_image_url || item.image);
-        const imgUrl = item.featured_image_url || item.image || '';
-        const imgClass = hasImg ? ' has-image' : '';
-        const imgInner = hasImg
-          ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(item.title || 'Article image')}" loading="lazy" decoding="async" style="aspect-ratio:16/9;object-fit:cover;">`
-          : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-        return `<a class="pick-card" href="#" data-story-id="${storyId}">
-          <div class="pick-card-img${imgClass}">${imgInner}</div>
+        const fallbackImage = item.featured_image_url || item.image || '';
+        const query = UnsplashImageLoader.getQuery(item.title, item.category);
+        const unsplashAttr = query ? ` data-unsplash-query="${escapeHtml(query)}"` : '';
+        const fallbackAttr = fallbackImage ? ` data-fallback-image="${escapeHtml(fallbackImage)}"` : '';
+        const imgInner = `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
+        return `<a class="pick-card" href="#" data-story-id="${storyId}"${unsplashAttr}${fallbackAttr}>
+          <div class="pick-card-img js-unsplash-target">${imgInner}</div>
           <div class="pick-card-cat">${escapeHtml(cat)}</div>
           <div class="pick-card-title">${escapeHtml(item.title)}</div>
           <div class="pick-card-summary">${escapeHtml(summary)}</div>
           <div class="pick-card-footer">
-            <span>${escapeHtml(item.source || 'CS Desk')}${ago ? ' · ' + escapeHtml(ago) : ''}</span>
+            <span>${escapeHtml(item.source || 'India Student Desk')}${ago ? ' · ' + escapeHtml(ago) : ''}</span>
             <span class="reading-time">⏱ ${mins} min read</span>
           </div>
         </a>`;
       }).join('');
+      UnsplashImageLoader.observeAll($grid);
     }
 
     function applyQualityFilter(items) {
@@ -1561,30 +1658,30 @@
        DEMO DATA (fallback)
     ================================================================ */
     const DEMO_STORIES = [
-      { title: 'How I Landed a Google SWE Internship as a Sophomore', source: 'Reddit', summary: 'A step-by-step breakdown of preparation, applications, and interview strategy.', url: '#', category: 'career', published_at: new Date(Date.now() - 4*36e5).toISOString() },
-      { title: 'Our Hackathon Team Built an AI Study Planner in 36 Hours', source: 'Medium', summary: 'Lessons learned from shipping a functional product under extreme time pressure.', url: '#', category: 'hackathons', published_at: new Date(Date.now() - 7*36e5).toISOString() },
-      { title: 'I Published My First Research Paper as an Undergrad', source: 'Hacker News', summary: 'Navigating the academic publishing process as a junior researcher.', url: '#', category: 'research', published_at: new Date(Date.now() - 10*36e5).toISOString() },
-      { title: 'Building a Campus Event App That 2,000 Students Actually Use', source: 'Product Hunt', summary: 'From side project to campus-wide adoption — what worked and what failed.', url: '#', category: 'projects', published_at: new Date(Date.now() - 14*36e5).toISOString() },
-      { title: 'What I Learned Running a CS Study Group for Two Semesters', source: 'Reddit', summary: 'Community building, accountability, and the unexpected benefits of teaching peers.', url: '#', category: 'community', published_at: new Date(Date.now() - 18*36e5).toISOString() },
-      { title: 'My Open-Source Contribution Got Merged Into a Major Framework', source: 'GitHub', summary: 'How contributing to open source changed my understanding of production code.', url: '#', category: 'projects', published_at: new Date(Date.now() - 22*36e5).toISOString() },
-      { title: 'Remote Internship vs On-Site: An Honest Comparison', source: 'Medium', summary: 'Pros and cons after completing both types of internships back-to-back.', url: '#', category: 'internships', published_at: new Date(Date.now() - 28*36e5).toISOString() },
-      { title: 'How Our University Coding Club Grew From 5 to 200 Members', source: 'Reddit', summary: 'Strategies for building a vibrant tech community on campus from scratch.', url: '#', category: 'community', published_at: new Date(Date.now() - 36*36e5).toISOString() },
+      { title: 'How I Landed a Chennai Product Internship in My Third Year', source: 'Internshala', summary: 'A practical timeline for resume iterations, project proof, and interview prep.', url: '#', category: 'career', published_at: new Date(Date.now() - 4*36e5).toISOString() },
+      { title: 'Our Coimbatore Team Built an AI Study Planner in 36 Hours', source: 'Devfolio Blog', summary: 'What helped us scope, ship, and demo a working product at a student hackathon.', url: '#', category: 'hackathons', published_at: new Date(Date.now() - 7*36e5).toISOString() },
+      { title: 'Publishing My First Undergraduate Paper with an IIT Lab Mentor', source: 'IIT Madras', summary: 'A realistic path to research output with constraints of regular semester workload.', url: '#', category: 'research', published_at: new Date(Date.now() - 10*36e5).toISOString() },
+      { title: 'Building a Campus App Used by 2,000 Students in Tamil Nadu', source: 'Unstop Blog', summary: 'How feedback loops and on-campus pilots helped us scale reliably.', url: '#', category: 'projects', published_at: new Date(Date.now() - 14*36e5).toISOString() },
+      { title: 'What I Learned Running an Engineering Peer Study Group', source: 'Indian Academia', summary: 'Community systems that improved accountability and semester outcomes.', url: '#', category: 'community', published_at: new Date(Date.now() - 18*36e5).toISOString() },
+      { title: 'My Open Source Contribution Helped Me Get Interview Calls', source: 'developersIndia', summary: 'Why issue quality and consistent commits mattered more than vanity metrics.', url: '#', category: 'projects', published_at: new Date(Date.now() - 22*36e5).toISOString() },
+      { title: 'Remote vs On-Site Internships: A Tamil Nadu Student Perspective', source: 'The Hindu Education', summary: 'Tradeoffs in learning speed, mentoring access, and conversion opportunities.', url: '#', category: 'internships', published_at: new Date(Date.now() - 28*36e5).toISOString() },
+      { title: 'How Our Coding Club Grew from 8 to 180 Students', source: 'YourStory', summary: 'Tactics that helped us sustain momentum with limited funding and faculty time.', url: '#', category: 'community', published_at: new Date(Date.now() - 36*36e5).toISOString() },
     ];
 
     const DEMO_DEPARTMENT = [
-      { title: 'After all the hype, some AI experts think LLMs have plateaued', source: 'Reddit', summary: 'Industry experts debate whether large language models have hit diminishing returns.', url: '#', category: 'ai', published_at: new Date(Date.now() - 6*36e5).toISOString() },
-      { title: 'Zero-day vulnerability found in popular npm package', source: 'GitHub', summary: 'Critical security flaw affects thousands of Node.js projects.', url: '#', category: 'security', published_at: new Date(Date.now() - 9*36e5).toISOString() },
-      { title: 'The State of WebAssembly in 2026: What Changed', source: 'Medium', summary: 'WebAssembly adoption across browsers and server-side runtimes.', url: '#', category: 'web', published_at: new Date(Date.now() - 12*36e5).toISOString() },
-      { title: 'Kubernetes 1.33 released with major networking changes', source: 'Hacker News', summary: 'New release simplifies service mesh configuration.', url: '#', category: 'devops', published_at: new Date(Date.now() - 16*36e5).toISOString() },
-      { title: 'Rust vs Go in 2026: Which should CS students learn?', source: 'Reddit', summary: 'Community debate on systems programming language choices.', url: '#', category: 'general', published_at: new Date(Date.now() - 20*36e5).toISOString() },
+      { title: 'NPTEL AI Course Completion Strategy Shared by Top Performers', source: 'NPTEL', summary: 'A weekly plan to finish labs, assessments, and portfolio-ready outputs.', url: '#', category: 'ai', published_at: new Date(Date.now() - 6*36e5).toISOString() },
+      { title: 'Campus Cybersecurity Challenge Opens for South India Colleges', source: 'PIB India', summary: 'Hands-on security tasks with mentor feedback and placement visibility.', url: '#', category: 'security', published_at: new Date(Date.now() - 9*36e5).toISOString() },
+      { title: 'Building Web Projects that Recruiters Actually Review', source: 'Internshala', summary: 'Project structure, deployment, and documentation tips from hiring partners.', url: '#', category: 'web', published_at: new Date(Date.now() - 12*36e5).toISOString() },
+      { title: 'DevOps Fresher Path for Tier-2 Colleges: What Works', source: 'developersIndia', summary: 'Skill stack and interview flow students used to secure first roles.', url: '#', category: 'devops', published_at: new Date(Date.now() - 16*36e5).toISOString() },
+      { title: 'Choosing Between Core and IT Roles After Final Year', source: 'TOI Education', summary: 'Decision framework using strengths, market demand, and location flexibility.', url: '#', category: 'general', published_at: new Date(Date.now() - 20*36e5).toISOString() },
     ];
 
     const DEMO_TRENDING = [
-      { title: 'A Stock Market Doom Loop Is Hitting Everything That Isn\'t AI', source: 'Reddit', summary: 'Finance sector turbulence affecting tech company valuations.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
-      { title: 'Hard Drives Already Sold Out for the Entire Year Due to AI', source: 'Reddit', summary: 'AI demand creating supply chain shortages.', url: '#', category: 'supply', published_at: new Date(Date.now() - 8*36e5).toISOString() },
-      { title: 'Japan Creates World\'s First Zero-Emission Hydrogen Engine', source: 'Reddit', summary: 'Breakthrough in green energy technology.', url: '#', category: 'science', published_at: new Date(Date.now() - 11*36e5).toISOString() },
-      { title: 'PS6 Could Be Delayed While Switch 2 Might Launch Early', source: 'Reddit', summary: 'Console wars heating up in the gaming industry.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 15*36e5).toISOString() },
-      { title: 'California\'s Billionaires Pour Cash Into Local Elections', source: 'Reddit', summary: 'Tech wealth influencing civic processes.', url: '#', category: 'civic', published_at: new Date(Date.now() - 19*36e5).toISOString() },
+      { title: 'Fresh Graduate IT Hiring Improves Across Bengaluru and Chennai', source: 'Economic Times Tech', summary: 'Companies are prioritizing practical project work over pure GPA filtering.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
+      { title: 'Cloud and Data Roles Dominate Off-Campus Listings This Month', source: 'Naukri Blog', summary: 'Students with Python, SQL, and deployment skills are seeing higher response rates.', url: '#', category: 'supply', published_at: new Date(Date.now() - 8*36e5).toISOString() },
+      { title: 'Student Research Funding Track Opens for Engineering Teams', source: 'DST India', summary: 'Early-stage grants available for campus projects with practical impact.', url: '#', category: 'science', published_at: new Date(Date.now() - 11*36e5).toISOString() },
+      { title: 'Consumer Tech Manufacturing Expands Hiring in South India', source: 'ETInfra', summary: 'New lines and supplier expansion are creating cross-discipline roles.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 15*36e5).toISOString() },
+      { title: 'College Innovation Cells Receive New Mentorship Support', source: 'Vigyan Prasar', summary: 'Clubs and teams can access mentors for project-to-product transitions.', url: '#', category: 'civic', published_at: new Date(Date.now() - 19*36e5).toISOString() },
     ];
 
     /* ================================================================
@@ -1596,7 +1693,7 @@
       return {
         title: item.title || '',
         url: item.original_url || item.url || '#',
-        source: item.source || item.source_name || 'CS Desk',
+        source: item.source || item.source_name || 'India Student Desk',
         summary,
         content: summary || item.title || '',
         category: item.category || '',
@@ -1650,20 +1747,29 @@
         } catch {}
       }
 
-      // Fallback to demo data
-      if (!allFeedItems.length) allFeedItems = DEMO_STORIES;
-      if (!relatedItems.length) relatedItems = DEMO_DEPARTMENT;
-      if (!trendingItems.length) trendingItems = DEMO_TRENDING;
+      // Fallback to demo data only when backend is unavailable.
+      // If backend is live but this department has no items yet, keep explicit empty state.
+      if (!allFeedItems.length) allFeedItems = backendOk ? [] : DEMO_STORIES;
+      if (!relatedItems.length) relatedItems = backendOk ? [] : DEMO_DEPARTMENT;
+      if (!trendingItems.length) trendingItems = backendOk ? [] : DEMO_TRENDING;
 
       // Apply quality filter
-      const qualityItems = applyQualityFilter(allFeedItems);
-      if (qualityItems.length >= 3) allFeedItems = qualityItems;
+      if (allFeedItems.length) {
+        const qualityItems = applyQualityFilter(allFeedItems);
+        if (qualityItems.length >= 3) allFeedItems = qualityItems;
+      }
     }
 
     /* ================================================================
        INIT
     ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
+      const authOk = await (window.__newsdayAuthReady || Promise.resolve(true));
+      if (!authOk) return;
+      if (window.NewsdayAuth) {
+        await window.NewsdayAuth.initNavbarAuth({ linkSelector: '#nav-auth-link' });
+      }
+
       loadPersistedStoryCache();
 
       // Stale-while-revalidate: render cached data instantly

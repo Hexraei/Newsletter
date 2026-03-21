@@ -843,22 +843,18 @@
 </div>
 <a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
-  <!-- AUTH GATE — redirect to auth.html if not logged in -->
+  <script src="auth_session.js?v=20260319"></script>
+  <!-- AUTH GATE — validate session against cookie auth and redirect if needed -->
   <script>
-    (function() {
-      try {
-        var raw = localStorage.getItem('newsday_session');
-        if (!raw) { window.location.replace('auth.html'); return; }
-        var s = JSON.parse(raw);
-        if (!s.authenticated || (s.expires_at && Date.now() > s.expires_at)) {
-          localStorage.removeItem('newsday_session');
-          window.location.replace('auth.html');
-          return;
-        }
-      } catch(e) {
+    window.__newsdayAuthReady = (async function () {
+      if (!window.NewsdayAuth) {
         window.location.replace('auth.html');
-        return;
+        return false;
       }
+      return window.NewsdayAuth.ensureAuthenticated({
+        redirectTo: 'auth.html',
+        syncProfileOnSuccess: true,
+      });
     })();
   </script>
 
@@ -898,7 +894,7 @@
   <div id="main-content"></div>
     <div class="hero-text active" id="hero-text">
       <div class="breaking-tag" id="hero-breaking-tag" style="display:none">BREAKING</div>
-      <div class="hero-source" id="hero-source">HACKER NEWS</div>
+      <div class="hero-source" id="hero-source">INDIA STUDENT DESK</div>
       <h1 class="hero-title" id="hero-title">Loading top stories...</h1>
       <p class="hero-subtitle" id="hero-subtitle">Fetching the latest news</p>
       <a class="hero-btn" id="hero-btn" href="#">Read AI Brief</a>
@@ -1001,11 +997,11 @@
     <div>
       <div class="footer-col-title">Sources</div>
       <ul class="footer-links">
-        <li><a href="https://news.ycombinator.com" target="_blank">Hacker News</a></li>
-        <li><a href="https://reddit.com/r/technology" target="_blank">Reddit</a></li>
-        <li><a href="https://github.com/trending" target="_blank">GitHub</a></li>
-        <li><a href="https://medium.com" target="_blank">Medium</a></li>
-        <li><a href="https://producthunt.com" target="_blank">Product Hunt</a></li>
+        <li><a href="https://www.thehindu.com/education/" target="_blank">The Hindu Education</a></li>
+        <li><a href="https://timesofindia.indiatimes.com/education" target="_blank">TOI Education</a></li>
+        <li><a href="https://blog.internshala.com/" target="_blank">Internshala</a></li>
+        <li><a href="https://www.iitm.ac.in/" target="_blank">IIT Madras</a></li>
+        <li><a href="https://nptel.ac.in/" target="_blank">NPTEL</a></li>
       </ul>
     </div>
     <div>
@@ -1132,16 +1128,20 @@
        UNSPLASH IMAGE LOADER
        - Client-side only (access key is public/safe per Unsplash docs)
        - Guidelines compliant: attribution, download trigger, hotlink, UTM
-       - Rate-limited: max 40 req/hr via localStorage tracker (50/hr limit)
+       - Rate-limited: configurable hourly cap via localStorage (defaults to 4800/hr)
        - 24hr localStorage cache per search keyword
     ======================================================== */
-    const UNSPLASH_KEY = 'FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM';
+    const UNSPLASH_KEY =
+      window.NEWSDAY_UNSPLASH_KEY ||
+      localStorage.getItem('newsday_unsplash_key') ||
+      'FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM';
     const UNSPLASH_UTM = '?utm_source=newsday&utm_medium=referral';
 
     const UnsplashImageLoader = (() => {
       const CACHE_KEY  = 'newsday_unsplash_cache_v1';
       const RATE_KEY   = 'newsday_unsplash_rate_v1';
-      const MAX_REQ_HR = 40;
+      const configuredMax = Number(localStorage.getItem('newsday_unsplash_max_req_hr') || '4800');
+      const MAX_REQ_HR = Number.isFinite(configuredMax) && configuredMax > 0 ? configuredMax : 4800;
 
       // Persistent cache: keyword → {url, name, profile, download_location, ts}
       function _loadCache() {
@@ -1195,7 +1195,7 @@
 
       // Trigger Unsplash download event (required by guidelines when image is shown)
       function _triggerDownload(download_location) {
-        if (!download_location) return;
+        if (!download_location || !UNSPLASH_KEY) return;
         fetch(download_location + (download_location.includes('?') ? '&' : '?') + 'client_id=' + UNSPLASH_KEY)
           .catch(() => {});
       }
@@ -1221,8 +1221,22 @@
         _triggerDownload(data.download_location);
       }
 
+      function _applyFallbackImage(cardEl) {
+        const fallbackUrl = cardEl.dataset.fallbackImage;
+        if (!fallbackUrl) return;
+        const visual = cardEl.querySelector('.article-card-visual');
+        if (!visual) return;
+        visual.style.backgroundImage = `url('${fallbackUrl}')`;
+        visual.style.backgroundSize = 'cover';
+        visual.style.backgroundPosition = 'center';
+        visual.classList.add('has-image');
+        const ph = visual.querySelector('.placeholder-icon');
+        if (ph) ph.remove();
+      }
+
       // Fetch from Unsplash API (with cache)
       async function _fetchImage(query) {
+        if (!UNSPLASH_KEY) return null;
         const cache = _loadCache();
         const now = Date.now();
         // Cache hit (valid for 24hr)
@@ -1267,6 +1281,7 @@
             _observer.unobserve(cardEl);
             _fetchImage(query).then(data => {
               if (data) _applyImage(cardEl, data);
+              else _applyFallbackImage(cardEl);
             });
           });
         }, { rootMargin: '200px' }); // preload 200px before visible
@@ -1276,17 +1291,15 @@
       // Public: observe a card element for lazy image loading
       function observe(cardEl) {
         if (!cardEl) return;
-        // Skip if card already has a real background image set inline (from item.image)
         const visual = cardEl.querySelector('.article-card-visual');
         if (!visual) return;
-        if (visual.classList.contains('has-image')) return;
         const query = cardEl.dataset.unsplashQuery;
         if (!query) return;
         _pending.set(cardEl, query);
         _getObserver().observe(cardEl);
       }
 
-      // Public: observe all unimaged cards in a container
+      // Public: observe all cards that have an Unsplash query
       function observeAll(containerEl) {
         if (!containerEl) return;
         containerEl.querySelectorAll('.article-card[data-unsplash-query]').forEach(observe);
@@ -1385,26 +1398,26 @@
     ======================================================== */
     const DEMO = {
       breaking: [
-        { title: 'Ministry of Justice Orders Deletion of UK\'s Largest Court Reporting Database', subtitle: 'Hacker News \u2022 241 upvotes \u2022 156 comments', source: 'Hacker News', url: '#', is_breaking: true },
-        { title: 'X Goes Down: Social Media Site Not Working for Thousands of Users', subtitle: 'Reddit \u2022 r/technology \u2022 Trending', source: 'Reddit', url: '#', is_breaking: true },
-        { title: 'AI Surgery Tool Blamed for Injuring Patients Instead of Helping', subtitle: 'Reddit \u2022 r/technology', source: 'Reddit', url: '#', is_breaking: true },
-        { title: 'Anthropic CEO Suggests OpenAI Doesn\'t Have a Real Lead in AI', subtitle: 'Reddit \u2022 r/technology \u2022 Industry', source: 'Reddit', url: '#', is_breaking: true },
-        { title: 'Japan Creates World\'s First Zero-Emission Hydrogen Engine', subtitle: 'Reddit \u2022 r/technology \u2022 Breakthrough', source: 'Reddit', url: '#', is_breaking: false },
+        { title: 'NPTEL Opens New Free AI and Data Science Courses for Summer', subtitle: 'NPTEL \u2022 Enrollment open \u2022 Student alert', source: 'NPTEL', url: '#', is_breaking: true },
+        { title: 'IIT Madras Announces Industry-Backed Internship Cohort for Final Years', subtitle: 'IIT Madras \u2022 Internship track', source: 'IIT Madras', url: '#', is_breaking: true },
+        { title: 'Tamil Nadu Skill Mission Expands Campus Employability Bootcamps', subtitle: 'Tamil Nadu Gov \u2022 Career programs', source: 'PIB India', url: '#', is_breaking: true },
+        { title: 'Internshala Releases New Remote Internship Window for Engineering Students', subtitle: 'Internshala \u2022 Apply now', source: 'Internshala', url: '#', is_breaking: true },
+        { title: 'Anna University Publishes Updated Placement Training Calendar', subtitle: 'Anna University \u2022 Campus notice', source: 'The Hindu Education', url: '#', is_breaking: false },
       ],
       department: [
-        { title: 'Running My Own XMPP Server with Prosody and STUN/TURN', source: 'Hacker News', meta: 'Self-hosting \u2022 103 points', url: '#', category: 'infra' },
-        { title: 'Show HN: Open-source tool for real-time database replication', source: 'Hacker News', meta: 'Open Source \u2022 87 points', url: '#', category: 'tools' },
-        { title: 'The State of WebAssembly in 2026: What Changed', source: 'Medium', meta: 'Web Development \u2022 5 min read', url: '#', category: 'web' },
+        { title: 'How Chennai Students Built an Open Source Hostel Management Stack', source: 'The News Minute Tech', meta: 'Campus engineering \u2022 Chennai', url: '#', category: 'infra' },
+        { title: 'Internship-Ready DSA Sheet Shared by NIT Trichy Alumni Network', source: 'Indian Academia', meta: 'Placements \u2022 CSE', url: '#', category: 'tools' },
+        { title: 'Python + FastAPI Interview Project Ideas for Tamil Nadu Final Years', source: 'Internshala', meta: 'Web development \u2022 6 min read', url: '#', category: 'web' },
       ],
       insights: [
-        { title: 'A Stock Market Doom Loop Is Hitting Everything That Isn\'t AI', source: 'Reddit', meta: 'Finance & Tech \u2022 Trending', url: '#', category: 'market' },
-        { title: 'PS6 Could Be Delayed While Switch 2 Might Launch Early', source: 'Reddit', meta: 'Consumer Tech \u2022 2.1k upvotes', url: '#', category: 'consumer' },
-        { title: 'Parents Opt Kids Out of School Computers Over Privacy', source: 'Reddit', meta: 'Education & Privacy \u2022 860 upvotes', url: '#', category: 'privacy' },
+        { title: 'Indian IT Hiring Rebounds in Cloud, Data, and Cybersecurity Roles', source: 'Economic Times Tech', meta: 'Hiring trend \u2022 India', url: '#', category: 'market' },
+        { title: 'EV and Embedded Hiring Expands Across Chennai and Coimbatore', source: 'Indian Express Technology', meta: 'Industry demand \u2022 Tamil Nadu', url: '#', category: 'consumer' },
+        { title: 'UGC Pushes New Data Privacy Compliance for Campus Tech Platforms', source: 'PIB India', meta: 'Policy update \u2022 Education', url: '#', category: 'privacy' },
       ],
       stories: [
-        { title: 'State Department Orders Nonprofit Libraries to Stop Operating', source: 'Reddit', meta: 'Policy \u2022 1.2k upvotes', url: '#', category: 'policy' },
-        { title: 'California\'s Billionaires Pour Cash Into Local Elections', source: 'Reddit', meta: 'Civic \u2022 Trending', url: '#', category: 'civic' },
-        { title: 'Hard Drives Already Sold Out for the Entire Year Due to AI', source: 'Reddit', meta: 'Supply Chain \u2022 AI Impact', url: '#', category: 'supply' },
+        { title: 'SRM Team Won National Hackathon with an AI Attendance System', source: 'Devfolio Blog', meta: 'Campus story \u2022 Tamil Nadu', url: '#', category: 'policy' },
+        { title: 'How a Madurai Student Community Built a Placement Prep Pipeline', source: 'Unstop Blog', meta: 'Student community \u2022 Career', url: '#', category: 'civic' },
+        { title: 'Bengaluru-Chennai Startup Corridor Opens New Intern Roles for Freshers', source: 'YourStory', meta: 'Startup hiring \u2022 South India', url: '#', category: 'supply' },
       ]
     };
 
@@ -1556,14 +1569,16 @@
       BREAKING_KEYWORDS.forEach(k => { if (text.includes(k)) breakingHits += 1; });
 
       const sourceCsBoost =
-        (source.includes('github') ? 12 : 0) +
-        (source.includes('hacker news') ? 9 : 0) +
-        (source.includes('medium') ? 4 : 0);
+        (source.includes('iit') ? 12 : 0) +
+        (source.includes('nptel') ? 10 : 0) +
+        (source.includes('internshala') ? 8 : 0) +
+        (source.includes('hindu') ? 6 : 0);
 
       const sourceInsightBoost =
-        (source.includes('reddit') ? 8 : 0) +
-        (source.includes('product hunt') ? 8 : 0) +
-        (source.includes('medium') ? 3 : 0);
+        (source.includes('times of india') ? 8 : 0) +
+        (source.includes('economic times') ? 8 : 0) +
+        (source.includes('indian express') ? 6 : 0) +
+        (source.includes('news minute') ? 5 : 0);
 
       const engagementScore = extractEngagementScore(item);
       const engagementBoost = Math.min(45, Math.round(Math.log10(engagementScore + 1) * 12));
@@ -1595,7 +1610,7 @@
       return {
         title: item.title || '',
         url: item.original_url || item.url || '#',
-        source: item.source || item.source_name || 'CS Desk',
+        source: item.source || item.source_name || 'India Student Desk',
         summary,
         content: summary || item.title || '',
         category: item.category || '',
@@ -1980,7 +1995,7 @@
 
       data.breaking.slice(0, maxPerSection.breaking).forEach(item => {
         jobs.push(summarizeWithAI(item, 'breaking', backendOk).then(text => {
-          item.subtitle = `${item.source || 'CS Desk'} - ${text}`;
+          item.subtitle = `${item.source || 'India Student Desk'} - ${text}`;
         }));
       });
 
@@ -2006,7 +2021,7 @@
       const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
         title: item.title || '',
-        source: item.source || 'CS Desk',
+        source: item.source || 'India Student Desk',
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
@@ -2140,7 +2155,7 @@
       if (!item) return;
 
       $storyModalTitle.textContent = item.title || 'Story';
-      $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+      $storyModalMeta.textContent = `${(item.source || 'India Student Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
       $storyQuickSummary.textContent = 'Preparing summary...';
       $storyWhyImportant.textContent = 'Preparing context...';
       $storyImpact.textContent = 'Preparing student impact...';
@@ -2178,13 +2193,13 @@
       const storyId = registerStory(item);
       const cardMeta = shortText(item.meta || item.subtitle || item.content || item.source || '', 120);
 
-      const hasImg = !!(item.image);
-      const imgClass = hasImg ? ' has-image' : '';
-      const imgInner = hasImg
-        ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title || 'Article image')}" loading="lazy" decoding="async" style="aspect-ratio:16/9;object-fit:cover;">`
-        : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(item.title, item.category))}"`;      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
-        <div class="article-card-visual${imgClass}">${imgInner}</div>
+      const fallbackImage = item.image || '';
+      const query = UnsplashImageLoader.getQuery(item.title, item.category);
+      const fallbackAttr = fallbackImage ? ` data-fallback-image="${escapeHtml(fallbackImage)}"` : '';
+      const unsplashAttr = query ? ` data-unsplash-query="${escapeHtml(query)}"` : '';
+      const imgInner = `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
+      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}${fallbackAttr}>
+        <div class="article-card-visual">${imgInner}</div>
         <div class="article-card-title">${escapeHtml(item.title)}</div>
         <div class="article-card-meta">${escapeHtml(cardMeta || item.source)}</div>
       </a>`;
@@ -2202,7 +2217,7 @@
       items.slice(0, 3).forEach(item => {
         grid.insertAdjacentHTML('beforeend', renderCard(item));
       });
-      // Lazy-load Unsplash images for cards without existing images
+      // Lazy-load Unsplash images for cards and fallback to existing image if needed
       UnsplashImageLoader.observeAll(grid);
     }
 
@@ -2213,14 +2228,14 @@
       const storyId = registerStory(paper);
       const meta = [paper.authors, paper.venue].filter(Boolean).join(' · ');
       const cite = paper.citations ? paper.citations + ' citations' : '';
-      const hasImg = !!(paper.featured_image_url);
-      const imgInner = hasImg
-        ? `<img src="${escapeHtml(paper.featured_image_url)}" alt="${escapeHtml(paper.title || 'Research paper image')}" loading="lazy" decoding="async" style="aspect-ratio:16/9;object-fit:cover;">`
-        : '';
-      const fallbackStyle = hasImg ? '' : 'style="background:#f4f0ff"';
-      const unsplashAttr = hasImg ? '' : ` data-unsplash-query="${escapeHtml(UnsplashImageLoader.getQuery(paper.title, 'research'))}"`;
-      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}>
-        <div class="article-card-visual" ${fallbackStyle}>${imgInner}</div>
+      const fallbackImage = paper.featured_image_url || '';
+      const query = UnsplashImageLoader.getQuery(paper.title, 'research');
+      const unsplashAttr = query ? ` data-unsplash-query="${escapeHtml(query)}"` : '';
+      const fallbackAttr = fallbackImage ? ` data-fallback-image="${escapeHtml(fallbackImage)}"` : '';
+      return `<a class="article-card" href="#" data-story-id="${storyId}"${unsplashAttr}${fallbackAttr}>
+        <div class="article-card-visual" style="background:#f4f0ff">
+          <span class="placeholder-icon">${escapeHtml((paper.title || 'N')[0].toUpperCase())}</span>
+        </div>
         <div class="article-card-title">${escapeHtml(paper.title)}</div>
         <div class="article-card-meta">${escapeHtml(meta)}${cite ? ' · ' + escapeHtml(cite) : ''}</div>
       </a>`;
@@ -2274,13 +2289,30 @@
       let data = null;
       if (backendOk) {
         data = await loadFromBackendAll();
+        if (!data) {
+          const dept = getSelectedDept();
+          const deptName = DEPT_NAMES[dept] || dept;
+          data = {
+            breaking: [{
+              title: 'No ' + deptName + ' news yet',
+              subtitle: 'Content for this department is being collected. Check back soon!',
+              source: 'NEWS DAY',
+              url: '#',
+              is_breaking: false,
+            }],
+            department: [],
+            insights: [],
+            stories: [],
+            research_papers: { featured: [], papers: [] },
+          };
+        }
       }
 
-      if (!data) {
+      if (!backendOk && !data) {
         data = await loadFromScrapedFile();
       }
 
-      if (!data) {
+      if (!backendOk && !data) {
         data = JSON.parse(JSON.stringify(DEMO));
       }
 
@@ -2390,7 +2422,7 @@
         const heroStoryId = `hero-${currentSlide}`;
         storyRegistry.set(heroStoryId, {
           title: slide.title || '',
-          source: slide.source || 'CS Desk',
+          source: slide.source || 'India Student Desk',
           url: slide.url || '#',
           category: 'breaking',
           content: slide.content || slide.subtitle || slide.title || '',
@@ -2400,26 +2432,24 @@
         $btn.dataset.storyId = heroStoryId;
         $breakingTag.style.display = slide.is_breaking ? 'inline-block' : 'none';
 
-        // Hero image — use featured_image_url, then try Unsplash fallback
+        // Hero image — Unsplash first, then fallback to API-provided image
         const $visual = $('hero-visual');
         if ($visual) {
-          if (slide.image) {
+          $visual.style.backgroundImage = '';
+          const heroQuery = UnsplashImageLoader.getQuery(slide.title, slide.category);
+          if (heroQuery) {
+            UnsplashImageLoader._fetchForHero(heroQuery).then(data => {
+              const chosenUrl = data && data.url ? data.url : (slide.image || '');
+              if (chosenUrl && $visual) {
+                $visual.style.backgroundImage = `url('${chosenUrl}')`;
+                $visual.style.backgroundSize = 'cover';
+                $visual.style.backgroundPosition = 'center';
+              }
+            });
+          } else if (slide.image) {
             $visual.style.backgroundImage = `url('${slide.image}')`;
             $visual.style.backgroundSize = 'cover';
             $visual.style.backgroundPosition = 'center';
-          } else {
-            $visual.style.backgroundImage = '';
-            // Unsplash fallback for hero slides
-            const heroQuery = UnsplashImageLoader.getQuery(slide.title, slide.category);
-            if (heroQuery) {
-              UnsplashImageLoader._fetchForHero(heroQuery).then(data => {
-                if (data && $visual) {
-                  $visual.style.backgroundImage = `url('${data.url}')`;
-                  $visual.style.backgroundSize = 'cover';
-                  $visual.style.backgroundPosition = 'center';
-                }
-              });
-            }
           }
         }
 
@@ -2611,7 +2641,17 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-      initNavbarAuth();
+      const authOk = await (window.__newsdayAuthReady || Promise.resolve(true));
+      if (!authOk) return;
+
+      if (window.NewsdayAuth) {
+        await window.NewsdayAuth.initNavbarAuth({
+          linkSelector: '#nav-auth-link',
+          avatarSelector: '#navbar-avatar',
+        });
+      } else {
+        initNavbarAuth();
+      }
       initDeptSelector();
       loadPersistedStoryCache();
 

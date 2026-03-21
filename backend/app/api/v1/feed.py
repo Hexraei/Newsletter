@@ -12,6 +12,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user, get_current_user, get_optional_current_user, get_db
+from app.config import settings
 from app.models import ProcessedContent, RawContent, User, UserFeedback, UserSaves
 from app.schemas.content import FeedbackRequest
 from app.schemas.responses import SingleResponse, SuccessResponse
@@ -20,6 +21,16 @@ from app.services.feed_service import FeedService
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+_IS_SQLITE = str(getattr(settings, "DATABASE_URL", "")).startswith("sqlite")
+
+
+def _normalize_raw_id(raw_id: str | None) -> str | None:
+    if not raw_id:
+        return None
+    raw = str(raw_id).strip().lower()
+    if _IS_SQLITE:
+        return raw.replace("-", "")
+    return raw
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +72,10 @@ async def _fetch_all_sections(
             {"d": dept_key},
         )).first()
         if row and row[0]:
-            return {"success": True, "data": row[0]}
+            cached_data = row[0]
+            if isinstance(cached_data, str):
+                cached_data = json.loads(cached_data)
+            return {"success": True, "data": cached_data}
     except Exception:
         pass  # cached_feeds table may not exist (e.g. SQLite local dev)
 
@@ -70,6 +84,7 @@ async def _fetch_all_sections(
     trending = await service.get_trending_content(limit=trending_limit, department=dept_key)
     dept_feed = await service.get_personalized_feed(department=dept_key, limit=department_limit)
     dept_items = dept_feed.get("items", [])
+    career = await service.get_career_content(limit=max(5, min(10, trending_limit)), department=dept_key)
     research = await service.get_research_papers(department=dept_key, featured_limit=3, general_limit=10)
 
     return {
@@ -78,6 +93,7 @@ async def _fetch_all_sections(
             "breaking": breaking,
             "department": dept_items,
             "trending": trending,
+            "career": career,
             "research_papers": research,
         },
     }
@@ -267,7 +283,8 @@ async def search_content(
     items = result.scalars().all()
     
     # Fetch original URLs
-    raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+    raw_ids = [_normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+    raw_ids = [raw_id for raw_id in raw_ids if raw_id]
     url_map = {}
     if raw_ids:
         raw_result = await db.execute(
@@ -292,7 +309,7 @@ async def search_content(
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "is_breaking": item.is_breaking,
                 "featured_image_url": item.featured_image_url,
-                "original_url": url_map.get(str(item.raw_content_id), None),
+                "original_url": url_map.get(_normalize_raw_id(item.raw_content_id), None),
             }
             for item in items
         ],
@@ -333,7 +350,8 @@ async def get_saved_content(
     items = result.scalars().all()
     
     # Fetch original URLs
-    raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+    raw_ids = [_normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+    raw_ids = [raw_id for raw_id in raw_ids if raw_id]
     url_map = {}
     if raw_ids:
         raw_result = await db.execute(
@@ -354,7 +372,7 @@ async def get_saved_content(
                 "reading_time_minutes": item.reading_time_minutes,
                 "attractiveness_score": item.attractiveness_score,
                 "published_at": item.published_at.isoformat() if item.published_at else None,
-                "original_url": url_map.get(str(item.raw_content_id), None),
+                "original_url": url_map.get(_normalize_raw_id(item.raw_content_id), None),
             }
             for item in items
         ],

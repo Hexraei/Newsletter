@@ -6,9 +6,12 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import ProcessedContent, RawContent, Source
+from app.departments import INDIA_COMMON_REDDIT
 import sys
 import os
 
@@ -37,6 +40,69 @@ class ScraperService:
         "medium": MediumScraper,
         "producthunt": ProductHuntScraper,
     }
+
+    REDDIT_SUBREDDITS_BY_MODE = {
+        "speed": [
+            "technology",
+            "programming",
+            "MachineLearning",
+            "cscareerquestions",
+            "technews",
+            "startups",
+        ],
+        "balanced": [
+            "technology",
+            "programming",
+            "MachineLearning",
+            "compsci",
+            "netsec",
+            "LocalLLaMA",
+            "cscareerquestions",
+            "csMajors",
+            "learnprogramming",
+            "technews",
+            "startups",
+            "Futurology",
+        ],
+        "quality": [
+            "technology",
+            "programming",
+            "MachineLearning",
+            "compsci",
+            "netsec",
+            "LocalLLaMA",
+            "artificial",
+            "cscareerquestions",
+            "csMajors",
+            "ExperiencedDevs",
+            "learnprogramming",
+            "singularity",
+            "Futurology",
+            "startups",
+            "technews",
+            "ArtificialInteligence",
+            "stocks",
+            "energy",
+            "biotech",
+        ],
+        "india_strict": [
+            "Indian_Academia",
+            "developersIndia",
+            "Btechtards",
+            "GATE",
+            "TamilNadu",
+            "chennai",
+            "gradadmissions",
+        ],
+    }
+    STRICT_REDDIT_SUBREDDITS = [
+        "Indian_Academia",
+        "developersIndia",
+        "Btechtards",
+        "GATE",
+        "TamilNadu",
+        "chennai",
+    ]
     
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -98,9 +164,9 @@ class ScraperService:
         for config in sources_config:
             # Check if source exists
             result = await self.db.execute(
-                select(Source).where(Source.platform == config["platform"])
+                select(Source).where(Source.platform == config["platform"]).order_by(Source.id.asc())
             )
-            existing = result.scalar_one_or_none()
+            existing = result.scalars().first()
             
             if not existing:
                 source = Source(**config)
@@ -131,25 +197,33 @@ class ScraperService:
             
             # Run scraper
             print(f"Running scraper: {scraper_name}")
-            
+            source_id = source.id
+            limit = int(kwargs.get("limit") or 0) if kwargs.get("limit") is not None else None
+            mode = str(kwargs.get("mode", "quality")).lower()
+             
             if scraper_name == "hackernews":
-                items = await self._scrape_hackernews(source.id, **kwargs)
+                items = await self._scrape_hackernews(source_id, limit=limit or 30)
             elif scraper_name == "reddit":
-                items = await self._scrape_reddit(source.id, **kwargs)
+                items = await self._scrape_reddit(
+                    source_id,
+                    limit=limit or 25,
+                    profile=mode,
+                    subreddits=kwargs.get("subreddits"),
+                )
             elif scraper_name == "github":
-                items = await self._scrape_github(source.id, **kwargs)
+                items = await self._scrape_github(source_id, limit=limit or 20)
             elif scraper_name == "twitter":
-                items = await self._scrape_twitter(source.id, **kwargs)
+                items = await self._scrape_twitter(source_id, limit=limit or 20)
             elif scraper_name == "medium":
-                items = await self._scrape_medium(source.id, **kwargs)
+                items = await self._scrape_medium(source_id, limit=limit or 20)
             elif scraper_name == "producthunt":
-                items = await self._scrape_producthunt(source.id, **kwargs)
+                items = await self._scrape_producthunt(source_id, limit=limit or 20)
             else:
                 items = []
-            
+             
             # Store items
             for item in items:
-                stored = await self._store_raw_content(item, source.id)
+                stored = await self._store_raw_content(item, source_id)
                 if stored:
                     items_stored += 1
             
@@ -197,23 +271,43 @@ class ScraperService:
         
         return items
     
-    async def _scrape_reddit(self, source_id: int, limit: int = 25) -> List[Dict]:
+    async def _scrape_reddit(
+        self,
+        source_id: int,
+        limit: int = 25,
+        profile: str = "quality",
+        subreddits: Optional[List[str]] = None,
+    ) -> List[Dict]:
         """Scrape Reddit."""
         items = []
-        
+        if subreddits:
+            selected_subreddits = subreddits
+        else:
+            selected_subreddits = self.REDDIT_SUBREDDITS_BY_MODE.get(
+                profile,
+                self.REDDIT_SUBREDDITS_BY_MODE["quality"],
+            )
+        selected_subreddits = list(dict.fromkeys(selected_subreddits))
+
+        per_subreddit_limit = limit
+        if profile == "india_strict":
+            strict_set = {s.lower() for s in self.STRICT_REDDIT_SUBREDDITS}
+            selected_subreddits = [s for s in selected_subreddits if s.lower() in strict_set]
+            if not selected_subreddits:
+                selected_subreddits = self.STRICT_REDDIT_SUBREDDITS[:]
+            per_subreddit_limit = max(
+                1,
+                min(limit, int(getattr(settings, "RELEVANCE_REDDIT_MAX_PER_SUBREDDIT", 8))),
+            )
+          
         async with RedditScraper() as scraper:
             scraped_items = await scraper.scrape(
-                subreddits=[
-                    'technology', 'programming', 'MachineLearning',
-                    'compsci', 'netsec', 'LocalLLaMA', 'artificial',
-                    'cscareerquestions', 'csMajors', 'ExperiencedDevs',
-                    'learnprogramming',
-                    'singularity', 'Futurology', 'startups',
-                    'technews', 'ArtificialInteligence',
-                    'stocks', 'energy', 'biotech',
-                ],
-                limit=limit
+                subreddits=selected_subreddits,
+                limit=per_subreddit_limit
             )
+            if profile == "india_strict":
+                total_limit = max(1, int(getattr(settings, "RELEVANCE_REDDIT_MAX_TOTAL_ITEMS", 60)))
+                scraped_items = scraped_items[:total_limit]
             
             for item in scraped_items:
                 items.append({
@@ -346,12 +440,12 @@ class ScraperService:
         )
         
         try:
-            self.db.add(raw)
-            await self.db.flush()
+            async with self.db.begin_nested():
+                self.db.add(raw)
+                await self.db.flush()
             return True
-        except Exception:
-            # Duplicate content_hash — rollback and skip
-            await self.db.rollback()
+        except IntegrityError:
+            # Duplicate content_hash — skip without rolling back the parent transaction.
             return False
     
     async def run_all_scrapers(self) -> Dict:

@@ -1,6 +1,6 @@
-const CACHE_NAME = 'newsday-v1';
-const STATIC_CACHE = 'newsday-static-v1';
-const API_CACHE = 'newsday-api-v1';
+const CACHE_NAME = 'newsday-v2';
+const STATIC_CACHE = 'newsday-static-v2';
+const API_CACHE = 'newsday-api-v2';
 
 // Pages to pre-cache (must match backend routes)
 const PRECACHE_URLS = [
@@ -69,6 +69,22 @@ self.addEventListener('fetch', event => {
                 .then(response => {
                     const clone = response.clone();
                     caches.open(STATIC_CACHE).then(cache => cache.put(event.request, clone));
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // Keep auth session helper fresh to avoid stale login/session logic.
+    if (url.pathname === '/auth_session.js') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    if (response.ok) {
+                        const clone = response.clone();
+                        caches.open(STATIC_CACHE).then(cache => cache.put(event.request, clone));
+                    }
                     return response;
                 })
                 .catch(() => caches.match(event.request))

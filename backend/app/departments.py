@@ -496,8 +496,7 @@ INDIA_COMMON_RSS: List[Dict[str, str]] = [
 # India-specific Reddit subs shared across departments
 INDIA_COMMON_REDDIT: List[str] = [
     "india", "Indian_Academia", "developersIndia", "Btechtards",
-    "Indian_Startups", "chennai", "TamilNadu",
-    "Indian_Jobs", "GATE", "gradadmissions",
+    "chennai", "TamilNadu", "GATE", "gradadmissions",
     "IndianGaming",
 ]
 
@@ -600,3 +599,54 @@ def get_all_reddit_subs_for_department(dept_key: str) -> List[str]:
 def get_department_tag(dept_key: str) -> str:
     """Return the canonical tag string used in department_tags arrays."""
     return dept_key
+
+
+CAREER_SOURCE_TYPES = {
+    "india-career", "india-events", "india-startup", "india-industry", "india-policy", "india-education"
+}
+KNOWLEDGE_SOURCE_TYPES = {
+    "academic", "industry", "news", "blog", "india-news", "india-tech", "india-research",
+    "india-south", "india-energy", "india-defence",
+}
+CAREER_REDDIT_HINTS = {
+    "career", "jobs", "job", "academia", "admission", "gate", "btechtards",
+}
+
+
+def _classify_reddit_lane(subreddit: str) -> str:
+    sub = (subreddit or "").lower()
+    if any(h in sub for h in CAREER_REDDIT_HINTS):
+        return "career_opportunity"
+    return "knowledge_tech"
+
+
+def get_department_source_matrix(dept_key: str) -> Dict[str, List[str]]:
+    """Return per-department source lanes for curation and ingestion tuning."""
+    key = (dept_key or "").upper()
+    if key not in DEPARTMENT_KEYS:
+        return {
+            "career_opportunity_rss": [],
+            "knowledge_tech_rss": [],
+            "career_opportunity_reddit": [],
+            "knowledge_tech_reddit": [],
+        }
+
+    rss_feeds = get_all_rss_feeds_for_department(key)
+    reddit_subs = get_all_reddit_subs_for_department(key)
+
+    matrix = {
+        "career_opportunity_rss": [],
+        "knowledge_tech_rss": [],
+        "career_opportunity_reddit": [],
+        "knowledge_tech_reddit": [],
+    }
+
+    for feed in rss_feeds:
+        lane = "career_opportunity_rss" if feed.get("type") in CAREER_SOURCE_TYPES else "knowledge_tech_rss"
+        matrix[lane].append(feed.get("name", ""))
+
+    for sub in reddit_subs:
+        lane = "career_opportunity_reddit" if _classify_reddit_lane(sub) == "career_opportunity" else "knowledge_tech_reddit"
+        matrix[lane].append(sub)
+
+    return matrix

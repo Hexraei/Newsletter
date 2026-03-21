@@ -1,10 +1,11 @@
 #!/usr/bin/env python
-"""Backfill article images — OG scraping first, Unsplash fallback.
+"""Backfill article images — Unsplash first, then fallback providers.
 
 Strategy (per article):
-  1. Scrape the original article URL for og:image / twitter:image meta tags
-  2. If OG scraping fails, search Unsplash with a smart title-based query
-  3. Store the winning URL in processed_content.featured_image_url
+  1. Search Unsplash with a smart title-based query
+  2. If Unsplash fails, scrape the article URL for og:image / twitter:image
+  3. If OG scraping fails, use semantic fallback providers (Openverse/Wikimedia/etc.)
+  4. Store the winning URL in processed_content.featured_image_url
 
 Usage:
   python scrapers/fetch_images.py [--limit 200] [--batch-size 50]
@@ -36,6 +37,7 @@ import httpx
 
 # ── Unsplash config ──────────────────────────────────────────────────
 UNSPLASH_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "")
+UNSPLASH_HOURLY_LIMIT = int(os.environ.get("UNSPLASH_HOURLY_LIMIT", "4800"))
 
 # ── Category → visual search context for Unsplash fallback ──────────
 CATEGORY_VISUAL = {
@@ -230,9 +232,23 @@ async def fetch_unsplash(client: httpx.AsyncClient, query: str) -> str:
                         pass
                 return url
         elif resp.status_code == 403:
-            print("  [RATE LIMITED] Unsplash 50 req/hr limit hit")
+            print("  [RATE LIMITED] Unsplash request rejected (check quota/key)")
     except Exception as e:
         print(f"  [ERROR] Unsplash: {e}")
+    return ""
+
+
+async def fetch_semantic_fallback(title: str, category: str = "general") -> str:
+    """Use non-Unsplash providers as last resort."""
+    try:
+        from app.services.image_fetcher import ImageFetcher
+
+        fetcher = ImageFetcher(sources=["openverse", "wikimedia", "pixabay", "pexels"])
+        result = await fetcher.fetch_with_fallback(title, category=category, top_k=1)
+        if result and result.get("url"):
+            return result["url"]
+    except Exception as e:
+        print(f"  [ERROR] Semantic fallback: {e}")
     return ""
 
 
@@ -355,25 +371,36 @@ def show_stats(conn):
 # ── Main backfill logic ─────────────────────────────────────────────
 
 async def backfill_images(limit: int = 200, batch_size: int = 50):
-    """Backfill images: OG scraping (primary) + Unsplash (fallback)."""
+    """Backfill images: Unsplash (primary) + OG + semantic fallback."""
     conn = _get_connection()
     c = conn.cursor()
     ph = _placeholder()
     join = _join_clause()
 
-    c.execute("SELECT COUNT(*) FROM processed_content WHERE featured_image_url IS NULL AND status = 'published'")
-    total_missing = c.fetchone()[0]
+    c.execute("""
+        SELECT COUNT(*)
+        FROM processed_content
+        WHERE status = 'published'
+          AND (
+            featured_image_url IS NULL
+            OR LOWER(COALESCE(featured_image_url, '')) NOT LIKE '%unsplash%'
+          )
+    """)
+    total_candidates = c.fetchone()[0]
     db_label = "PostgreSQL" if _IS_POSTGRES else "SQLite"
     print(f"Database: {db_label}")
-    print(f"Articles missing images: {total_missing}")
+    print(f"Articles needing Unsplash attempt: {total_candidates}")
     print(f"Processing up to {limit} in batches of {batch_size}")
-    print(f"Strategy: OG scrape article URL → Unsplash fallback\n")
+    print("Strategy: Unsplash → OG image scrape → semantic fallback\n")
 
     c.execute(f"""
         SELECT p.id, p.title, p.category, r.original_url
         FROM processed_content p
         JOIN raw_content r ON {join}
-        WHERE p.featured_image_url IS NULL
+        WHERE (
+            p.featured_image_url IS NULL
+            OR LOWER(COALESCE(p.featured_image_url, '')) NOT LIKE '%unsplash%'
+        )
           AND p.status = 'published'
         ORDER BY p.attractiveness_score DESC
         LIMIT {ph}
@@ -389,9 +416,10 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
 
     og_ok = 0
     unsplash_ok = 0
+    semantic_ok = 0
     failed = 0
     start_time = time.time()
-    unsplash_remaining = 45
+    unsplash_remaining = max(0, UNSPLASH_HOURLY_LIMIT)
 
     async with httpx.AsyncClient(
         timeout=10,
@@ -410,15 +438,25 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
                 category = (_row_get(row, "category") or row[2]) or "general"
                 original_url = (_row_get(row, "original_url") or row[3]) or ""
 
-                url = await scrape_og_image(client, original_url)
-                source = "OG"
+                url = ""
+                source = "MISS"
 
-                if not url and unsplash_remaining > 0:
+                if unsplash_remaining > 0 and UNSPLASH_KEY:
                     query = build_search_query(title, category)
                     url = await fetch_unsplash(client, query)
                     if url:
                         unsplash_remaining -= 1
                         source = "Unsplash"
+                
+                if not url:
+                    url = await scrape_og_image(client, original_url)
+                    if url:
+                        source = "OG"
+
+                if not url:
+                    url = await fetch_semantic_fallback(title, category)
+                    if url:
+                        source = "Semantic"
 
                 if url:
                     c.execute(
@@ -427,8 +465,10 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
                     )
                     if source == "OG":
                         og_ok += 1
-                    else:
+                    elif source == "Unsplash":
                         unsplash_ok += 1
+                    else:
+                        semantic_ok += 1
                     print(f"  [{source:8s}] {title[:65]}")
                 else:
                     failed += 1
@@ -438,20 +478,24 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
 
             conn.commit()
             elapsed = time.time() - start_time
-            total_ok = og_ok + unsplash_ok
-            print(f"    Progress: {total_ok}/{batch_start + len(batch)} | OG:{og_ok} Unsplash:{unsplash_ok} Miss:{failed} | {elapsed:.0f}s")
+            total_ok = og_ok + unsplash_ok + semantic_ok
+            print(
+                f"    Progress: {total_ok}/{batch_start + len(batch)} | "
+                f"Unsplash:{unsplash_ok} OG:{og_ok} Semantic:{semantic_ok} Miss:{failed} | {elapsed:.0f}s"
+            )
 
             if batch_start + batch_size < len(rows):
                 await asyncio.sleep(1)
 
     conn.close()
     elapsed = time.time() - start_time
-    total_ok = og_ok + unsplash_ok
+    total_ok = og_ok + unsplash_ok + semantic_ok
     print(f"\nDone! Updated {total_ok}/{len(rows)} articles in {elapsed:.0f}s")
     print(f"  OG images: {og_ok}")
     print(f"  Unsplash:  {unsplash_ok}")
+    print(f"  Semantic:  {semantic_ok}")
     print(f"  Failed:    {failed}")
-    print(f"  Remaining: {total_missing - total_ok}")
+    print(f"  Remaining: {max(total_candidates - total_ok, 0)}")
 
 
 def main():

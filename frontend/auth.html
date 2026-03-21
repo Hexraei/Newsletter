@@ -1055,6 +1055,7 @@
     <span>2026 NEWS DAY · <a href="index.html">Back to home</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
   </footer>
 
+  <script src="auth_session.js?v=20260319"></script>
   <script>
     /* ====================================================================
        NEWS DAY — AUTH PAGE
@@ -1062,6 +1063,7 @@
     ==================================================================== */
 
     const API_BASE = window.location.origin + '/api/v1';
+    const authSession = window.NewsdayAuth;
 
     /* ===== DOM ===== */
     const $ = id => document.getElementById(id);
@@ -1155,27 +1157,12 @@
 
     /* ===== SESSION HELPERS ===== */
     function saveSession(data) {
-      const session = {
-        user: data.user || null,
-        expires_at: Date.now() + (data.expires_in || 3600) * 1000,
-        authenticated: true,
-      };
-      localStorage.setItem('newsday_session', JSON.stringify(session));
+      if (!authSession) return null;
+      return authSession.saveSession(data);
     }
 
     function getSession() {
-      try {
-        const raw = localStorage.getItem('newsday_session');
-        if (!raw) return null;
-        const session = JSON.parse(raw);
-        if (session.expires_at && Date.now() > session.expires_at) {
-          localStorage.removeItem('newsday_session');
-          return null;
-        }
-        return session;
-      } catch {
-        return null;
-      }
+      return authSession ? authSession.getSession() : null;
     }
 
     /* ===== LOGIN ===== */
@@ -1216,17 +1203,10 @@
         }
         saveSession(data);
 
-        // Fetch user profile to get department preference
-        try {
-          const meRes = await fetch(API_BASE + '/auth/me', {
-            credentials: 'include',
-          });
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            const userDept = (meData.data && meData.data.department_key) || (meData.data && meData.data.department);
-            if (userDept) localStorage.setItem('newsday_dept', userDept.toUpperCase());
-          }
-        } catch (_) { /* non-critical */ }
+        // Keep profile/department in sync with cookie-auth state.
+        if (authSession) {
+          try { await authSession.syncProfile({ allowRefresh: true }); } catch (_) {}
+        }
 
         showMessage('Welcome back. Redirecting...', 'success');
         setTimeout(() => { window.location.href = 'index.html'; }, 800);
@@ -1304,6 +1284,9 @@
         const loginData = await loginRes.json();
         if (loginRes.ok) {
           saveSession(loginData);
+          if (authSession) {
+            try { await authSession.syncProfile({ allowRefresh: true }); } catch (_) {}
+          }
           showMessage('Account created successfully. Redirecting...', 'success');
           setTimeout(() => { window.location.href = 'index.html'; }, 800);
         } else {
@@ -1392,7 +1375,7 @@
     });
 
     /* ===== INIT ===== */
-    (function init() {
+    (async function init() {
       // Check for reset token in URL
       const params = new URLSearchParams(window.location.search);
       if (params.get('reset_token')) {
@@ -1400,9 +1383,11 @@
         return;
       }
 
-      // Check if already logged in
-      const session = getSession();
-      if (session && session.authenticated) {
+      // If cookie/session is already valid, skip auth form.
+      const isAuthenticated = authSession
+        ? await authSession.ensureAuthenticated({ redirectTo: null, syncProfileOnSuccess: true })
+        : !!(getSession() && getSession().authenticated);
+      if (isAuthenticated) {
         window.location.href = 'index.html';
         return;
       }

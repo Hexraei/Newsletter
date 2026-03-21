@@ -33,7 +33,7 @@ NEWS DAY is your department-specific daily briefing. Instead of scrolling throug
 
 - **Breaking News** — Top 3 high-impact stories surfaced from everything scraped that day
 - **Trending** — Most engaging stories across your department's sources
-- **Article Images** — Every article displays an image. Original source images are used when available; otherwise, semantically matched images are fetched from Openverse & Wikimedia Commons with proper attribution (creator, license, source link)
+- **Article Images** — Every article displays an image. Unsplash is used as the primary image source, with OG/source images and semantic providers as fallback only when Unsplash is unavailable.
 - **Image Attribution** — All fetched images display creator credits, license type (CC BY-SA, etc.), and source links as required by API guidelines
 - **Research Papers** — 2–3 highly-cited landmark papers at the top, followed by 10–15 additional suggestions on a dedicated research page
 - **Best Skills for Placements** — Ranked, department-specific placement skills with ratings, evidence, learning resources (NPTEL + Coursera/Udemy), project ideas, and time estimates. 10–15 skills per department across 10 branches. Filter by category (core/tool/soft), sort by rating or name.
@@ -198,9 +198,33 @@ python scrapers/run_all.py         # Full pipeline (recommended)
 python scrapers/seed_sources.py    # Re-seed sources after department changes
 python scrapers/run_rss.py         # RSS only (parallel, semaphore=5)
 python scrapers/run_research.py    # Research papers only
-python scrapers/run_general.py     # HN, Reddit, GitHub, Medium, ProductHunt
+python scrapers/run_general.py     # Default india_strict mode: India/TN RSS + India-focused Reddit only (faster, stricter)
+python scrapers/run_general.py --include-global-fallback   # add hackernews/github/medium/producthunt in india_strict
+python scrapers/run_general.py --mode balanced   # legacy mixed mode
 python scrapers/refresh_cache.py   # Rebuild cached_feeds (run after any scrape)
 python scrapers/fetch_images.py    # Backfill images for articles missing them
+```
+
+### Automated Scrape Cycle (GitHub Actions)
+
+The repository workflow at `.github/workflows/scrapers.yml` runs the scrape cycle:
+
+- **Schedule:** Monday + Thursday at **00:00 IST** (`30 18 * * 0,3` in UTC cron)
+- **Manual run:** Actions tab -> **Run Scrapers** -> **Run workflow**
+
+The scheduled run applies migrations, seeds sources, runs RSS + general + research scrapers, and backfills images.
+
+Recommended GitHub repository secrets:
+
+- `DATABASE_URL` (required)
+- `UNSPLASH_ACCESS_KEY` (recommended for image quality/coverage)
+- `GROQ_API_KEY` (optional, if using Groq in pipeline)
+
+Local equivalent of one cycle:
+
+```bash
+python scrapers/run_general.py --mode india_strict --process-limit 1500
+python scrapers/refresh_cache.py
 ```
 
 ### AI Provider Configuration
@@ -252,7 +276,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 | Rate Limiting | slowapi (5/min login, 3/hour register) |
 | AI | Pollinations · Groq · OpenAI · HuggingFace · Ollama |
 | Scraping | httpx (async), feedparser, BeautifulSoup, aiohttp |
-| Images | Semantic search via Openverse, Wikimedia, Pixabay, Pexels + sentence-transformers ranking; category fallback ensures 100% image coverage; attribution overlay on all images |
+| Images | Unsplash-first image pipeline; fallback via OG/source images and semantic providers (Openverse/Wikimedia/Pixabay/Pexels) with attribution metadata |
 | Research | Semantic Scholar API · Crossref API · OpenAlex API · PubMed API |
 | Frontend | HTML/CSS/JS (no build step) |
 | CI | GitHub Actions (black, isort, mypy, flake8) |
@@ -288,8 +312,8 @@ The system auto-selects the best available provider at runtime with automatic fa
 | `backend/app/api/v1/feed.py` | `/all-sections` endpoint — cache-first with research_papers |
 | `scrapers/run_rss.py` | Parallel RSS scraper with `asyncio.gather` + `Semaphore(5)` |
 | `scrapers/run_research.py` | Research paper fetcher (4 APIs, dept-specific queries) |
-| `backend/app/services/image_fetcher.py` | Semantic image search (Openverse, Wikimedia, cosine ranking) |
-| `scrapers/fetch_images.py` | Backfill images for articles missing `featured_image_url` |
+| `backend/app/services/image_fetcher.py` | Unsplash-first semantic image search with fallback providers |
+| `scrapers/fetch_images.py` | Backfill/enforce Unsplash-first images for published content |
 | `scrapers/refresh_cache.py` | Writes one JSONB row per department to `cached_feeds` |
 | `scraper_platform/src/scrapers/rss_scraper.py` | RSS/Atom parser with IST timezone handling |
 | `backend/app/services/skills_service.py` | Placement skills service — cache-first with baseline fallback |

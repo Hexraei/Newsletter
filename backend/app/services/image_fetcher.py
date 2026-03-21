@@ -1,6 +1,7 @@
 """Semantic Image Fetcher — finds the most relevant image for any text.
 
-Searches multiple free image APIs (Openverse, Wikimedia, Pixabay, Pexels),
+Searches multiple image APIs with Unsplash-first priority (then Openverse,
+Wikimedia, Pixabay, Pexels),
 builds text profiles from metadata, and ranks results using sentence-transformer
 embeddings + cosine similarity.
 
@@ -14,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Optional
 
@@ -73,10 +75,13 @@ class ImageFetcher:
     _shared_client: httpx.AsyncClient | None = None
 
     def __init__(self, sources: list[str] | None = None, timeout: float = 10.0):
-        all_sources = ["openverse", "wikimedia", "pixabay", "pexels"]
+        all_sources = ["unsplash", "openverse", "wikimedia", "pixabay", "pexels"]
         self.sources = sources or all_sources
         self.timeout = timeout
         self._openverse_token: str | None = None
+        self._unsplash_key = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
+        self._search_cache: OrderedDict[tuple[str, tuple[str, ...]], list[ImageCandidate]] = OrderedDict()
+        self._search_cache_max = 256
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create a shared httpx client with connection pooling."""
@@ -125,7 +130,22 @@ class ImageFetcher:
 
         # Simplify query: extract key terms (3-5 words) for better API matches
         query = self._simplify_query(text.strip())
-        candidates = await self._search_all(query)
+        unsplash_candidates = await self._search_all(query, sources=["unsplash"])
+        if unsplash_candidates:
+            # Unsplash search endpoint already returns relevance-ranked results.
+            # Use the top result directly for the hot path to avoid embedding overhead.
+            best_candidate = unsplash_candidates[0]
+            return {
+                "url": best_candidate.url,
+                "source_url": best_candidate.source_url,
+                "score": 0.0,
+                "provider": best_candidate.provider,
+                "creator": best_candidate.creator,
+                "license": best_candidate.license,
+            }
+
+        fallback_sources = [s for s in self.sources if s != "unsplash"]
+        candidates = await self._search_all(query, sources=fallback_sources)
         if not candidates:
             return None
 
@@ -177,16 +197,17 @@ class ImageFetcher:
     async def fetch_with_fallback(
         self, title: str, category: str = "general", top_k: int = 1
     ) -> Optional[dict[str, Any]]:
-        """Try semantic search first, then fall back to category-based search."""
-        # 1. Try semantic search with title
+        """Try Unsplash-first semantic search, then category fallback on other providers."""
         result = await self.fetch_best_image(title, top_k=top_k)
+        if result and result.get("provider") == "unsplash":
+            return result
         if result and result.get("score", 0) >= 0.15:
             return result
 
-        # 2. Fallback: search by category keywords (broader, almost always returns results)
         cat_key = (category or "general").lower().replace(" ", "_")
         cat_query = self.CATEGORY_KEYWORDS.get(cat_key, self.CATEGORY_KEYWORDS["general"])
-        candidates = await self._search_all(cat_query)
+        fallback_sources = [s for s in self.sources if s != "unsplash"]
+        candidates = await self._search_all(cat_query, sources=fallback_sources)
         if candidates:
             # Pick the first good-sized image (no ranking needed for generic category images)
             c = candidates[0]
@@ -211,10 +232,17 @@ class ImageFetcher:
         words = [w for w in clean.split() if len(w) >= 3]
         return " ".join(words[:5])
 
-    async def _search_all(self, query: str) -> list[ImageCandidate]:
+    async def _search_all(self, query: str, sources: list[str] | None = None) -> list[ImageCandidate]:
         """Search all configured sources and merge results."""
+        source_list = tuple(sources or self.sources)
+        cache_key = (query, source_list)
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            self._search_cache.move_to_end(cache_key)
+            return list(cached)
+
         tasks = []
-        for source in self.sources:
+        for source in source_list:
             method = getattr(self, f"_search_{source}", None)
             if method:
                 tasks.append(self._safe_search(method, query))
@@ -226,7 +254,55 @@ class ImageFetcher:
                 candidates.extend(result)
         # Filter out unsafe URLs (SSRF protection)
         candidates = [c for c in candidates if self._is_safe_url(c.url)]
+        self._search_cache[cache_key] = list(candidates)
+        self._search_cache.move_to_end(cache_key)
+        if len(self._search_cache) > self._search_cache_max:
+            self._search_cache.popitem(last=False)
         return candidates
+
+    # ── Unsplash ────────────────────────────────────────────────
+
+    async def _search_unsplash(self, query: str) -> list[ImageCandidate]:
+        if not self._unsplash_key:
+            return []
+
+        client = await self._get_client()
+        resp = await client.get(
+            "https://api.unsplash.com/search/photos",
+            params={
+                "query": query,
+                "per_page": 10,
+                "orientation": "landscape",
+                "content_filter": "high",
+            },
+            headers={"Authorization": f"Client-ID {self._unsplash_key}"},
+            timeout=self.timeout,
+        )
+        if resp.status_code != 200:
+            return []
+
+        results = []
+        for photo in resp.json().get("results", []):
+            urls = photo.get("urls") or {}
+            url = urls.get("regular") or urls.get("small") or ""
+            if not url:
+                continue
+            user = photo.get("user") or {}
+            title = photo.get("alt_description") or photo.get("description") or ""
+            tags = " ".join((tag.get("title") or "") for tag in (photo.get("tags") or []))
+            results.append(
+                ImageCandidate(
+                    url=url,
+                    source_url=(photo.get("links") or {}).get("html", ""),
+                    title=title,
+                    tags=tags,
+                    description=title,
+                    creator=user.get("name", ""),
+                    provider="unsplash",
+                    license="Unsplash License",
+                )
+            )
+        return results
 
     async def _safe_search(self, method, query: str) -> list[ImageCandidate]:
         """Wrap search in try/except to prevent one source from killing others."""

@@ -11,7 +11,7 @@ if scraper_path not in sys.path:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -19,10 +19,12 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import router
 from app.config import settings
-from app.models import init_db
+from app.models import get_db, init_db
 
 
 def configure_logging():
@@ -160,13 +162,10 @@ async def add_security_headers(request: Request, call_next):
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])
-async def health_check():
+async def health_check(db: AsyncSession = Depends(get_db)):
     """Health check endpoint — validates DB connectivity."""
-    from sqlalchemy import text
-    from app.models.base import AsyncSessionLocal
     try:
-        async with AsyncSessionLocal() as db:
-            await db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception as e:
         return JSONResponse(
@@ -210,6 +209,19 @@ async def service_worker():
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
     return JSONResponse(status_code=404, content={"detail": "Service worker not found"})
+
+
+@app.get("/auth_session.js", tags=["Root"], include_in_schema=False)
+async def auth_session_script():
+    """Serve shared auth helper from root path used by frontend pages."""
+    script_path = Path(__file__).parent.parent.parent / "frontend" / "auth_session.js"
+    if script_path.exists():
+        return FileResponse(
+            str(script_path),
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+    return JSONResponse(status_code=404, content={"detail": "auth_session.js not found"})
 
 
 @app.get("/department.html", tags=["Root"])

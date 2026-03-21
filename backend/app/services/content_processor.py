@@ -1,18 +1,27 @@
 """Content processing service for transforming raw to processed content."""
 
+import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.integrations.ai_provider import AIProvider
 from app.models import ProcessedContent, RawContent, Source
+from app.models.base import AsyncSessionLocal
 from app.services.cache_service import invalidate_feed_caches
-from app.services.dept_relevance import assign_departments, detect_category, score_article_departments
+from app.services.dept_relevance import (
+    GENERAL_SOURCE_TYPES,
+    assign_departments,
+    detect_category,
+    score_article_departments,
+)
 
 logger = logging.getLogger(__name__)
+_IS_SQLITE = str(getattr(settings, "DATABASE_URL", "")).startswith("sqlite")
 
 
 class ContentProcessor:
@@ -21,6 +30,7 @@ class ContentProcessor:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.ai_provider = AIProvider()
+        self._image_fetchers: dict[tuple[str, ...], object] = {}
     
     # ── Source Reputation Tiers ─────────────────────────────────────────
     # Named sources get tiered scores based on editorial quality and
@@ -116,6 +126,58 @@ class ContentProcessor:
         "mou", "contract awarded", "expansion", "new factory",
         "new facility", "production line",
     }
+
+    INDIA_GEO_KEYWORDS = {
+        "india", "indian", "bharat", "tamil nadu", "tamilnadu", "chennai", "coimbatore",
+        "madurai", "trichy", "salem", "tirunelveli", "bangalore", "bengaluru", "hyderabad",
+        "pune", "mumbai", "delhi", "noida", "gurgaon", "iit", "nit", "anna university",
+        "srm", "vit", "bits pilani", "upsc", "jee", "gate", "ugc", "aicte", "nptel",
+        "internshala", "freshersworld", "naukri",
+    }
+    INDIA_SOURCE_HINTS = {
+        "times of india", "the hindu", "indian express", "livemint", "medianama", "inc42",
+        "yourstory", "news18", "moneycontrol", "pib india", "et govt", "iit madras",
+        "dst india", "csir", "nptel", "the news minute", "citizen matters",
+    }
+    INDIA_REDDIT_HINTS = {
+        "r/developersindia",
+        "r/indian_academia",
+        "r/btechtards",
+        "r/gate",
+        "r/tamilnadu",
+        "r/chennai",
+    }
+    ACTIONABILITY_KEYWORDS = {
+        "internship", "intern", "placement", "hiring", "job", "fresher", "walk-in", "off-campus",
+        "campus drive", "exam", "gate", "jee", "upsc", "scholarship", "fellowship", "deadline",
+        "apply", "application", "registration", "eligibility", "course", "certification", "bootcamp",
+        "hackathon", "challenge", "workshop", "career", "salary", "ctc",
+        "recruitment", "vacancy", "notification", "last date", "admit card", "counselling",
+        "campus hiring", "drive", "assessment", "test series", "results", "cutoff",
+        "stipend", "apprentice", "apprenticeship", "walk in", "job fair",
+    }
+    KNOWLEDGE_KEYWORDS = {
+        "research", "paper", "journal", "conference", "study",
+        "ieee", "acm", "arxiv", "preprint", "publication",
+        "breakthrough", "new model", "algorithm", "framework",
+        "chip", "semiconductor", "vlsi", "embedded", "fpga",
+        "robotics", "automation", "control system", "sensor",
+        "battery", "renewable", "aerospace", "avionics",
+        "biotech", "genomics", "materials", "manufacturing",
+        "industry 4.0", "digital twin", "simulation", "protocol",
+        "standard", "benchmark", "dataset", "inference", "training",
+    }
+    NOISE_PATTERNS = (
+        "i will not promote",
+        "upvote if",
+        "please subscribe",
+        "my channel",
+        "rate my",
+        "roast my",
+        "thoughts?",
+        "is this good?",
+        "what do you think of my",
+    )
 
     async def calculate_attractiveness_score(self, raw: RawContent) -> int:
         """Calculate attractiveness score (0-100) for content.
@@ -226,9 +288,24 @@ class ContentProcessor:
 
         return min(100, score)
     
-    async def process_pending_items(self, limit: int = 10) -> Dict:
+    async def process_pending_items(
+        self,
+        limit: int = 10,
+        mode: str = "quality",
+        concurrency: int = 1,
+        progress_every: int = 10,
+    ) -> Dict:
         """Process pending raw content items."""
-        
+        mode = (mode or "quality").lower()
+        if mode not in {"speed", "balanced", "quality", "india_strict"}:
+            mode = "quality"
+
+        include_semantic_images = mode != "speed"
+        worker_count = max(1, int(concurrency or 1))
+        if worker_count > 1 and settings.DATABASE_URL.startswith("sqlite"):
+            logger.info("SQLite backend detected; using single-worker processing for DB safety.")
+            worker_count = 1
+
         # Get pending items
         result = await self.db.execute(
             select(RawContent)
@@ -237,20 +314,170 @@ class ContentProcessor:
             .limit(limit)
         )
         pending_items = result.scalars().all()
-        
+
+        if not pending_items:
+            return {
+                "processed": 0,
+                "total_pending": 0,
+                "errors": [],
+                "rejected": 0,
+                "rejected_samples": [],
+                "runtime_failed": 0,
+                "mode": mode,
+                "concurrency": worker_count,
+                "ai_enriched": 0,
+                "basic_processed": 0,
+            }
+
+        score_cache: Dict[str, int] = {}
+        ai_allowed_ids = set()
+        if mode == "balanced":
+            ai_allowed_ids, score_cache = await self._plan_balanced_ai_budget(pending_items)
+
         processed_count = 0
+        ai_processed_count = 0
         errors = []
-        
-        for raw in pending_items:
-            try:
-                await self.process_single_item(raw)
-                processed_count += 1
-            except Exception as e:
-                errors.append(f"Error processing {raw.id}: {str(e)}")
-                raw.status = "failed"
-                raw.processing_error = str(e)[:500]
-                await self.db.commit()
-        
+        rejected_samples = []
+        rejected_count = 0
+        runtime_failed_count = 0
+        strict_yield_by_source: dict[str, dict[str, Any]] = {}
+        pending_by_id = {raw.id: raw for raw in pending_items}
+        source_map = await self._load_sources_for_items(pending_items)
+
+        def _metric_bucket(raw: RawContent) -> dict[str, Any]:
+            source = source_map.get(raw.source_id)
+            key = str(raw.source_id)
+            if key not in strict_yield_by_source:
+                strict_yield_by_source[key] = {
+                    "source_id": raw.source_id,
+                    "source_name": source.name if source else f"source-{raw.source_id}",
+                    "platform": (source.platform if source else "") or "unknown",
+                    "source_type": (source.source_type if source else "") or "unknown",
+                    "attempted": 0,
+                    "passed": 0,
+                    "rejected": 0,
+                    "runtime_failed": 0,
+                    "strict_rejected": 0,
+                    "noise_rejected": 0,
+                }
+            return strict_yield_by_source[key]
+
+        def _record_source_outcome(raw: RawContent, success: bool, error_text: str = "") -> None:
+            bucket = _metric_bucket(raw)
+            bucket["attempted"] += 1
+            if success:
+                bucket["passed"] += 1
+                return
+            error_lower = error_text.lower()
+            if "strict relevance gate failed" in error_lower:
+                bucket["rejected"] += 1
+                bucket["strict_rejected"] += 1
+            elif "noise filter" in error_lower:
+                bucket["rejected"] += 1
+                bucket["noise_rejected"] += 1
+            else:
+                bucket["runtime_failed"] += 1
+
+        if worker_count == 1:
+            for idx, raw in enumerate(pending_items, start=1):
+                force_basic = mode == "speed" or (mode == "balanced" and raw.id not in ai_allowed_ids)
+                try:
+                    await self.process_single_item(
+                        raw,
+                        source=source_map.get(raw.source_id),
+                        force_basic=force_basic,
+                        include_semantic_images=include_semantic_images,
+                        precomputed_score=score_cache.get(raw.id),
+                    )
+                    processed_count += 1
+                    if not force_basic:
+                        ai_processed_count += 1
+                    _record_source_outcome(raw, success=True)
+                except Exception as e:
+                    error_text = str(e)
+                    status = self._classify_failure_status(error_text)
+                    _record_source_outcome(raw, success=False, error_text=error_text)
+                    if status == "rejected":
+                        rejected_count += 1
+                        if len(rejected_samples) < 25:
+                            rejected_samples.append(f"{raw.id}: {error_text}")
+                    else:
+                        runtime_failed_count += 1
+                        errors.append(f"Error processing {raw.id}: {error_text}")
+                    raw.status = status
+                    raw.processing_error = error_text[:500]
+                    await self.db.commit()
+
+                if progress_every > 0 and (idx % progress_every == 0 or idx == len(pending_items)):
+                    logger.info(
+                        "Processing progress: %d/%d complete (mode=%s, ai=%d, basic=%d)",
+                        idx,
+                        len(pending_items),
+                        mode,
+                        ai_processed_count,
+                        processed_count - ai_processed_count,
+                    )
+        else:
+            pending_ids = [raw.id for raw in pending_items]
+            progress = {"done": 0}
+            progress_lock = asyncio.Lock()
+            semaphore = asyncio.Semaphore(worker_count)
+
+            async def _process_with_worker(raw_id: str) -> tuple[bool, bool, str, str]:
+                async with semaphore:
+                    async with AsyncSessionLocal() as worker_db:
+                        worker_processor = ContentProcessor(worker_db)
+                        raw = await worker_db.get(RawContent, raw_id)
+                        if not raw or raw.status != "pending":
+                            return False, False, "", ""
+
+                        force_basic = mode == "speed" or (mode == "balanced" and raw_id not in ai_allowed_ids)
+                        try:
+                            await worker_processor.process_single_item(
+                                raw,
+                                force_basic=force_basic,
+                                include_semantic_images=include_semantic_images,
+                                precomputed_score=score_cache.get(raw_id),
+                            )
+                            return True, not force_basic, "", ""
+                        except Exception as exc:
+                            error_text = str(exc)
+                            status = worker_processor._classify_failure_status(error_text)
+                            raw.status = status
+                            raw.processing_error = error_text[:500]
+                            await worker_db.commit()
+                            return False, False, error_text, status
+                        finally:
+                            async with progress_lock:
+                                progress["done"] += 1
+                                if progress_every > 0 and (
+                                    progress["done"] % progress_every == 0 or progress["done"] == len(pending_ids)
+                                ):
+                                    logger.info(
+                                        "Processing progress: %d/%d complete (mode=%s)",
+                                        progress["done"],
+                                        len(pending_ids),
+                                        mode,
+                                    )
+
+            results = await asyncio.gather(*[_process_with_worker(raw_id) for raw_id in pending_ids])
+            for raw_id, (success, used_ai, error_text, status) in zip(pending_ids, results):
+                raw = pending_by_id.get(raw_id)
+                if raw:
+                    _record_source_outcome(raw, success=success, error_text=error_text)
+                if success:
+                    processed_count += 1
+                    if used_ai:
+                        ai_processed_count += 1
+                elif error_text:
+                    if status == "rejected":
+                        rejected_count += 1
+                        if len(rejected_samples) < 25:
+                            rejected_samples.append(f"{raw_id}: {error_text}")
+                    else:
+                        runtime_failed_count += 1
+                        errors.append(f"Error processing {raw_id}: {error_text}")
+
         # Invalidate feed caches when new content is processed
         if processed_count > 0:
             try:
@@ -259,29 +486,263 @@ class ContentProcessor:
             except Exception:
                 logger.warning("Failed to invalidate feed caches", exc_info=True)
         
+        strict_source_rows = []
+        for row in strict_yield_by_source.values():
+            attempted = row["attempted"] or 0
+            row["pass_rate"] = round((row["passed"] / attempted) * 100, 2) if attempted else 0.0
+            strict_source_rows.append(row)
+        strict_source_rows.sort(key=lambda item: item["attempted"], reverse=True)
+
         return {
             "processed": processed_count,
             "total_pending": len(pending_items),
-            "errors": errors
+            "errors": errors,
+            "rejected": rejected_count,
+            "rejected_samples": rejected_samples,
+            "runtime_failed": runtime_failed_count,
+            "mode": mode,
+            "concurrency": worker_count,
+            "ai_enriched": ai_processed_count,
+            "basic_processed": processed_count - ai_processed_count,
+            "strict_yield_by_source": strict_source_rows,
         }
-    
-    async def process_single_item(self, raw: RawContent) -> Optional[ProcessedContent]:
+
+    async def _plan_balanced_ai_budget(self, pending_items: List[RawContent]) -> tuple[set[str], Dict[str, int]]:
+        """Pick a capped subset for AI enrichment in balanced mode."""
+        score_cache: Dict[str, int] = {}
+        scored_items: list[tuple[float, str]] = []
+
+        for raw in pending_items:
+            score = await self.calculate_attractiveness_score(raw)
+            score_cache[raw.id] = score
+            age_hours = self._content_age_hours(raw)
+            freshness_bonus = 24 if age_hours is None else max(0.0, 24.0 - min(age_hours, 24.0))
+            priority = score + freshness_bonus
+            scored_items.append((priority, raw.id))
+
+        quota = min(len(scored_items), max(8, min(30, len(scored_items) // 2)))
+        scored_items.sort(reverse=True)
+        allowed_ids = {item_id for _, item_id in scored_items[:quota]}
+        return allowed_ids, score_cache
+
+    async def process_single_item(
+        self,
+        raw: RawContent,
+        *,
+        source: Optional[Source] = None,
+        force_basic: bool = False,
+        include_semantic_images: bool = True,
+        precomputed_score: Optional[int] = None,
+    ) -> Optional[ProcessedContent]:
         """Process a single raw content item."""
-        
+
         # Calculate attractiveness score
-        attractiveness_score = await self.calculate_attractiveness_score(raw)
-        
-        # All articles get AI processing (score is for ranking, not gating)
-        processed = await self._process_with_nlp(raw, attractiveness_score)
-        
+        attractiveness_score = precomputed_score if precomputed_score is not None else await self.calculate_attractiveness_score(raw)
+        source = source or await self._get_source(raw.source_id)
+
+        prefilter_ok, geo_score, actionability_score, knowledge_score = self._strict_prefilter_decision(raw, source)
+        if (
+            settings.RELEVANCE_STRICT_MODE
+            and getattr(settings, "RELEVANCE_PREFILTER_ENABLED", True)
+            and not prefilter_ok
+        ):
+            raw.status = "rejected"
+            raw.processing_error = (
+                "Strict relevance gate failed "
+                f"(geo={geo_score}, actionability={actionability_score}, knowledge={knowledge_score})"
+            )
+            raw.processed_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            raise ValueError(raw.processing_error)
+
+        if self._is_noise_content(raw):
+            raw.status = "rejected"
+            raw.processing_error = "Rejected by strict relevance noise filter"
+            raw.processed_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            raise ValueError(raw.processing_error)
+
+        if force_basic:
+            processed = await self._process_basic(
+                raw,
+                source=source,
+                score=attractiveness_score,
+                include_semantic_images=include_semantic_images,
+                geo_score=geo_score,
+                actionability_score=actionability_score,
+                knowledge_score=knowledge_score,
+            )
+        else:
+            processed = await self._process_with_nlp(
+                raw,
+                source=source,
+                score=attractiveness_score,
+                include_semantic_images=include_semantic_images,
+                geo_score=geo_score,
+                actionability_score=actionability_score,
+                knowledge_score=knowledge_score,
+            )
+
         # Update raw content status
         raw.status = "processed"
         raw.processed_at = datetime.now(timezone.utc)
         await self.db.commit()
-        
+
         return processed
-    
-    async def _process_with_nlp(self, raw: RawContent, score: int) -> ProcessedContent:
+
+    async def _get_source(self, source_id: int) -> Optional[Source]:
+        result = await self.db.execute(select(Source).where(Source.id == source_id))
+        return result.scalar_one_or_none()
+
+    async def _load_sources_for_items(self, items: List[RawContent]) -> dict[int, Source]:
+        source_ids = {raw.source_id for raw in items if raw.source_id is not None}
+        source_map: dict[int, Source] = {}
+        if not source_ids:
+            return source_map
+        result = await self.db.execute(select(Source).where(Source.id.in_(source_ids)))
+        for source in result.scalars().all():
+            source_map[source.id] = source
+        return source_map
+
+    def _resolve_publish_time(self, raw: RawContent) -> datetime:
+        dt = raw.published_at or raw.scraped_at
+        if dt is None:
+            return datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def _source_text(self, raw: RawContent, source: Optional[Source]) -> str:
+        metadata = raw.raw_metadata or {}
+        bits = [
+            raw.original_title or "",
+            raw.original_content or "",
+            raw.original_url or "",
+            metadata.get("feed_name", ""),
+            metadata.get("feed_type", ""),
+            source.name if source else "",
+            source.source_type if source else "",
+            source.platform if source else "",
+        ]
+        return " ".join(str(x) for x in bits if x).lower()
+
+    def _geo_relevance_score(self, raw: RawContent, source: Optional[Source]) -> int:
+        text = self._source_text(raw, source)
+        score = 0
+        hits = sum(1 for kw in self.INDIA_GEO_KEYWORDS if kw in text)
+        score += min(70, hits * 12)
+        src_hits = sum(1 for kw in self.INDIA_SOURCE_HINTS if kw in text)
+        score += min(25, src_hits * 8)
+        if source and str(source.source_type or "").startswith("india-"):
+            # Curated india-* sources should satisfy geo baseline; actionability still gates publish.
+            score = max(score, 70)
+        if source and str(source.platform or "").lower() == "reddit":
+            if any(hint in text for hint in self.INDIA_REDDIT_HINTS):
+                # India student-focused subreddits are geo-relevant by definition.
+                score = max(score, 60)
+        return max(0, min(100, score))
+
+    def _student_actionability_score(self, raw: RawContent) -> int:
+        text = f"{raw.original_title or ''} {raw.original_content or ''}".lower()
+        score = 0
+        hits = sum(1 for kw in self.ACTIONABILITY_KEYWORDS if kw in text)
+        score += min(80, hits * 12)
+        if any(k in text for k in ("deadline", "apply", "registration", "eligibility")):
+            score += 20
+        return max(0, min(100, score))
+
+    def _knowledge_relevance_score(self, raw: RawContent, source: Optional[Source]) -> int:
+        text = self._source_text(raw, source)
+        score = 0
+        hits = sum(1 for kw in self.KNOWLEDGE_KEYWORDS if kw in text)
+        score += min(75, hits * 9)
+        if source and str(source.source_type or "").lower() in {"academic", "industry", "india-research", "india-tech"}:
+            score += 20
+        if source and str(source.platform or "").lower() == "research":
+            score += 20
+        return max(0, min(100, score))
+
+    def _is_noise_content(self, raw: RawContent) -> bool:
+        text = f"{raw.original_title or ''} {raw.original_content or ''}".lower()
+        if any(p in text for p in self.NOISE_PATTERNS):
+            return True
+        title = (raw.original_title or "").strip().lower()
+        if title.endswith("?") and len((raw.original_content or "").strip()) < 120:
+            return True
+        return False
+
+    def _passes_strict_relevance_gate(
+        self,
+        raw: RawContent,
+        source: Optional[Source],
+    ) -> tuple[bool, int, int, int]:
+        geo = self._geo_relevance_score(raw, source)
+        actionability = self._student_actionability_score(raw)
+        knowledge = self._knowledge_relevance_score(raw, source)
+        min_geo = int(getattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45))
+        min_actionability_default = int(getattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25))
+        min_actionability_reddit = int(
+            getattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE_REDDIT", min_actionability_default)
+        )
+        min_knowledge = int(getattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32))
+        is_reddit = bool(source and str(source.platform or "").lower() == "reddit")
+        min_actionability = min_actionability_reddit if is_reddit else min_actionability_default
+        global_override = int(getattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65))
+        global_knowledge_override = int(getattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72))
+        passed = (
+            (geo >= min_geo and actionability >= min_actionability)
+            or (geo >= min_geo and knowledge >= min_knowledge)
+            or actionability >= global_override
+            or knowledge >= global_knowledge_override
+        )
+        return passed, geo, actionability, knowledge
+
+    def _strict_prefilter_decision(
+        self,
+        raw: RawContent,
+        source: Optional[Source],
+    ) -> tuple[bool, int, int, int]:
+        return self._passes_strict_relevance_gate(raw, source)
+
+    def _classify_failure_status(self, error_text: str) -> str:
+        """Map processing outcome to status without hiding runtime failures."""
+        lowered = (error_text or "").lower()
+        if "strict relevance gate failed" in lowered or "noise filter" in lowered:
+            return "rejected"
+        return "failed"
+
+    def _normalize_raw_content_id(self, raw_id: Any) -> Optional[str]:
+        """Normalize UUID-like IDs for stable joins across SQLite/Postgres."""
+        if raw_id is None:
+            return None
+        normalized = str(raw_id).strip().lower()
+        if _IS_SQLITE:
+            normalized = normalized.replace("-", "")
+        return normalized or None
+
+    def _fallback_department_tags(
+        self,
+        source_tags: List[str],
+        source_type: str,
+    ) -> List[str]:
+        """Fallback tags only for department-specific (non-general) sources."""
+        if not source_tags:
+            return ["general"]
+        if source_type in GENERAL_SOURCE_TYPES:
+            return ["general"]
+        return source_tags
+
+    async def _process_with_nlp(
+        self,
+        raw: RawContent,
+        source: Optional[Source],
+        score: int,
+        *,
+        include_semantic_images: bool = True,
+        geo_score: Optional[int] = None,
+        actionability_score: Optional[int] = None,
+        knowledge_score: Optional[int] = None,
+    ) -> ProcessedContent:
         """Process with full NLP (high attractiveness)."""
         
         # Get AI summary
@@ -296,13 +757,18 @@ class ContentProcessor:
             # Fallback to basic if AI fails
             import logging as _log
             _log.getLogger(__name__).warning("AI summarization failed: %s, using basic", e)
-            return await self._process_basic(raw, score)
+            return await self._process_basic(
+                raw,
+                source=source,
+                score=score,
+                include_semantic_images=include_semantic_images,
+                geo_score=geo_score,
+                actionability_score=actionability_score,
+                knowledge_score=knowledge_score,
+            )
         
         # Get source info for department tags
-        source_result = await self.db.execute(
-            select(Source).where(Source.id == raw.source_id)
-        )
-        source = source_result.scalar_one_or_none()
+        source = source or await self._get_source(raw.source_id)
         source_name = source.name if source else ""
         
         # Determine department tags via content analysis (not just source tags)
@@ -349,7 +815,7 @@ class ContentProcessor:
         elif score >= 20: _rel += 5
         relevance_score = max(5, min(100, _rel))
 
-        # Determine if this is breaking newsusing quality + recency + urgency rules
+        # Determine if this is breaking news using quality + recency + urgency rules
         is_breaking = self._is_breaking_candidate(raw, score)
         breaking_score = self._calculate_breaking_score(raw, score) if is_breaking else None
         
@@ -373,16 +839,31 @@ class ContentProcessor:
             _log.getLogger(__name__).warning("Headline generation failed, using original title", exc_info=True)
             headline = raw.original_title
         
-        # Extract featured image from metadata (og:image from feed or scraper)
-        featured_image_url = self._extract_featured_image(raw)
-        image_credit = None
+        # Prefer Unsplash; fall back to source image or secondary providers.
+        featured_image_url, image_credit = await self._resolve_featured_image(
+            raw=raw,
+            title=raw.original_title or "",
+            category=detected_cat or "general",
+            allow_semantic=include_semantic_images,
+        )
         
         # Determine content type
         content_type = self._detect_content_type(raw, source)
 
+        if geo_score is None or actionability_score is None or knowledge_score is None:
+            _, geo_score, actionability_score, knowledge_score = self._passes_strict_relevance_gate(raw, source)
+
+        base_visualizations = {
+            "geo_relevance_score": geo_score,
+            "student_actionability_score": actionability_score,
+            "knowledge_relevance_score": knowledge_score,
+        }
+        if image_credit:
+            base_visualizations["image_credit"] = image_credit
+
         # Create processed content
         processed = ProcessedContent(
-            raw_content_id=raw.id,
+            raw_content_id=self._normalize_raw_content_id(raw.id),
             title=headline or raw.original_title or "Untitled",
             summary=summary_data.get("why_it_matters", ""),
             content_blocks={
@@ -393,19 +874,19 @@ class ContentProcessor:
             },
             reading_time_minutes=2,
             category=detect_category(raw.original_title or "", raw.original_content or ""),
-            department_tags=dept_tags if dept_tags else (source_tags or ["general"]),
+            department_tags=dept_tags if dept_tags else self._fallback_department_tags(source_tags, source_type),
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             relevance_score=relevance_score,
             quality_score=min(100, score + 10),
             content_type=content_type,
             status="published",
-            published_at=datetime.now(timezone.utc),
+            published_at=self._resolve_publish_time(raw),
             is_breaking=is_breaking,
             breaking_score=breaking_score,
             breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
             featured_image_url=featured_image_url,
-            visualizations={"image_credit": image_credit} if image_credit else {},
+            visualizations=base_visualizations,
         )
         
         self.db.add(processed)
@@ -414,14 +895,21 @@ class ContentProcessor:
         
         return processed
     
-    async def _process_basic(self, raw: RawContent, score: int) -> ProcessedContent:
+    async def _process_basic(
+        self,
+        raw: RawContent,
+        source: Optional[Source],
+        score: int,
+        *,
+        include_semantic_images: bool = True,
+        geo_score: Optional[int] = None,
+        actionability_score: Optional[int] = None,
+        knowledge_score: Optional[int] = None,
+    ) -> ProcessedContent:
         """Basic processing for low attractiveness (snippet only)."""
         
         # Get source info
-        source_result = await self.db.execute(
-            select(Source).where(Source.id == raw.source_id)
-        )
-        source = source_result.scalar_one_or_none()
+        source = source or await self._get_source(raw.source_id)
         
         # Build a useful summary from available data
         title = raw.original_title or "Untitled"
@@ -470,8 +958,13 @@ class ContentProcessor:
             abstract = (raw.original_content or "")[:300]
             summary = f"{meta_line}. {abstract}" if meta_line else abstract
 
-        featured_image_url = self._extract_featured_image(raw)
-        image_credit = None
+        basic_category = detect_category(title, content)
+        featured_image_url, image_credit = await self._resolve_featured_image(
+            raw=raw,
+            title=title,
+            category=basic_category,
+            allow_semantic=include_semantic_images,
+        )
 
         # Assign departments via content analysis
         source_tags = (source.department_tags or source.default_categories) if source else []
@@ -507,8 +1000,19 @@ class ContentProcessor:
         elif score >= 20: _rel += 5
         relevance_score = max(5, min(100, _rel))
 
+        if geo_score is None or actionability_score is None or knowledge_score is None:
+            _, geo_score, actionability_score, knowledge_score = self._passes_strict_relevance_gate(raw, source)
+
+        base_visualizations = {
+            "geo_relevance_score": geo_score,
+            "student_actionability_score": actionability_score,
+            "knowledge_relevance_score": knowledge_score,
+        }
+        if image_credit:
+            base_visualizations["image_credit"] = image_credit
+
         processed = ProcessedContent(
-            raw_content_id=raw.id,
+            raw_content_id=self._normalize_raw_content_id(raw.id),
             title=title,
             summary=summary,
             content_blocks={
@@ -517,20 +1021,20 @@ class ContentProcessor:
                 "key_points": [],
             },
             reading_time_minutes=max(1, len(content) // 1000 + 1),
-            category=detect_category(title, content),
-            department_tags=dept_tags if dept_tags else (source_tags or ["general"]),
+            category=basic_category,
+            department_tags=dept_tags if dept_tags else self._fallback_department_tags(source_tags, source_type),
             topic_tags=self._extract_topics(raw),
             attractiveness_score=score,
             relevance_score=relevance_score,
             quality_score=score,
             content_type=content_type if content_type == "research_paper" else "snippet",
             status="published",
-            published_at=datetime.now(timezone.utc),
+            published_at=self._resolve_publish_time(raw),
             is_breaking=is_breaking,
             breaking_score=breaking_score,
             breaking_detected_at=datetime.now(timezone.utc) if is_breaking else None,
             featured_image_url=featured_image_url,
-            visualizations={"image_credit": image_credit} if image_credit else {},
+            visualizations=base_visualizations,
         )
         
         self.db.add(processed)
@@ -597,13 +1101,13 @@ class ContentProcessor:
             return False
 
         # Tier 1: Top-scoring + recent
-        if score >= 48 and age_hours <= 12:
+        if score >= 55 and age_hours <= 6:
             return True
         # Tier 2: Good score + very fresh
-        if score >= 40 and age_hours <= 6:
+        if score >= 50 and age_hours <= 3:
             return True
         # Tier 3: Decent score + fresh + urgent keywords
-        if score >= 35 and age_hours <= 24 and self._has_urgent_keywords(raw):
+        if score >= 45 and age_hours <= 6 and self._has_urgent_keywords(raw):
             return True
 
         return False
@@ -727,42 +1231,92 @@ class ContentProcessor:
         
         return None
 
-    async def _fetch_semantic_image(self, title: Optional[str], category: str = "general") -> Optional[dict]:
+    async def _resolve_featured_image(
+        self,
+        raw: RawContent,
+        title: str,
+        category: str = "general",
+        allow_semantic: bool = True,
+    ) -> tuple[Optional[str], Optional[dict]]:
+        """Resolve image URL with Unsplash-first policy.
+
+        Order:
+        1) Unsplash semantic match
+        2) Existing source/OG image from scraped metadata
+        3) Secondary semantic providers (Openverse/Wikimedia/Pixabay/Pexels)
+        """
+        source_image = self._extract_featured_image(raw)
+        if not allow_semantic:
+            return source_image, None
+
+        semantic = await self._fetch_semantic_image(
+            title=title,
+            category=category,
+            fallback_url=source_image,
+        )
+        if semantic and semantic.get("url"):
+            return semantic["url"], semantic.get("credit")
+        return source_image, None
+
+    async def _fetch_semantic_image(
+        self,
+        title: Optional[str],
+        category: str = "general",
+        fallback_url: Optional[str] = None,
+    ) -> Optional[dict]:
         """Fetch a semantically relevant image for the article title.
         
-        Uses semantic search first, then falls back to category-based search.
-        Returns dict with 'url' and 'credit' keys, or None.
+        Uses Unsplash first and only falls back to source/other providers if needed.
+        Returns dict with 'url' and structured 'credit', or None.
         """
         if not title or len(title.strip()) < 5:
-            return None
+            return {"url": fallback_url, "credit": None} if fallback_url else None
         try:
             from app.services.image_fetcher import ImageFetcher
-            fetcher = ImageFetcher(sources=["openverse", "wikimedia"])
-            result = await fetcher.fetch_with_fallback(title, category=category, top_k=1)
-            if result and result.get("url"):
-                # Build attribution credit line
-                creator = result.get("creator", "").strip()
-                provider = result.get("provider", "").strip()
-                lic = result.get("license", "").strip()
-                source_url = result.get("source_url", "").strip()
-                parts = []
-                if creator:
-                    parts.append(creator)
-                if provider:
-                    parts.append(provider.title())
-                credit = " / ".join(parts) if parts else provider
-                if lic:
-                    credit += f" ({lic})"
-                return {
-                    "url": result["url"],
-                    "credit": credit,
-                    "source_url": source_url,
-                    "provider": provider,
-                    "license": lic,
-                }
+            primary_fetcher = self._get_image_fetcher(["unsplash"], ImageFetcher)
+            primary_result = await primary_fetcher.fetch_with_fallback(title, category=category, top_k=1)
+            if primary_result and primary_result.get("url"):
+                return self._format_image_result(primary_result)
+
+            if fallback_url:
+                return {"url": fallback_url, "credit": None}
+
+            secondary_fetcher = self._get_image_fetcher(["openverse", "wikimedia", "pixabay", "pexels"], ImageFetcher)
+            secondary_result = await secondary_fetcher.fetch_with_fallback(title, category=category, top_k=1)
+            if secondary_result and secondary_result.get("url"):
+                return self._format_image_result(secondary_result)
         except Exception:
             logger.debug("Semantic image fetch failed for: %s", title, exc_info=True)
-        return None
+        return {"url": fallback_url, "credit": None} if fallback_url else None
+
+    def _get_image_fetcher(self, sources: list[str], image_fetcher_cls):
+        key = tuple(sources)
+        fetcher = self._image_fetchers.get(key)
+        if fetcher is None:
+            fetcher = image_fetcher_cls(sources=sources)
+            self._image_fetchers[key] = fetcher
+        return fetcher
+
+    def _format_image_result(self, result: dict) -> dict:
+        creator = (result.get("creator") or "").strip()
+        provider = (result.get("provider") or "").strip()
+        lic = (result.get("license") or "").strip()
+        source_url = (result.get("source_url") or "").strip()
+        parts = []
+        if creator:
+            parts.append(creator)
+        if provider:
+            parts.append(provider.title())
+        credit_text = " / ".join(parts) if parts else provider.title()
+        if lic:
+            credit_text = f"{credit_text} ({lic})" if credit_text else lic
+        credit_payload = {
+            "credit": credit_text,
+            "source_url": source_url,
+            "provider": provider,
+            "license": lic,
+        }
+        return {"url": result["url"], "credit": credit_payload}
     
     async def get_processing_stats(self) -> Dict:
         """Get content processing statistics."""
@@ -792,6 +1346,7 @@ class ContentProcessor:
                 "pending": status_counts.get("pending", 0),
                 "processed": status_counts.get("processed", 0),
                 "failed": status_counts.get("failed", 0),
+                "rejected": status_counts.get("rejected", 0),
             },
             "processed_content": processed_count,
             "average_attractiveness_score": round(avg_score, 2)

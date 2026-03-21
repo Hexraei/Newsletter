@@ -299,6 +299,8 @@ COMMON_NEGATIVE_KEYWORDS = [
 
 # Minimum score to assign an article to a department
 RELEVANCE_THRESHOLD = 3
+MULTI_DEPT_RELATIVE_THRESHOLD = 0.75
+COMMON_SIGNAL_CAP = 3
 
 # Shared/general source types that publish cross-department content
 GENERAL_SOURCE_TYPES = {
@@ -311,6 +313,13 @@ GENERAL_SOURCE_TYPES = {
 def _tokenize(text: str) -> str:
     """Lowercase and normalize text for matching."""
     return text.lower()
+
+
+def _keyword_present(text: str, keyword: str) -> bool:
+    """Check keyword presence with boundary logic for single alphanumeric tokens."""
+    if keyword.isalnum():
+        return bool(re.search(r"\b" + re.escape(keyword) + r"\b", text))
+    return keyword in text
 
 
 def score_article_departments(
@@ -326,10 +335,14 @@ def score_article_departments(
     """
     text = _tokenize(f"{title} {title} {content}")  # title weighted 2x
 
+    # Common student-career signals should not assign departments on their own.
+    common_signal_hits = sum(1 for keyword, _ in COMMON_CAREER_KEYWORDS if _keyword_present(text, keyword))
+    common_signal_bonus = min(COMMON_SIGNAL_CAP, common_signal_hits)
+
     results = []
     for dept, profile in DEPARTMENT_PROFILES.items():
-        # Merge department-specific and common keywords/negatives
-        all_keywords = profile["keywords"] + COMMON_CAREER_KEYWORDS
+        # Department assignment must be driven by department-specific signals.
+        dept_keywords = profile["keywords"]
         all_negatives = profile.get("negative", []) + COMMON_NEGATIVE_KEYWORDS
 
         # Check negative keywords first
@@ -337,32 +350,34 @@ def score_article_departments(
         if neg_count >= 2:
             continue  # strong negative signal, skip this dept
 
-        # Score positive keywords
+        # Score department-specific keywords only.
         score = 0
-        matched = 0
-        for keyword, weight in all_keywords:
-            if keyword in text:
-                # Use word boundary check for short keywords (<=3 chars)
-                if len(keyword) <= 3:
-                    pattern = r'\b' + re.escape(keyword) + r'\b'
-                    if re.search(pattern, text):
-                        score += weight
-                        matched += 1
-                else:
-                    score += weight
-                    matched += 1
+        specific_matches = 0
+        for keyword, weight in dept_keywords:
+            if _keyword_present(text, keyword):
+                score += weight
+                specific_matches += 1
 
         # Bonus if source is explicitly tagged for this dept (and not a general source)
         if source_dept_tags and dept in source_dept_tags:
             if source_type not in GENERAL_SOURCE_TYPES:
                 score += 3  # source tagging bonus for specific sources
+                specific_matches = max(specific_matches, 1)
+            else:
+                # For general/news sources, a mild tag lift helps low-volume departments
+                # without allowing tags to assign departments alone.
+                score += 1
 
         # Career/event/South India source type bonuses
         india_career_types = {"india-career", "india-events", "india-south", "india-research"}
-        if source_type in india_career_types:
-            score += 2  # Boost career/event/local content
+        if source_type in india_career_types and specific_matches > 0:
+            score += 1
 
-        if score >= RELEVANCE_THRESHOLD and matched >= 1:
+        # Apply limited common signal bonus only after dept-specific evidence exists.
+        if specific_matches > 0:
+            score += common_signal_bonus
+
+        if score >= RELEVANCE_THRESHOLD and specific_matches >= 1:
             results.append((dept, score))
 
     results.sort(key=lambda x: x[1], reverse=True)
@@ -374,7 +389,7 @@ def assign_departments(
     content: str,
     source_dept_tags: List[str] = None,
     source_type: str = "",
-    max_depts: int = 3,
+    max_depts: int = 2,
 ) -> List[str]:
     """Assign department tags to an article based on content analysis.
 
@@ -391,9 +406,9 @@ def assign_departments(
         # General source with no relevance match → empty (will show in "general" feed)
         return []
 
-    # Take top departments, but only if they're within 50% of the best score
+    # Keep secondary tags only when they are very close to the top score.
     best_score = scored[0][1]
-    threshold = best_score * 0.5
+    threshold = best_score * MULTI_DEPT_RELATIVE_THRESHOLD
     depts = [dept for dept, score in scored if score >= threshold]
 
     return depts[:max_depts]

@@ -131,7 +131,8 @@ class PipelineService:
             "raw_content": {
                 "pending": raw_counts.get("pending", 0),
                 "processed": raw_counts.get("processed", 0),
-                "failed": raw_counts.get("failed", 0)
+                "failed": raw_counts.get("failed", 0),
+                "rejected": raw_counts.get("rejected", 0),
             },
             "processed_content": processed_count,
             "pending_embeddings": pending_embeddings,

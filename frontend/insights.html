@@ -708,22 +708,18 @@
 </div>
 <a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
+  <script src="auth_session.js?v=20260319"></script>
   <!-- AUTH GATE -->
   <script>
-    (function() {
-      try {
-        var raw = localStorage.getItem('newsday_session');
-        if (!raw) { window.location.replace('auth.html'); return; }
-        var s = JSON.parse(raw);
-        if (!s.authenticated || (s.expires_at && Date.now() > s.expires_at)) {
-          localStorage.removeItem('newsday_session');
-          window.location.replace('auth.html');
-          return;
-        }
-      } catch(e) {
+    window.__newsdayAuthReady = (async function () {
+      if (!window.NewsdayAuth) {
         window.location.replace('auth.html');
-        return;
+        return false;
       }
+      return window.NewsdayAuth.ensureAuthenticated({
+        redirectTo: 'auth.html',
+        syncProfileOnSuccess: true,
+      });
     })();
   </script>
 
@@ -747,12 +743,13 @@
           <div class="dept-dropdown-item" data-key="RAE"><span class="dept-abbr">RAE</span> Robotics & Automation</div>
           <div class="dept-dropdown-item" data-key="PT"><span class="dept-abbr">PT</span> Production Technology</div>
       </div>
+      </div>
       <a href="department.html">Department news</a>
       <a href="insights.html" class="active">Industrial insights</a>
       <a href="research.html">Research Papers</a>
       <a href="skills.html">Skills</a>
-      <a href="stories.html">Deep Reads</a>
-      <a href="auth.html">Log In</a>
+      <a href="stories.html">Student Stories</a>
+      <a href="auth.html" id="nav-auth-link">Log In</a>
     </div>
   </nav>
 
@@ -872,17 +869,17 @@
         <li><a href="insights.html">Industrial Insights</a></li>
         <li><a href="research.html">Research Papers</a></li>
         <li><a href="skills.html">Skills</a></li>
-        <li><a href="stories.html">Deep Reads</a></li>
+        <li><a href="stories.html">Student Stories</a></li>
       </ul>
     </div>
     <div>
       <div class="footer-col-title">Sources</div>
       <ul class="footer-links">
-        <li><a href="https://news.ycombinator.com" target="_blank">Hacker News</a></li>
-        <li><a href="https://reddit.com/r/technology" target="_blank">Reddit</a></li>
-        <li><a href="https://github.com/trending" target="_blank">GitHub</a></li>
-        <li><a href="https://medium.com" target="_blank">Medium</a></li>
-        <li><a href="https://producthunt.com" target="_blank">Product Hunt</a></li>
+        <li><a href="https://www.thehindu.com/education/" target="_blank">The Hindu Education</a></li>
+        <li><a href="https://timesofindia.indiatimes.com/education" target="_blank">TOI Education</a></li>
+        <li><a href="https://blog.internshala.com/" target="_blank">Internshala</a></li>
+        <li><a href="https://www.iitm.ac.in/" target="_blank">IIT Madras</a></li>
+        <li><a href="https://nptel.ac.in/" target="_blank">NPTEL</a></li>
       </ul>
     </div>
     <div>
@@ -1197,7 +1194,7 @@
       const cleanSummary = stripSourcePrefix(item.meta || item.subtitle || item.summary || '');
       storyRegistry.set(id, {
         title: item.title || '',
-        source: item.source || 'CS Desk',
+        source: item.source || 'India Student Desk',
         url: item.url || '#',
         category: item.category || '',
         content: item.content || item.meta || item.subtitle || item.title || '',
@@ -1350,7 +1347,7 @@
     async function openStoryModal(item) {
       if (!item) return;
       $storyModalTitle.textContent = item.title || 'Story';
-      $storyModalMeta.textContent = `${(item.source || 'CS Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
+      $storyModalMeta.textContent = `${(item.source || 'India Student Desk').toUpperCase()}${item.category ? ' - ' + String(item.category).toUpperCase() : ''}`;
       $storyQuickSummary.textContent = 'Preparing summary...';
       $storyWhyImportant.textContent = 'Preparing context...';
       $storyImpact.textContent = 'Preparing student impact...';
@@ -1398,7 +1395,7 @@
       const storyId = registerStory(item);
       const category = formatCategory(item);
       const ago = timeAgo(item.published_at);
-      const source = item.source || 'CS Desk';
+      const source = item.source || 'India Student Desk';
 
       return `<a class="feed-item" href="#" data-story-id="${storyId}">
         <div class="feed-item-thumb"></div>
@@ -1491,7 +1488,7 @@
           <div class="sidebar-item-body">
             <div class="sidebar-item-cat">${escapeHtml(cat)}</div>
             <div class="sidebar-item-title">${escapeHtml(item.title || '')}</div>
-            <div class="sidebar-item-meta">${escapeHtml(item.source || 'CS Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
+            <div class="sidebar-item-meta">${escapeHtml(item.source || 'India Student Desk')}${ago ? ' - ' + escapeHtml(ago) : ''}</div>
           </div>
         </a>`;
       }).join('');
@@ -1565,22 +1562,22 @@
        DEMO DATA
     ================================================================ */
     const DEMO_INSIGHTS = [
-      { title: 'A Stock Market Doom Loop Is Hitting Everything That Isn\'t AI', source: 'Reddit', summary: 'Finance sector turbulence is reshaping tech company valuations and hiring plans.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
-      { title: 'PS6 Could Be Delayed While Switch 2 Might Launch Early', source: 'Reddit', summary: 'Console wars heating up with supply chain implications for the gaming industry.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 7*36e5).toISOString() },
-      { title: 'Parents Opt Kids Out of School Computers Over Privacy', source: 'Reddit', summary: 'Growing privacy concerns driving policy changes in education technology.', url: '#', category: 'policy', published_at: new Date(Date.now() - 9*36e5).toISOString() },
-      { title: 'Hard Drives Already Sold Out for the Entire Year Due to AI', source: 'Reddit', summary: 'AI demand creating unprecedented supply chain shortages in storage hardware.', url: '#', category: 'supply', published_at: new Date(Date.now() - 11*36e5).toISOString() },
-      { title: 'Japan Creates World\'s First Zero-Emission Hydrogen Engine', source: 'Reddit', summary: 'Breakthrough in green energy technology with major industry implications.', url: '#', category: 'energy', published_at: new Date(Date.now() - 13*36e5).toISOString() },
-      { title: 'EU Proposes Mandatory AI Safety Testing for All Consumer Products', source: 'Reuters', summary: 'New regulation could reshape how AI products are developed and deployed.', url: '#', category: 'policy', published_at: new Date(Date.now() - 16*36e5).toISOString() },
-      { title: 'Venture Capital Funding Hits 3-Year Low Outside of AI Startups', source: 'TechCrunch', summary: 'Non-AI startups struggling to raise capital as investors concentrate bets.', url: '#', category: 'finance', published_at: new Date(Date.now() - 20*36e5).toISOString() },
-      { title: 'Apple and Google Face New Antitrust Probes in South Korea', source: 'Bloomberg', summary: 'App store policies under scrutiny as regulatory pressure mounts globally.', url: '#', category: 'policy', published_at: new Date(Date.now() - 28*36e5).toISOString() },
+      { title: 'Indian IT Hiring Rebounds in Cloud, Data, and Security Roles', source: 'Economic Times Tech', summary: 'Hiring demand is strongest in practical cloud operations, SOC roles, and data workflows.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
+      { title: 'Tamil Nadu EV and Embedded Ecosystem Adds Entry-Level Engineering Jobs', source: 'Indian Express Technology', summary: 'Fresh graduates in ECE, EEE, and Mechanical are seeing more openings in south India.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 7*36e5).toISOString() },
+      { title: 'UGC Pushes New Privacy Compliance Baselines for Campus Platforms', source: 'PIB India', summary: 'Institutions are expected to tighten student-data handling and platform governance.', url: '#', category: 'policy', published_at: new Date(Date.now() - 9*36e5).toISOString() },
+      { title: 'India Data Center Expansion Triggers Hardware and Infra Talent Demand', source: 'Livemint Technology', summary: 'Growing infra footprints are increasing demand for networking, Linux, and reliability skills.', url: '#', category: 'supply', published_at: new Date(Date.now() - 11*36e5).toISOString() },
+      { title: 'Green Energy Projects in Tamil Nadu Create New Core Engineering Tracks', source: 'ETEnergyWorld', summary: 'Students in EEE, Mechanical, and Civil can align projects to emerging renewable initiatives.', url: '#', category: 'energy', published_at: new Date(Date.now() - 13*36e5).toISOString() },
+      { title: 'NASSCOM Calls Out Practical Skill Gaps in Fresh Graduate Hiring', source: 'NASSCOM Blog', summary: 'Industry asks for stronger project portfolios, communication, and systems fundamentals.', url: '#', category: 'policy', published_at: new Date(Date.now() - 16*36e5).toISOString() },
+      { title: 'Indian Startup Funding Rotates Toward B2B, SaaS, and Applied AI', source: 'YourStory', summary: 'Funding behavior signals where student founders should focus product-market validation.', url: '#', category: 'finance', published_at: new Date(Date.now() - 20*36e5).toISOString() },
+      { title: 'Bengaluru-Chennai Talent Corridor Tightens Competition for Quality Interns', source: 'The News Minute Tech', summary: 'Students with real shipped work and internships now stand out significantly more.', url: '#', category: 'policy', published_at: new Date(Date.now() - 28*36e5).toISOString() },
     ];
 
     const DEMO_DEPARTMENT = [
-      { title: 'Running My Own XMPP Server with Prosody and STUN/TURN', source: 'Hacker News', summary: 'A deep dive into self-hosting communication infrastructure.', url: '#', category: 'infra', published_at: new Date(Date.now() - 6*36e5).toISOString() },
-      { title: 'Show HN: Open-source tool for real-time database replication', source: 'Hacker News', summary: 'New OSS project for syncing PostgreSQL across distributed systems.', url: '#', category: 'tools', published_at: new Date(Date.now() - 8*36e5).toISOString() },
-      { title: 'The State of WebAssembly in 2026: What Changed', source: 'Medium', summary: 'WebAssembly adoption across browsers and server-side runtimes.', url: '#', category: 'web', published_at: new Date(Date.now() - 11*36e5).toISOString() },
-      { title: 'Rust vs Go in 2026: Which should CS students learn?', source: 'Reddit', summary: 'Community debate on systems programming language choices.', url: '#', category: 'general', published_at: new Date(Date.now() - 14*36e5).toISOString() },
-      { title: 'Zero-day vulnerability found in popular npm package', source: 'GitHub', summary: 'Critical security flaw affects thousands of Node.js projects.', url: '#', category: 'security', published_at: new Date(Date.now() - 18*36e5).toISOString() },
+      { title: 'IIT Madras Open Source Fellowship Applications Open for Undergrads', source: 'IIT Madras', summary: 'Students can contribute to production-grade projects with mentor-backed milestones.', url: '#', category: 'infra', published_at: new Date(Date.now() - 6*36e5).toISOString() },
+      { title: 'NPTEL Launches New Cloud Labs for Placement-Oriented Learning', source: 'NPTEL', summary: 'Hands-on projects are mapped to common fresher interview topics.', url: '#', category: 'tools', published_at: new Date(Date.now() - 8*36e5).toISOString() },
+      { title: 'Internshala Shares Portfolio Projects That Convert to Interview Calls', source: 'Internshala', summary: 'Project quality and deployment evidence are highlighted as key differentiators.', url: '#', category: 'web', published_at: new Date(Date.now() - 11*36e5).toISOString() },
+      { title: 'DevelopersIndia Discusses Salary Signals for Tier-2 Engineering Colleges', source: 'developersIndia', summary: 'Actionable thread on skills, interview prep, and realistic role targeting.', url: '#', category: 'general', published_at: new Date(Date.now() - 14*36e5).toISOString() },
+      { title: 'CERT-In Advisories Increase Demand for Entry-Level Security Skills', source: 'PIB India', summary: 'Security operations and incident fundamentals are becoming baseline expectations.', url: '#', category: 'security', published_at: new Date(Date.now() - 18*36e5).toISOString() },
     ];
 
     /* ================================================================
@@ -1592,7 +1589,7 @@
       return {
         title: item.title || '',
         url: item.original_url || item.url || '#',
-        source: item.source || item.source_name || 'CS Desk',
+        source: item.source || item.source_name || 'India Student Desk',
         summary,
         content: summary || item.title || '',
         category: item.category || '',
@@ -1616,10 +1613,11 @@
         try {
           // For insights page, load trending (used as proxy for industrial/insights)
           // plus department for sidebar recommendations, and breaking for sidebar
+          const dept = getSelectedDept();
           const [trendRes, deptRes, breakRes] = await Promise.allSettled([
-            fetchWithTimeout(API + '/api/v1/feed/trending?limit=30', {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/trending?limit=30&department=' + encodeURIComponent(dept), {}, 6000),
             fetchWithTimeout(API + '/api/v1/feed/personalized?limit=5&department=' + encodeURIComponent(getSelectedDept()), {}, 6000),
-            fetchWithTimeout(API + '/api/v1/feed/breaking?limit=5', {}, 6000),
+            fetchWithTimeout(API + '/api/v1/feed/breaking?limit=5&department=' + encodeURIComponent(dept), {}, 6000),
           ]);
 
           if (trendRes.status === 'fulfilled' && trendRes.value.ok) {
@@ -1644,16 +1642,23 @@
         } catch {}
       }
 
-      // Fallback
-      if (!allFeedItems.length) allFeedItems = DEMO_INSIGHTS;
-      if (!relatedItems.length) relatedItems = DEMO_DEPARTMENT;
-      if (!breakingItems.length) breakingItems = allFeedItems.slice(0, 5);
+      // Fallback to demo data only when backend is unavailable.
+      // If backend is live but this department has no items yet, keep explicit empty state.
+      if (!allFeedItems.length) allFeedItems = backendOk ? [] : DEMO_INSIGHTS;
+      if (!relatedItems.length) relatedItems = backendOk ? [] : DEMO_DEPARTMENT;
+      if (!breakingItems.length) breakingItems = backendOk ? [] : allFeedItems.slice(0, 5);
     }
 
     /* ================================================================
        INIT
     ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
+      const authOk = await (window.__newsdayAuthReady || Promise.resolve(true));
+      if (!authOk) return;
+      if (window.NewsdayAuth) {
+        await window.NewsdayAuth.initNavbarAuth({ linkSelector: '#nav-auth-link' });
+      }
+
       loadPersistedStoryCache();
 
       // Stale-while-revalidate: render cached data instantly

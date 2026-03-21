@@ -58,14 +58,68 @@
     .navbar-links a:hover { opacity: 0.5; }
     .navbar-links a.active { font-weight: 600; }
 
-    .dept-selector { position: relative; }
-    .dept-selector-btn { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px; background: var(--black); color: var(--white); border: none; padding: 6px 16px; cursor: pointer; letter-spacing: 0.5px; }
-    .dept-dropdown { display: none; position: absolute; top: calc(100% + 8px); left: 0; background: var(--white); border: 1px solid var(--black); min-width: 300px; z-index: 200; }
+    .dept-selector {
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+    }
+    .dept-selector-btn {
+      background: var(--black);
+      color: var(--white);
+      border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    .dept-selector-btn:hover { opacity: 0.75; }
+    .dept-selector-btn::after {
+      content: '';
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--white);
+    }
+    .dept-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      min-width: 260px;
+      z-index: 200;
+      padding: 6px 0;
+      max-height: 400px;
+      overflow-y: auto;
+    }
     .dept-dropdown.open { display: block; }
-    .dept-dropdown-item { padding: 10px 16px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s; }
+    .dept-dropdown-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--gray-500);
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .dept-dropdown-item:hover { background: var(--gray-100); }
-    .dept-dropdown-item.active { font-weight: 700; background: var(--gray-100); }
-    .dept-abbr { font-family: 'DM Sans', sans-serif; font-weight: 700; min-width: 40px; }
+    .dept-dropdown-item.active {
+      color: var(--black);
+      font-weight: 600;
+      background: var(--gray-100);
+    }
+    .dept-abbr { font-weight: 700; min-width: 42px; font-size: 11px; color: var(--black); }
 
     /* ── Page Shell ─────────────────────────────────────── */
     .page { padding: 90px var(--page-margin) 60px; max-width: 1120px; margin: 0 auto; }
@@ -186,6 +240,21 @@
 </div>
 <a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
+  <script src="auth_session.js?v=20260319"></script>
+  <!-- AUTH GATE -->
+  <script>
+    window.__newsdayAuthReady = (async function () {
+      if (!window.NewsdayAuth) {
+        window.location.replace('auth.html');
+        return false;
+      }
+      return window.NewsdayAuth.ensureAuthenticated({
+        redirectTo: 'auth.html',
+        syncProfileOnSuccess: true,
+      });
+    })();
+  </script>
+
   <nav class="navbar" aria-label="Main navigation">
     <a class="navbar-brand" href="index.html">NEWS DAY</a>
     <div class="navbar-links">
@@ -205,12 +274,13 @@
           <div class="dept-dropdown-item" data-key="RAE"><span class="dept-abbr">RAE</span> Robotics & Automation</div>
           <div class="dept-dropdown-item" data-key="PT"><span class="dept-abbr">PT</span> Production Technology</div>
       </div>
+      </div>
       <a href="department.html">Department news</a>
       <a href="insights.html">Industrial insights</a>
       <a href="research.html">Research Papers</a>
       <a href="skills.html" class="active">Skills</a>
       <a href="stories.html">Student Stories</a>
-      <a href="auth.html">Log In</a>
+      <a href="auth.html" id="nav-auth-link">Log In</a>
     </div>
   </nav>
 
@@ -513,7 +583,14 @@
       }
 
       /* ── Init ──────────────────────────────────────── */
-      loadSkills();
+      (async function initPage() {
+        const authOk = await (window.__newsdayAuthReady || Promise.resolve(true));
+        if (!authOk) return;
+        if (window.NewsdayAuth) {
+          await window.NewsdayAuth.initNavbarAuth({ linkSelector: '#nav-auth-link' });
+        }
+        loadSkills();
+      })();
     })();
   </script>
 <footer style="text-align:center;padding:24px 0 12px;font-size:12px;color:#a8a49e;font-family:'DM Sans',sans-serif;">

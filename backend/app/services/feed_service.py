@@ -4,10 +4,11 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
-from sqlalchemy import select, func, case, literal
+from sqlalchemy import select, func, case, literal, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProcessedContent, RawContent, Source
+from app.config import settings
 
 _IS_SQLITE = os.environ.get("DATABASE_URL", "").startswith("sqlite")
 
@@ -38,6 +39,57 @@ class FeedService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _strict_mode_enabled(self) -> bool:
+        return bool(getattr(settings, "RELEVANCE_STRICT_MODE", True))
+
+    def _strict_relevance_filter(self):
+        """Filter for strict TN/India relevance based on stored diagnostics."""
+        if _IS_SQLITE:
+            geo_expr = func.coalesce(
+                func.cast(func.json_extract(ProcessedContent.visualizations, "$.geo_relevance_score"), Integer),
+                0,
+            )
+            action_expr = func.coalesce(
+                func.cast(func.json_extract(ProcessedContent.visualizations, "$.student_actionability_score"), Integer),
+                0,
+            )
+            knowledge_expr = func.coalesce(
+                func.cast(func.json_extract(ProcessedContent.visualizations, "$.knowledge_relevance_score"), Integer),
+                0,
+            )
+        else:
+            geo_expr = func.coalesce(
+                func.cast(ProcessedContent.visualizations["geo_relevance_score"].astext, Integer),
+                0,
+            )
+            action_expr = func.coalesce(
+                func.cast(ProcessedContent.visualizations["student_actionability_score"].astext, Integer),
+                0,
+            )
+            knowledge_expr = func.coalesce(
+                func.cast(ProcessedContent.visualizations["knowledge_relevance_score"].astext, Integer),
+                0,
+            )
+        min_geo = int(getattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45))
+        min_actionability = int(getattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25))
+        min_knowledge = int(getattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32))
+        global_override = int(getattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65))
+        global_knowledge_override = int(getattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72))
+        return (
+            ((geo_expr >= min_geo) & (action_expr >= min_actionability))
+            | ((geo_expr >= min_geo) & (knowledge_expr >= min_knowledge))
+            | (action_expr >= global_override)
+            | (knowledge_expr >= global_knowledge_override)
+        )
+
+    def _normalize_raw_id(self, raw_id: Optional[str]) -> Optional[str]:
+        if not raw_id:
+            return None
+        raw = str(raw_id).strip().lower()
+        if _IS_SQLITE:
+            return raw.replace("-", "")
+        return raw
     
     async def get_personalized_feed(
         self,
@@ -52,6 +104,8 @@ class FeedService:
         query = select(ProcessedContent).where(
             ProcessedContent.status == "published"
         )
+        if self._strict_mode_enabled():
+            query = query.where(self._strict_relevance_filter())
         
         # Filter by recency — try 30 days first, fall back to all content if empty
         week_ago = datetime.now(timezone.utc) - timedelta(days=30)
@@ -69,9 +123,42 @@ class FeedService:
         if department:
             query = query.where(_dept_filter(department))
         
-        # Order by relevance (if filtering by dept) then attractiveness and recency
+        # Prefer career/opportunity and knowledge/tech items over generic updates.
+        text_col = func.lower(func.coalesce(ProcessedContent.title, '') + ' ' + func.coalesce(ProcessedContent.summary, ''))
+        career_priority = case(
+            (
+                (ProcessedContent.category.in_(["career", "opportunity", "startup"])) |
+                text_col.like('%internship%') |
+                text_col.like('%hiring%') |
+                text_col.like('%placement%') |
+                text_col.like('%fresher%'),
+                2,
+            ),
+            else_=0,
+        )
+        knowledge_priority = case(
+            (
+                (ProcessedContent.category.in_([
+                    "research", "ai_ml", "electronics", "robotics", "energy",
+                    "biotech", "aerospace", "automotive", "backend", "webdev", "devops"
+                ])) |
+                text_col.like('%research%') |
+                text_col.like('%paper%') |
+                text_col.like('%ieee%') |
+                text_col.like('%arxiv%') |
+                text_col.like('%technology%') |
+                text_col.like('%semiconductor%') |
+                text_col.like('%robotics%'),
+                1,
+            ),
+            else_=0,
+        )
+        mix_priority = (career_priority + knowledge_priority).label("mix_priority")
+
+        # Order by mix, then relevance (if filtering by dept), then attractiveness and recency.
         if department:
             query = query.order_by(
+                mix_priority.desc(),
                 _image_priority,
                 ProcessedContent.relevance_score.desc().nullslast(),
                 ProcessedContent.attractiveness_score.desc(),
@@ -79,6 +166,7 @@ class FeedService:
             )
         else:
             query = query.order_by(
+                mix_priority.desc(),
                 _image_priority,
                 ProcessedContent.attractiveness_score.desc(),
                 ProcessedContent.published_at.desc()
@@ -90,8 +178,8 @@ class FeedService:
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        # Cross-department supplement for low-content departments
-        if department and len(items) < limit:
+        # Cross-department supplement for low-content departments (disabled in strict mode)
+        if department and len(items) < limit and not self._strict_mode_enabled():
             existing_ids = [item.id for item in items]
             week_ago_xd = datetime.now(timezone.utc) - timedelta(days=30)
             xdept_query = (
@@ -110,7 +198,8 @@ class FeedService:
             ).limit(limit - len(items)).offset(offset)
             xd_result = await self.db.execute(xdept_query)
             items.extend(xd_result.scalars().all())
-        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
         url_map = {}
         content_map = {}
         if raw_ids:
@@ -125,7 +214,7 @@ class FeedService:
         # Format response
         feed_items = []
         for item in items:
-            raw_id = str(item.raw_content_id) if item.raw_content_id else None
+            raw_id = self._normalize_raw_id(item.raw_content_id)
             feed_items.append({
                 "id": str(item.id),
                 "title": item.title,
@@ -141,7 +230,7 @@ class FeedService:
                 "is_breaking": item.is_breaking,
                 "featured_image_url": item.featured_image_url,
                 "image_credit": (item.visualizations or {}).get("image_credit"),
-                "original_url": url_map.get(str(item.raw_content_id), None)
+                "original_url": url_map.get(raw_id, None)
             })
         
         return {
@@ -156,16 +245,45 @@ class FeedService:
     
     async def get_trending_content(self, limit: int = 10, department: str = None) -> List[dict]:
         """Get trending content based on engagement scores."""
-        
+        text_col = func.lower(func.coalesce(ProcessedContent.title, '') + ' ' + func.coalesce(ProcessedContent.summary, ''))
+        career_priority = case(
+            (
+                (ProcessedContent.category.in_(["career", "opportunity", "startup"])) |
+                text_col.like('%internship%') |
+                text_col.like('%hiring%') |
+                text_col.like('%placement%'),
+                2,
+            ),
+            else_=0,
+        )
+        knowledge_priority = case(
+            (
+                (ProcessedContent.category.in_([
+                    "research", "ai_ml", "electronics", "robotics", "energy",
+                    "biotech", "aerospace", "automotive", "backend", "webdev", "devops"
+                ])) |
+                text_col.like('%research%') |
+                text_col.like('%paper%') |
+                text_col.like('%technology%') |
+                text_col.like('%robotics%'),
+                1,
+            ),
+            else_=0,
+        )
+        mix_priority = (career_priority + knowledge_priority).label("mix_priority")
+
         query = (
             select(ProcessedContent)
             .where(ProcessedContent.status == "published")
         )
+        if self._strict_mode_enabled():
+            query = query.where(self._strict_relevance_filter())
         
         if department:
             query = query.where(_dept_filter(department))
         
         query = query.order_by(
+            mix_priority.desc(),
             _image_priority,
             ProcessedContent.attractiveness_score.desc(),
             ProcessedContent.view_count.desc()
@@ -173,8 +291,8 @@ class FeedService:
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        # Cross-department supplement for low-content departments
-        if department and len(items) < limit:
+        # Cross-department supplement for low-content departments (disabled in strict mode)
+        if department and len(items) < limit and not self._strict_mode_enabled():
             existing_ids = [item.id for item in items]
             xdept_query = (
                 select(ProcessedContent)
@@ -193,7 +311,8 @@ class FeedService:
             items.extend(xd_result.scalars().all())
         
         # Fetch original URLs and content
-        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
         url_map = {}
         content_map = {}
         if raw_ids:
@@ -210,7 +329,7 @@ class FeedService:
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
-                "content": content_map.get(str(item.raw_content_id), "") if item.raw_content_id else "",
+                "content": content_map.get(self._normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
                 "is_breaking": item.is_breaking,
@@ -221,13 +340,13 @@ class FeedService:
                 "content_blocks": item.content_blocks,
                 "featured_image_url": item.featured_image_url,
                 "image_credit": (item.visualizations or {}).get("image_credit"),
-                "original_url": url_map.get(str(item.raw_content_id), None)
+                "original_url": url_map.get(self._normalize_raw_id(item.raw_content_id), None)
             }
             for item in items
         ]
     
-    async def get_career_content(self, limit: int = 3) -> List[dict]:
-        """Get career and opportunity news (category = career or startup), not department-filtered."""
+    async def get_career_content(self, limit: int = 3, department: str = None) -> List[dict]:
+        """Get career/startup content, optionally filtered to a department."""
 
         query = (
             select(ProcessedContent)
@@ -239,10 +358,15 @@ class FeedService:
             )
             .limit(limit)
         )
+        if self._strict_mode_enabled():
+            query = query.where(self._strict_relevance_filter())
+        if department:
+            query = query.where(_dept_filter(department))
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
         url_map = {}
         content_map = {}
         if raw_ids:
@@ -259,7 +383,7 @@ class FeedService:
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
-                "content": content_map.get(str(item.raw_content_id), "") if item.raw_content_id else "",
+                "content": content_map.get(self._normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
                 "is_breaking": item.is_breaking,
@@ -270,7 +394,7 @@ class FeedService:
                 "content_blocks": item.content_blocks,
                 "featured_image_url": item.featured_image_url,
                 "image_credit": (item.visualizations or {}).get("image_credit"),
-                "original_url": url_map.get(str(item.raw_content_id), None),
+                "original_url": url_map.get(self._normalize_raw_id(item.raw_content_id), None),
             }
             for item in items
         ]
@@ -336,6 +460,8 @@ class FeedService:
             .where(ProcessedContent.status == "published")
             .where(ProcessedContent.published_at >= recent_window)
         )
+        if self._strict_mode_enabled():
+            query = query.where(self._strict_relevance_filter())
         if department:
             query = query.where(_dept_filter(department))
         primary_query = (
@@ -348,7 +474,7 @@ class FeedService:
         rows = result.all()
         items = [row[0] for row in rows]
 
-        # Fallback: if not enough, fill with top recent by attractiveness (14-day window, not 30)
+        # Fallback: if not enough, fill with top recent by attractiveness
         if len(items) < limit:
             fallback_window = now - timedelta(days=30)
             existing_ids = [item.id for item in items]
@@ -358,6 +484,8 @@ class FeedService:
                 .where(ProcessedContent.published_at >= fallback_window)
                 .where(ProcessedContent.attractiveness_score >= 25)
             )
+            if self._strict_mode_enabled():
+                fallback_query = fallback_query.where(self._strict_relevance_filter())
             if department:
                 fallback_query = fallback_query.where(_dept_filter(department))
             if existing_ids:
@@ -372,8 +500,8 @@ class FeedService:
             fb_result = await self.db.execute(fallback_query)
             items.extend(fb_result.scalars().all())
 
-        # Cross-department supplement: fill remaining with top general content
-        if department and len(items) < limit:
+        # Cross-department supplement: fill remaining with top general content (disabled in strict mode)
+        if department and len(items) < limit and not self._strict_mode_enabled():
             existing_ids = [item.id for item in items]
             xdept_query = (
                 select(ProcessedContent)
@@ -394,7 +522,8 @@ class FeedService:
             items.extend(xd_result.scalars().all())
 
         # Fetch original URLs and content
-        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
         url_map = {}
         content_map = {}
         if raw_ids:
@@ -411,7 +540,7 @@ class FeedService:
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
-                "content": content_map.get(str(item.raw_content_id), "") if item.raw_content_id else "",
+                "content": content_map.get(self._normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
                 "content_blocks": item.content_blocks,
                 "category": item.category,
                 "topic_tags": item.topic_tags,
@@ -423,7 +552,7 @@ class FeedService:
                 "image_credit": (item.visualizations or {}).get("image_credit"),
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "detected_at": item.breaking_detected_at.isoformat() if item.breaking_detected_at else None,
-                "original_url": url_map.get(str(item.raw_content_id), None),
+                "original_url": url_map.get(self._normalize_raw_id(item.raw_content_id), None),
             }
             for item in items
         ]
@@ -468,6 +597,8 @@ class FeedService:
             .where(ProcessedContent.published_at >= today_start)
             .where(ProcessedContent.attractiveness_score >= 50)
         )
+        if self._strict_mode_enabled():
+            query = query.where(self._strict_relevance_filter())
         if department:
             query = query.where(_dept_filter(department))
         query = query.order_by(ProcessedContent.attractiveness_score.desc()).limit(limit)
@@ -485,6 +616,8 @@ class FeedService:
                 .where(ProcessedContent.status == "published")
                 .where(ProcessedContent.id.notin_(existing_ids) if existing_ids else True)
                 .where(ProcessedContent.attractiveness_score >= 60)
+                .where(self._strict_relevance_filter() if self._strict_mode_enabled() else True)
+                .where(_dept_filter(department) if department else True)
                 .order_by(ProcessedContent.published_at.desc())
                 .limit(remaining)
             )
@@ -523,6 +656,8 @@ class FeedService:
                 ProcessedContent.content_type == "research_paper",
             )
         )
+        if self._strict_mode_enabled():
+            query = query.where(self._strict_relevance_filter())
 
         if department:
             query = query.where(_dept_filter(department))
@@ -536,7 +671,8 @@ class FeedService:
         items = result.scalars().all()
 
         # Fetch original URLs and metadata
-        raw_ids = [item.raw_content_id for item in items if item.raw_content_id]
+        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
         url_map = {}
         meta_map = {}
         if raw_ids:
@@ -552,7 +688,7 @@ class FeedService:
                 }
 
         def _to_dict(item):
-            raw_id = str(item.raw_content_id) if item.raw_content_id else ""
+            raw_id = self._normalize_raw_id(item.raw_content_id) or ""
             meta = meta_map.get(raw_id, {})
             return {
                 "id": str(item.id),
@@ -597,6 +733,14 @@ class FeedService:
             .where(ProcessedContent.status == "published")
         )
         total_published = result.scalar()
+
+        strict_filter = self._strict_relevance_filter()
+        strict_result = await self.db.execute(
+            select(func.count(ProcessedContent.id))
+            .where(ProcessedContent.status == "published")
+            .where(strict_filter)
+        )
+        strict_relevant = strict_result.scalar() or 0
         
         # Content by category
         result = await self.db.execute(
@@ -612,6 +756,25 @@ class FeedService:
             .where(ProcessedContent.status == "published")
         )
         avg_score = result.scalar() or 0
+
+        india_result = await self.db.execute(
+            select(func.count(ProcessedContent.id))
+            .where(ProcessedContent.status == "published")
+            .where(
+                func.lower(func.coalesce(ProcessedContent.title, "") + " " + func.coalesce(ProcessedContent.summary, "")).like("%india%")
+                | func.lower(func.coalesce(ProcessedContent.title, "") + " " + func.coalesce(ProcessedContent.summary, "")).like("%indian%")
+            )
+        )
+        tamil_result = await self.db.execute(
+            select(func.count(ProcessedContent.id))
+            .where(ProcessedContent.status == "published")
+            .where(
+                func.lower(func.coalesce(ProcessedContent.title, "") + " " + func.coalesce(ProcessedContent.summary, "")).like("%tamil%")
+                | func.lower(func.coalesce(ProcessedContent.title, "") + " " + func.coalesce(ProcessedContent.summary, "")).like("%chennai%")
+            )
+        )
+        india_count = india_result.scalar() or 0
+        tamil_count = tamil_result.scalar() or 0
         
         # Today's content count
         today = datetime.now(timezone.utc).date()
@@ -628,5 +791,9 @@ class FeedService:
             "total_published": total_published,
             "today_count": today_count,
             "by_category": by_category,
-            "average_attractiveness_score": round(avg_score, 2)
+            "average_attractiveness_score": round(avg_score, 2),
+            "strict_relevance_enabled": self._strict_mode_enabled(),
+            "strict_relevant_count": strict_relevant,
+            "india_signal_share": round((india_count / total_published) * 100, 2) if total_published else 0.0,
+            "tamil_signal_share": round((tamil_count / total_published) * 100, 2) if total_published else 0.0,
         }

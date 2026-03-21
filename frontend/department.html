@@ -611,22 +611,18 @@
 </div>
 <a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
 
+  <script src="auth_session.js?v=20260319"></script>
   <!-- AUTH GATE -->
   <script>
-    (function() {
-      try {
-        var raw = localStorage.getItem('newsday_session');
-        if (!raw) { window.location.replace('auth.html'); return; }
-        var s = JSON.parse(raw);
-        if (!s.authenticated || (s.expires_at && Date.now() > s.expires_at)) {
-          localStorage.removeItem('newsday_session');
-          window.location.replace('auth.html');
-          return;
-        }
-      } catch(e) {
+    window.__newsdayAuthReady = (async function () {
+      if (!window.NewsdayAuth) {
         window.location.replace('auth.html');
-        return;
+        return false;
       }
+      return window.NewsdayAuth.ensureAuthenticated({
+        redirectTo: 'auth.html',
+        syncProfileOnSuccess: true,
+      });
     })();
   </script>
 
@@ -650,12 +646,13 @@
           <div class="dept-dropdown-item" data-key="RAE"><span class="dept-abbr">RAE</span> Robotics & Automation</div>
           <div class="dept-dropdown-item" data-key="PT"><span class="dept-abbr">PT</span> Production Technology</div>
       </div>
+      </div>
       <a href="department.html" class="active">Department news</a>
       <a href="insights.html">Industrial insights</a>
       <a href="research.html">Research Papers</a>
       <a href="skills.html">Skills</a>
       <a href="stories.html">Student Stories</a>
-      <a href="auth.html">Log In</a>
+      <a href="auth.html" id="nav-auth-link">Log In</a>
     </div>
   </nav>
 
@@ -768,11 +765,11 @@
     <div>
       <div class="footer-col-title">Sources</div>
       <ul class="footer-links">
-        <li><a href="https://news.ycombinator.com" target="_blank">Hacker News</a></li>
-        <li><a href="https://reddit.com/r/technology" target="_blank">Reddit</a></li>
-        <li><a href="https://github.com/trending" target="_blank">GitHub</a></li>
-        <li><a href="https://medium.com" target="_blank">Medium</a></li>
-        <li><a href="https://producthunt.com" target="_blank">Product Hunt</a></li>
+        <li><a href="https://www.thehindu.com/education/" target="_blank">The Hindu Education</a></li>
+        <li><a href="https://timesofindia.indiatimes.com/education" target="_blank">TOI Education</a></li>
+        <li><a href="https://blog.internshala.com/" target="_blank">Internshala</a></li>
+        <li><a href="https://www.iitm.ac.in/" target="_blank">IIT Madras</a></li>
+        <li><a href="https://nptel.ac.in/" target="_blank">NPTEL</a></li>
       </ul>
     </div>
     <div>
@@ -895,6 +892,106 @@
       el.style.display = '';
     }
     setInterval(updateLastUpdatedIndicator, 30000);
+
+    const UNSPLASH_KEY =
+      window.NEWSDAY_UNSPLASH_KEY ||
+      localStorage.getItem('newsday_unsplash_key') ||
+      'FQe0eshVZdey7aFWSmwJacsyNEe5JxDHA3XZdKdhaLM';
+
+    const UnsplashImageLoader = (() => {
+      const CACHE_KEY = 'newsday_unsplash_cache_v1';
+      const RATE_KEY = 'newsday_unsplash_rate_v1';
+      const configuredMax = Number(localStorage.getItem('newsday_unsplash_max_req_hr') || '4800');
+      const MAX_REQ_HR = Number.isFinite(configuredMax) && configuredMax > 0 ? configuredMax : 4800;
+      const STOP = new Set(['the','a','an','in','on','of','to','for','and','or','with','by','at','is','are','was','were','has','have','it','its','this','that','from','as','be','how','why','what','when','who','your','our','their','will','can','may','about','into','over','after','using','new','top','best','just','not','now','get','all','more','per','vs','via']);
+      const NOISE = new Set(['patch','tuesday','edition','january','february','march','april','may','june','july','august','september','october','november','december','2024','2025','2026','2027','update','roundup','daily','weekly']);
+
+      function _loadCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } }
+      function _saveCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {} }
+      function _rateOK() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) {
+            localStorage.setItem(RATE_KEY, JSON.stringify({ count: 0, windowStart: now }));
+            return true;
+          }
+          return raw.count < MAX_REQ_HR;
+        } catch { return true; }
+      }
+      function _incRate() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(RATE_KEY) || '{}');
+          const now = Date.now();
+          if (!raw.windowStart || now - raw.windowStart > 3600000) localStorage.setItem(RATE_KEY, JSON.stringify({ count: 1, windowStart: now }));
+          else localStorage.setItem(RATE_KEY, JSON.stringify({ count: (raw.count || 0) + 1, windowStart: raw.windowStart }));
+        } catch {}
+      }
+      function _getQuery(title, category) {
+        const words = (title || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w) && !NOISE.has(w));
+        words.sort((a, b) => b.length - a.length);
+        const titlePart = words.slice(0, 2).join(' ');
+        const ctx = ({ ai_ml:'artificial intelligence', backend:'programming code', webdev:'web development', security:'cybersecurity', career:'career workplace', startup:'startup business', devops:'cloud servers', mobile:'smartphone app', robotics:'robot technology', electronics:'circuit board', research:'scientific research', biotech:'biotechnology', energy:'renewable energy' })[category] || 'technology';
+        return titlePart ? `${titlePart} ${ctx}` : ctx;
+      }
+      async function _fetchImage(query) {
+        if (!UNSPLASH_KEY) return null;
+        const cache = _loadCache();
+        const now = Date.now();
+        if (cache[query] && (now - cache[query].ts) < 86400000) return cache[query];
+        if (!_rateOK()) return null;
+        _incRate();
+        try {
+          const res = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape&client_id=${UNSPLASH_KEY}`);
+          if (!res.ok) return null;
+          const json = await res.json();
+          const photo = json.results && json.results[0];
+          if (!photo) return null;
+          const data = { url: photo.urls.small, ts: now };
+          cache[query] = data;
+          _saveCache(cache);
+          return data;
+        } catch { return null; }
+      }
+      function _target(cardEl) { return cardEl.querySelector('.js-unsplash-target'); }
+      function _apply(cardEl, url) {
+        const target = _target(cardEl);
+        if (!target || !url) return;
+        target.style.backgroundImage = `url('${url}')`;
+        target.style.backgroundSize = 'cover';
+        target.style.backgroundPosition = 'center';
+        target.classList.add('has-image');
+        const ph = target.querySelector('.placeholder-icon');
+        if (ph) ph.remove();
+      }
+      let _observer = null;
+      const _pending = new Map();
+      function _getObserver() {
+        if (_observer) return _observer;
+        _observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const cardEl = entry.target;
+            const query = _pending.get(cardEl);
+            if (!query) return;
+            _pending.delete(cardEl);
+            _observer.unobserve(cardEl);
+            _fetchImage(query).then(data => _apply(cardEl, (data && data.url) || cardEl.dataset.fallbackImage || ''));
+          });
+        }, { rootMargin: '200px' });
+        return _observer;
+      }
+      function observeAll(containerEl) {
+        if (!containerEl) return;
+        containerEl.querySelectorAll('[data-unsplash-query]').forEach(cardEl => {
+          const query = cardEl.dataset.unsplashQuery;
+          if (!query) return;
+          _pending.set(cardEl, query);
+          _getObserver().observe(cardEl);
+        });
+      }
+      return { observeAll, getQuery: _getQuery };
+    })();
 
     /* Department selector helpers */
     const DEPT_LABELS = {CSE:'CSE',IT:'IT',AIDS:'AI&DS',ECE:'ECE',EEE:'EEE',ME:'ME',CE:'CE',BT:'BT',CH:'CH',AE:'AE',RAE:'RAE',PT:'PT'};
@@ -1343,15 +1440,13 @@
       const ago = timeAgo(item.published_at);
       const meta = stripSourcePrefix(shortText(item.summary || item.content || item.meta || '', 140));
       const source = item.source || ((DEPT_LABELS[getSelectedDept()] || 'Dept') + ' Desk');
-
-      const hasImg = !!(item.featured_image_url || item.image);
-      const imgUrl = item.featured_image_url || item.image || '';
-      const imgClass = hasImg ? ' has-image' : '';
-      const imgInner = hasImg
-        ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(item.title || 'Article image')}" loading="lazy" decoding="async" style="aspect-ratio:3/2;object-fit:cover;">`
-        : `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
-      return `<a class="feed-item" href="#" data-story-id="${storyId}">
-        <div class="feed-item-thumb${imgClass}">${imgInner}</div>
+      const fallbackImage = item.featured_image_url || item.image || '';
+      const query = UnsplashImageLoader.getQuery(item.title, item.category);
+      const unsplashAttr = query ? ` data-unsplash-query="${escapeHtml(query)}"` : '';
+      const fallbackAttr = fallbackImage ? ` data-fallback-image="${escapeHtml(fallbackImage)}"` : '';
+      const imgInner = `<span class="placeholder-icon">${escapeHtml((item.title || 'N')[0].toUpperCase())}</span>`;
+      return `<a class="feed-item" href="#" data-story-id="${storyId}"${unsplashAttr}${fallbackAttr}>
+        <div class="feed-item-thumb js-unsplash-target">${imgInner}</div>
         <div class="feed-item-body">
           <div class="feed-item-category">${escapeHtml(category)}</div>
           <div class="feed-item-title">${escapeHtml(item.title)}</div>
@@ -1366,6 +1461,7 @@
         return;
       }
       $feed.innerHTML = items.map(renderFeedItem).join('');
+      UnsplashImageLoader.observeAll($feed);
     }
 
     /* ================================================================
@@ -1454,22 +1550,22 @@
        DEMO DATA (fallback)
     ================================================================ */
     const DEMO_DEPARTMENT = [
-      { title: 'Running My Own XMPP Server with Prosody and STUN/TURN', source: 'Hacker News', summary: 'A deep dive into self-hosting communication infrastructure for learning.', url: '#', category: 'infra', published_at: new Date(Date.now() - 6*36e5).toISOString() },
-      { title: 'Show HN: Open-source tool for real-time database replication', source: 'Hacker News', summary: 'New OSS project for syncing PostgreSQL across distributed systems.', url: '#', category: 'tools', published_at: new Date(Date.now() - 8*36e5).toISOString() },
-      { title: 'The State of WebAssembly in 2026: What Changed', source: 'Medium', summary: 'WebAssembly adoption across browsers and server-side runtimes.', url: '#', category: 'web', published_at: new Date(Date.now() - 11*36e5).toISOString() },
-      { title: 'After all the hype, some AI experts think LLMs have plateaued', source: 'Reddit', summary: 'Industry experts debate whether large language models have hit diminishing returns.', url: '#', category: 'ai', published_at: new Date(Date.now() - 12*36e5).toISOString() },
-      { title: 'Zero-day vulnerability found in popular npm package', source: 'GitHub', summary: 'Critical security flaw affects thousands of Node.js projects.', url: '#', category: 'security', published_at: new Date(Date.now() - 14*36e5).toISOString() },
-      { title: 'Kubernetes 1.33 released with major networking changes', source: 'Hacker News', summary: 'New release simplifies service mesh configuration and improves pod scheduling.', url: '#', category: 'devops', published_at: new Date(Date.now() - 18*36e5).toISOString() },
-      { title: 'How one student landed a FAANG internship with open-source contributions', source: 'Medium', summary: 'A practical guide to building your resume through OSS work.', url: '#', category: 'career', published_at: new Date(Date.now() - 24*36e5).toISOString() },
-      { title: 'Rust vs Go in 2026: Which should CS students learn?', source: 'Reddit', summary: 'Community debate on systems programming language choices for new grads.', url: '#', category: 'general', published_at: new Date(Date.now() - 30*36e5).toISOString() },
+      { title: 'Anna University Releases New Embedded Systems Placement Prep Modules', source: 'Anna University', summary: 'Department-focused modules to improve interview readiness for ECE and EEE students.', url: '#', category: 'embedded', published_at: new Date(Date.now() - 6*36e5).toISOString() },
+      { title: 'NIT Trichy Alumni Share Open Source Project List for Internship Portfolios', source: 'Indian Academia', summary: 'A curated project list for final-year students preparing for product and service company drives.', url: '#', category: 'tools', published_at: new Date(Date.now() - 8*36e5).toISOString() },
+      { title: 'IIT Madras Hosts Applied AI Workshop Series for Engineering Undergrads', source: 'IIT Madras', summary: 'Hands-on workshop track with practical use-cases aligned to industry hiring expectations.', url: '#', category: 'ai', published_at: new Date(Date.now() - 11*36e5).toISOString() },
+      { title: 'Tamil Nadu EV Firms Open Internship Slots for Mechanical and EEE Students', source: 'Economic Times Tech', summary: 'Internship openings in battery systems, manufacturing, and embedded control roles.', url: '#', category: 'career', published_at: new Date(Date.now() - 12*36e5).toISOString() },
+      { title: 'Cybersecurity Hiring Drive Expands Across Chennai IT Corridors', source: 'The Hindu Sci-Tech', summary: 'SOC and cloud security roles are opening up for fresh graduates with project experience.', url: '#', category: 'security', published_at: new Date(Date.now() - 14*36e5).toISOString() },
+      { title: 'NPTEL Adds New Credit-Eligible DevOps and Cloud Labs', source: 'NPTEL', summary: 'Students can now complete guided cloud labs with certification value for placements.', url: '#', category: 'devops', published_at: new Date(Date.now() - 18*36e5).toISOString() },
+      { title: 'How a Coimbatore Team Built a Campus Bus Tracker Used by 4,000 Students', source: 'Unstop Blog', summary: 'A practical case study on shipping and scaling a student-led product in Tamil Nadu.', url: '#', category: 'projects', published_at: new Date(Date.now() - 24*36e5).toISOString() },
+      { title: 'Internshala Publishes Final-Year Checklist for Off-Campus Hiring', source: 'Internshala', summary: 'A week-by-week plan for resumes, coding rounds, communication prep, and applications.', url: '#', category: 'general', published_at: new Date(Date.now() - 30*36e5).toISOString() },
     ];
 
     const DEMO_TRENDING = [
-      { title: 'A Stock Market Doom Loop Is Hitting Everything That Isn\'t AI', source: 'Reddit', summary: 'Finance sector turbulence affecting tech company valuations.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
-      { title: 'PS6 Could Be Delayed While Switch 2 Might Launch Early', source: 'Reddit', summary: 'Console wars heating up in the gaming industry.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 7*36e5).toISOString() },
-      { title: 'Japan Creates World\'s First Zero-Emission Hydrogen Engine', source: 'Reddit', summary: 'Breakthrough in green energy technology.', url: '#', category: 'science', published_at: new Date(Date.now() - 9*36e5).toISOString() },
-      { title: 'Hard Drives Already Sold Out for the Entire Year Due to AI', source: 'Reddit', summary: 'AI demand creating supply chain shortages.', url: '#', category: 'supply', published_at: new Date(Date.now() - 13*36e5).toISOString() },
-      { title: 'California\'s Billionaires Pour Cash Into Local Elections', source: 'Reddit', summary: 'Tech wealth influencing civic processes.', url: '#', category: 'civic', published_at: new Date(Date.now() - 16*36e5).toISOString() },
+      { title: 'Indian IT Firms Increase Fresher Intake for Cloud and Data Roles', source: 'Economic Times Tech', summary: 'Hiring momentum is strongest in cloud support, data operations, and security teams.', url: '#', category: 'market', published_at: new Date(Date.now() - 5*36e5).toISOString() },
+      { title: 'Tamil Nadu Semiconductor Push Creates New VLSI Trainee Roles', source: 'Indian Express Technology', summary: 'VLSI and verification opportunities are rising around Chennai and Hosur clusters.', url: '#', category: 'consumer', published_at: new Date(Date.now() - 7*36e5).toISOString() },
+      { title: 'CSIR Labs Open Summer Research Internships for Engineering Students', source: 'CSIR News', summary: 'Applications are open for domain projects in electronics, materials, and applied AI.', url: '#', category: 'science', published_at: new Date(Date.now() - 9*36e5).toISOString() },
+      { title: 'EV Supply Chain Firms Add Graduate Trainee Openings in South India', source: 'ETEnergyWorld', summary: 'Freshers with CAD, controls, and analytics skills are seeing higher demand.', url: '#', category: 'supply', published_at: new Date(Date.now() - 13*36e5).toISOString() },
+      { title: 'Student Innovation Grants Expanded for College Tech Clubs in TN', source: 'Vigyan Prasar', summary: 'Campus clubs can now apply for prototyping funds and mentorship support.', url: '#', category: 'civic', published_at: new Date(Date.now() - 16*36e5).toISOString() },
     ];
 
     /* ================================================================
@@ -1538,9 +1634,10 @@
         } catch {}
       }
 
-      // Fallback to demo data
-      if (!allFeedItems.length) allFeedItems = DEMO_DEPARTMENT;
-      if (!trendingItems.length) trendingItems = DEMO_TRENDING;
+      // Fallback to demo data only when backend is unavailable.
+      // If backend is live but this department has no items yet, keep explicit empty state.
+      if (!allFeedItems.length) allFeedItems = backendOk ? [] : DEMO_DEPARTMENT;
+      if (!trendingItems.length) trendingItems = backendOk ? [] : DEMO_TRENDING;
       if (!relatedItems.length) relatedItems = trendingItems.slice(0, 5);
     }
 
@@ -1548,6 +1645,12 @@
        INIT
     ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
+      const authOk = await (window.__newsdayAuthReady || Promise.resolve(true));
+      if (!authOk) return;
+      if (window.NewsdayAuth) {
+        await window.NewsdayAuth.initNavbarAuth({ linkSelector: '#nav-auth-link' });
+      }
+
       initDeptSelector();
       loadPersistedStoryCache();
 

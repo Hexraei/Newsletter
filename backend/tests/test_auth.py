@@ -19,9 +19,9 @@ async def test_root_endpoint(async_client: AsyncClient):
     """Test root endpoint."""
     response = await async_client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert "message" in data
-    assert "College Newsletter" in data["message"]
+    body = response.text.lower()
+    assert "<html" in body
+    assert "news day" in body
 
 
 @pytest.mark.asyncio
@@ -43,7 +43,7 @@ async def test_register_user(async_client: AsyncClient):
     assert data["success"] is True
     assert data["data"]["email"] == user_data["email"]
     assert data["data"]["full_name"] == user_data["full_name"]
-    assert data["data"]["department"] == user_data["department"]
+    assert data["data"]["department_key"] == user_data["department"]
     assert "password_hash" not in data["data"]
 
 
@@ -175,7 +175,7 @@ async def test_update_me(async_client: AsyncClient):
     data = response.json()
     assert data["success"] is True
     assert data["data"]["full_name"] == update_data["full_name"]
-    assert data["data"]["department"] == update_data["department"]
+    assert data["data"]["department_key"] == update_data["department"]
 
 
 @pytest.mark.asyncio

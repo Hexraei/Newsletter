@@ -20,6 +20,32 @@ from scrapers.lib.scrapers.rss_scraper import RSSFeedScraper
 # Max concurrent feed fetches (avoid overwhelming targets)
 CONCURRENCY = 5
 
+# Sources that consistently return invalid/non-feed payloads or hard failures.
+# Keep this list small and evidence-driven to avoid pruning good sources.
+BROKEN_RSS_URLS = {
+    "https://www.thenewsminute.com/topic/technology/feed",
+    "https://citizenmatters.in/bengaluru/feed",
+    "https://www.freshersworld.com/jobs/blog/feed",
+    "https://www.geeksforgeeks.org/feed/",
+    "https://www.iitm.ac.in/feed",
+    "https://blog.devfolio.co/rss/",
+    "https://unstop.com/blog/feed",
+    "https://nptel.ac.in/rss/new_courses.xml",
+    "https://nhai.gov.in/rss.xml",
+    "https://nasscom.in/knowledge-center/rss.xml",
+    "https://birac.nic.in/rss.xml",
+    "https://www.cii.in/rss.aspx",
+    "https://www.autocarpro.in/rss/feed",
+    "https://www.automationindia.net/feed/",
+    "https://vigyanprasar.gov.in/feed/",
+    "https://ml.iiit.ac.in/feed/",
+    "https://smartcities.gov.in/rss.xml",
+    "https://www.imtma.in/feed/",
+    "https://dbtindia.gov.in/rss.xml",
+    "https://www.techgig.com/feed/news",
+    "https://msme.gov.in/hi/rss.xml",
+}
+
 
 async def scrape_one_source(scraper, source, semaphore):
     """Scrape a single RSS source, guarded by semaphore."""
@@ -42,12 +68,19 @@ async def scrape_one_source(scraper, source, semaphore):
             return source, [], str(e)
 
 
-async def main():
+async def main(only_india: bool = False):
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Source).where(Source.platform == "rss", Source.is_active == True)
-        )
-        sources = result.scalars().all()
+        query = select(Source).where(Source.platform == "rss", Source.is_active == True)
+        if only_india:
+            query = query.where(Source.source_type.like("india-%"))
+        result = await db.execute(query)
+        sources = [s for s in result.scalars().all() if (s.url or "").strip() not in BROKEN_RSS_URLS]
+        if only_india and not sources:
+            # Safety fallback in case India-tagged sources were not seeded yet
+            result = await db.execute(
+                select(Source).where(Source.platform == "rss", Source.is_active == True)
+            )
+            sources = [s for s in result.scalars().all() if (s.url or "").strip() not in BROKEN_RSS_URLS]
         print(f"Found {len(sources)} active RSS sources")
 
         total_scraped = 0
@@ -117,6 +150,128 @@ async def main():
             print("Errors:")
             for err in errors:
                 print(f"  - {err}")
+        return {
+            "total_scraped": total_scraped,
+            "total_stored": total_stored,
+            "errors": len(errors),
+        }
+
+
+async def run_department_knowledge_stage():
+    """Run a bounded knowledge-focused RSS stage across low-volume departments."""
+    async with AsyncSessionLocal() as db:
+        query = (
+            select(Source)
+            .where(Source.platform == "rss", Source.is_active == True)
+            .where(
+                Source.source_type.in_([
+                    "academic",
+                    "industry",
+                    "india-research",
+                    "india-tech",
+                    "india-energy",
+                    "india-defence",
+                    "news",
+                ])
+            )
+        )
+        result = await db.execute(query)
+        all_sources = [s for s in result.scalars().all() if (s.url or "").strip() not in BROKEN_RSS_URLS]
+
+        # Prioritize under-covered departments first.
+        target_depts = {"AIDS", "EEE", "ME", "BT", "CH", "AE", "RAE", "PT", "CE", "IT"}
+        selected = []
+        per_dept_count = {k: 0 for k in target_depts}
+        per_dept_cap = 6
+
+        for src in all_sources:
+            src_depts = set(src.department_tags or [])
+            matched = [d for d in src_depts if d in target_depts and per_dept_count[d] < per_dept_cap]
+            if not matched:
+                continue
+            selected.append(src)
+            for d in matched:
+                per_dept_count[d] += 1
+
+        # If selection is too small, add remaining trusted knowledge sources.
+        if len(selected) < 40:
+            seen_ids = {s.id for s in selected}
+            for src in all_sources:
+                if src.id in seen_ids:
+                    continue
+                selected.append(src)
+                if len(selected) >= 40:
+                    break
+
+        if not selected:
+            print("Knowledge stage: no sources selected.")
+            return {"total_scraped": 0, "total_stored": 0, "errors": 0}
+
+        print(f"Knowledge stage: selected {len(selected)} RSS sources")
+        total_scraped = 0
+        total_stored = 0
+        errors = []
+        semaphore = asyncio.Semaphore(CONCURRENCY)
+
+        async with RSSFeedScraper() as scraper:
+            tasks = [scrape_one_source(scraper, s, semaphore) for s in selected]
+            results = await asyncio.gather(*tasks)
+
+        for source, items, error in results:
+            config = source.scrape_config or {}
+            feed_name = config.get("feed_name", source.name)
+            dept_tags = list(source.department_tags or [])
+
+            if error:
+                errors.append(f"{feed_name}: {error}")
+                print(f"  [ERR] {feed_name}: {error}")
+                continue
+
+            total_scraped += len(items)
+            stored = 0
+            seen_hashes = set()
+
+            for item in items:
+                content_str = f"{item.title}{item.url}{item.author}"
+                content_hash = hashlib.sha256(content_str.encode()).hexdigest()[:32]
+                if content_hash in seen_hashes:
+                    continue
+                seen_hashes.add(content_hash)
+
+                dup = await db.execute(
+                    select(RawContent).where(RawContent.content_hash == content_hash)
+                )
+                if dup.scalar_one_or_none():
+                    continue
+
+                raw = RawContent(
+                    source_id=source.id,
+                    original_url=item.url[:500] if item.url else "",
+                    original_title=(item.title or "")[:500],
+                    original_content=(item.content or "")[:2000],
+                    original_author=(item.author or "")[:255],
+                    published_at=item.published_at,
+                    raw_metadata={"feed_name": feed_name, "department_tags": dept_tags, "lane": "knowledge"},
+                    content_hash=content_hash,
+                    status="pending",
+                )
+                db.add(raw)
+                stored += 1
+
+            await db.commit()
+            total_stored += stored
+            dept_str = ",".join(dept_tags) if dept_tags else "none"
+            print(f"  [KNOWLEDGE:{dept_str}] {feed_name}: {len(items)} scraped, {stored} new")
+
+            source.last_scraped_at = datetime.now(timezone.utc)
+            source.last_success_at = datetime.now(timezone.utc)
+
+        print(f"\nKnowledge stage done: {total_scraped} scraped, {total_stored} stored, {len(errors)} errors")
+        return {
+            "total_scraped": total_scraped,
+            "total_stored": total_stored,
+            "errors": len(errors),
+        }
 
 
 if __name__ == "__main__":

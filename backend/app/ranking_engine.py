@@ -262,7 +262,8 @@ class BreakingNewsScorer:
             # Velocity (engagement/age) is more objective — weight it more than keyword hits
             keyword_score = min(1.0, 0.2 * keyword_hits)
             velocity_score = min(1.0, velocity / 2.5)
-            candidate.urgency_score = max(0.0, min(1.0, keyword_score + velocity_score))
+            # Avoid saturation at 1.0 when velocity is high so keyword signals can still differentiate items.
+            candidate.urgency_score = max(0.0, min(1.0, 0.3 * keyword_score + 0.7 * velocity_score))
 
 
 class CategoryRelevanceScorer:
@@ -291,7 +292,6 @@ class CategoryRelevanceScorer:
             "recall",
             "indicted",
             "bankrupt",
-        ),
         ),
         "department": (
             "computer science",
@@ -533,7 +533,7 @@ class WeightedCombiner:
         "breaking": {"engagement": 0.35, "recency": 0.25, "urgency": 0.25, "relevance": 0.15},
         "department": {"engagement": 0.25, "recency": 0.15, "urgency": 0.05, "relevance": 0.55},
         "student_stories": {"engagement": 0.25, "recency": 0.15, "urgency": 0.05, "relevance": 0.55},
-        "trending": {"engagement": 0.30, "recency": 0.20, "urgency": 0.05, "relevance": 0.45},
+        "trending": {"engagement": 0.50, "recency": 0.25, "urgency": 0.10, "relevance": 0.15},
     }
 
     @classmethod

@@ -148,6 +148,23 @@ class Settings(BaseSettings):
     STORAGE_BUCKET: str = "newsletter"
     STORAGE_TYPE: str = "local"
     STORAGE_PATH: str = "./data/storage"
+
+    # Image providers
+    UNSPLASH_ACCESS_KEY: Optional[str] = None
+    UNSPLASH_SECRET_KEY: Optional[str] = None
+    UNSPLASH_HOURLY_LIMIT: int = 4800
+
+    # Relevance policy (TN/India first)
+    RELEVANCE_STRICT_MODE: bool = True
+    RELEVANCE_MIN_GEO_SCORE: int = 45
+    RELEVANCE_MIN_ACTIONABILITY_SCORE: int = 25
+    RELEVANCE_MIN_ACTIONABILITY_SCORE_REDDIT: int = 38
+    RELEVANCE_MIN_KNOWLEDGE_SCORE: int = 32
+    RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE: int = 65
+    RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE: int = 72
+    RELEVANCE_PREFILTER_ENABLED: bool = True
+    RELEVANCE_REDDIT_MAX_PER_SUBREDDIT: int = 8
+    RELEVANCE_REDDIT_MAX_TOTAL_ITEMS: int = 60
     
     # AI Services - Priority: Gemini > Groq > OpenAI > HuggingFace > Free > Ollama
     

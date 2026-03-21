@@ -22,11 +22,11 @@ from app.models.base import AsyncSessionLocal, engine
 from app.services.feed_service import FeedService
 from app.departments import DEPARTMENTS
 
-BREAKING_LIMIT = 8
-TRENDING_LIMIT = 3
-DEPARTMENT_LIMIT = 3
-CAREER_LIMIT = 3
-RESEARCH_FEATURED = 3
+BREAKING_LIMIT = 12
+TRENDING_LIMIT = 14
+DEPARTMENT_LIMIT = 14
+CAREER_LIMIT = 10
+RESEARCH_FEATURED = 4
 RESEARCH_GENERAL = 10
 
 
@@ -39,6 +39,29 @@ def _serialise(obj):
     raise TypeError(f"Cannot serialise {type(obj)}")
 
 
+def _is_sqlite() -> bool:
+    return str(engine.url).startswith("sqlite")
+
+
+async def _ensure_cache_table() -> None:
+    """Create cached_feeds table when running in local SQLite mode."""
+    if not _is_sqlite():
+        return
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS cached_feeds (
+                    department TEXT PRIMARY KEY,
+                    data TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        await db.commit()
+
+
 async def build_section(dept_key: str) -> dict:
     """Compute all-sections payload for one department."""
     async with AsyncSessionLocal() as db:
@@ -47,7 +70,7 @@ async def build_section(dept_key: str) -> dict:
         trending = await svc.get_trending_content(limit=TRENDING_LIMIT, department=dept_key)
         dept_feed = await svc.get_personalized_feed(department=dept_key, limit=DEPARTMENT_LIMIT)
         dept_items = dept_feed.get("items", [])
-        career = await svc.get_career_content(limit=CAREER_LIMIT)
+        career = await svc.get_career_content(limit=CAREER_LIMIT, department=dept_key)
         research = await svc.get_research_papers(
             department=dept_key, featured_limit=RESEARCH_FEATURED, general_limit=RESEARCH_GENERAL
         )
@@ -63,6 +86,7 @@ async def build_section(dept_key: str) -> dict:
 async def refresh_all():
     dept_keys = [d["key"] for d in DEPARTMENTS]
     print(f"Refreshing cache for {len(dept_keys)} departments...")
+    await _ensure_cache_table()
 
     for key in dept_keys:
         try:
@@ -70,15 +94,26 @@ async def refresh_all():
             payload = json.loads(json.dumps(data, default=_serialise))
 
             async with AsyncSessionLocal() as db:
-                await db.execute(
-                    text(
-                        "INSERT INTO cached_feeds (department, data, updated_at) "
-                        "VALUES (:d, :data, NOW()) "
-                        "ON CONFLICT (department) DO UPDATE "
-                        "SET data = EXCLUDED.data, updated_at = NOW()"
-                    ),
-                    {"d": key, "data": json.dumps(payload)},
-                )
+                if _is_sqlite():
+                    await db.execute(
+                        text(
+                            "INSERT INTO cached_feeds (department, data, updated_at) "
+                            "VALUES (:d, :data, CURRENT_TIMESTAMP) "
+                            "ON CONFLICT(department) DO UPDATE "
+                            "SET data = excluded.data, updated_at = CURRENT_TIMESTAMP"
+                        ),
+                        {"d": key, "data": json.dumps(payload)},
+                    )
+                else:
+                    await db.execute(
+                        text(
+                            "INSERT INTO cached_feeds (department, data, updated_at) "
+                            "VALUES (:d, CAST(:data AS JSONB), NOW()) "
+                            "ON CONFLICT (department) DO UPDATE "
+                            "SET data = EXCLUDED.data, updated_at = NOW()"
+                        ),
+                        {"d": key, "data": json.dumps(payload)},
+                    )
                 await db.commit()
 
             b = len(data["breaking"])

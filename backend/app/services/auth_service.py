@@ -98,6 +98,17 @@ class AuthService:
             update_data["password_hash"] = get_password_hash(
                 update_data.pop("password")
             )
+
+        # Keep department + department_key consistent when department is updated.
+        if "department" in update_data:
+            dept_val = update_data.get("department")
+            if dept_val and str(dept_val).upper() in DEPARTMENT_KEYS:
+                dept_key = str(dept_val).upper()
+                dept_name = next((d["name"] for d in DEPARTMENTS if d["key"] == dept_key), dept_val)
+                update_data["department"] = dept_name
+                update_data["department_key"] = dept_key
+            else:
+                update_data["department_key"] = None
         
         for field, value in update_data.items():
             setattr(user, field, value)
