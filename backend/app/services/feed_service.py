@@ -1,8 +1,11 @@
 """Feed curation service for generating personalized newsletters."""
 
 import os
+import re
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 from sqlalchemy import select, func, case, literal, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,6 +45,15 @@ class FeedService:
 
     def _strict_mode_enabled(self) -> bool:
         return bool(getattr(settings, "RELEVANCE_STRICT_MODE", True))
+
+    def _strict_supplement_enabled(self) -> bool:
+        return bool(getattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", True))
+
+    def _strict_supplement_max_items(self) -> int:
+        return max(0, int(getattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MAX_ITEMS", 2)))
+
+    def _strict_supplement_min_attractiveness(self) -> int:
+        return max(0, int(getattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MIN_ATTRACTIVENESS", 35)))
 
     def _strict_relevance_filter(self):
         """Filter for strict TN/India relevance based on stored diagnostics."""
@@ -90,6 +102,167 @@ class FeedService:
         if _IS_SQLITE:
             return raw.replace("-", "")
         return raw
+
+    def _normalize_title_key(self, title: Optional[str]) -> Optional[str]:
+        if not title:
+            return None
+        normalized = re.sub(r"[^a-z0-9]+", "", title.lower())
+        return normalized or None
+
+    def _source_diversity_cap(self) -> int:
+        return max(0, int(getattr(settings, "RELEVANCE_SOURCE_DIVERSITY_CAP", 2)))
+
+    def _supplement_candidate_limit(self, slots: int) -> int:
+        if slots <= 0:
+            return 0
+        cap = self._source_diversity_cap()
+        return max(slots, slots * max(2, cap + 1))
+
+    def _apply_source_diversity_cap(
+        self,
+        items: List[ProcessedContent],
+        *,
+        limit: int,
+        source_map: Dict[str, Dict[str, Optional[str]]],
+    ) -> List[ProcessedContent]:
+        if limit <= 0 or not items:
+            return []
+
+        cap = self._source_diversity_cap()
+        if cap <= 0:
+            return items[:limit]
+
+        selected: List[ProcessedContent] = []
+        overflow: List[ProcessedContent] = []
+        bucket_counts: Dict[str, int] = defaultdict(int)
+
+        for item in items:
+            raw_id = self._normalize_raw_id(item.raw_content_id)
+            source_info: Dict[str, Optional[str]] = source_map.get(raw_id, {}) if raw_id else {}
+            bucket = source_info.get("host") or source_info.get("source_type")
+
+            if bucket and bucket_counts[bucket] >= cap:
+                overflow.append(item)
+                continue
+
+            selected.append(item)
+            if bucket:
+                bucket_counts[bucket] += 1
+
+            if len(selected) >= limit:
+                break
+
+        if len(selected) < limit:
+            needed = limit - len(selected)
+            selected.extend(overflow[:needed])
+
+        return selected[:limit]
+
+    def _extract_host(self, url: Optional[str]) -> Optional[str]:
+        if not url:
+            return None
+        host = (urlparse(url).netloc or "").lower().strip()
+        if host.startswith("www."):
+            host = host[4:]
+        return host or None
+
+    async def _build_raw_context(
+        self, items: List[ProcessedContent]
+    ) -> tuple[Dict[str, str], Dict[str, str], Dict[str, Dict[str, Optional[str]]]]:
+        raw_ids: List[str] = []
+        for item in items:
+            if not item.raw_content_id:
+                continue
+            raw_value = str(item.raw_content_id).strip().lower()
+            if not raw_value:
+                continue
+            raw_ids.append(raw_value)
+            normalized = self._normalize_raw_id(raw_value)
+            if normalized and normalized != raw_value:
+                raw_ids.append(normalized)
+        raw_ids = list(dict.fromkeys(raw_ids))
+        if not raw_ids:
+            return {}, {}, {}
+
+        raw_result = await self.db.execute(
+            select(
+                RawContent.id,
+                RawContent.original_url,
+                RawContent.original_content,
+                Source.source_type.label("source_type"),
+                Source.url.label("source_url"),
+            )
+            .select_from(RawContent)
+            .outerjoin(Source, RawContent.source_id == Source.id)
+            .where(RawContent.id.in_(raw_ids))
+        )
+
+        url_map: Dict[str, str] = {}
+        content_map: Dict[str, str] = {}
+        source_map: Dict[str, Dict[str, Optional[str]]] = {}
+        for row in raw_result.all():
+            key = self._normalize_raw_id(row.id)
+            if not key:
+                continue
+            url_map[key] = row.original_url
+            content_map[key] = row.original_content
+            source_map[key] = {
+                "host": self._extract_host(row.original_url) or self._extract_host(row.source_url),
+                "source_type": (row.source_type or "").strip().lower() or None,
+            }
+        return url_map, content_map, source_map
+
+    def _apply_section_item_controls(
+        self,
+        items: List[ProcessedContent],
+        *,
+        limit: Optional[int],
+        source_map: Dict[str, Dict[str, Optional[str]]],
+    ) -> List[ProcessedContent]:
+        seen_ids = set()
+        seen_title_keys = set()
+        deduped_items: List[ProcessedContent] = []
+        for item in items:
+            content_id = str(item.id) if item.id else None
+            title_key = self._normalize_title_key(item.title)
+            if content_id and content_id in seen_ids:
+                continue
+            if title_key and title_key in seen_title_keys:
+                continue
+            if content_id:
+                seen_ids.add(content_id)
+            if title_key:
+                seen_title_keys.add(title_key)
+            deduped_items.append(item)
+
+        target = int(limit) if limit and limit > 0 else None
+        if target:
+            deduped_items = deduped_items[:target]
+
+        cap = self._source_diversity_cap()
+        if cap <= 0 or not deduped_items:
+            return deduped_items
+
+        diversity_filtered: List[ProcessedContent] = []
+        overflow_items: List[ProcessedContent] = []
+        bucket_counts: Dict[str, int] = defaultdict(int)
+
+        for item in deduped_items:
+            raw_id = self._normalize_raw_id(item.raw_content_id)
+            source_info: Dict[str, Optional[str]] = source_map.get(raw_id, {}) if raw_id else {}
+            bucket = source_info.get("host") or source_info.get("source_type")
+            if bucket and bucket_counts[bucket] >= cap:
+                overflow_items.append(item)
+                continue
+            diversity_filtered.append(item)
+            if bucket:
+                bucket_counts[bucket] += 1
+
+        if target and len(diversity_filtered) < target:
+            remaining = target - len(diversity_filtered)
+            diversity_filtered.extend(overflow_items[:remaining])
+
+        return diversity_filtered[:target] if target else diversity_filtered
     
     async def get_personalized_feed(
         self,
@@ -178,38 +351,51 @@ class FeedService:
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        # Cross-department supplement for low-content departments (disabled in strict mode)
-        if department and len(items) < limit and not self._strict_mode_enabled():
-            existing_ids = [item.id for item in items]
-            week_ago_xd = datetime.now(timezone.utc) - timedelta(days=30)
-            xdept_query = (
-                select(ProcessedContent)
-                .where(ProcessedContent.status == "published")
-                .where(ProcessedContent.published_at >= week_ago_xd)
-            )
-            if existing_ids:
-                xdept_query = xdept_query.where(
-                    ProcessedContent.id.not_in(existing_ids)
+        # Cross-department supplement for sparse department sections.
+        if department and len(items) < limit:
+            strict_mode = self._strict_mode_enabled()
+            supplement_slots = limit - len(items)
+            if strict_mode:
+                if self._strict_supplement_enabled():
+                    supplement_slots = min(supplement_slots, self._strict_supplement_max_items())
+                else:
+                    supplement_slots = 0
+            if supplement_slots > 0:
+                existing_ids = [item.id for item in items]
+                week_ago_xd = datetime.now(timezone.utc) - timedelta(days=30)
+                xdept_query = (
+                    select(ProcessedContent)
+                    .where(ProcessedContent.status == "published")
+                    .where(ProcessedContent.published_at >= week_ago_xd)
                 )
-            xdept_query = xdept_query.order_by(
-                _image_priority,
-                ProcessedContent.attractiveness_score.desc(),
-                ProcessedContent.published_at.desc()
-            ).limit(limit - len(items)).offset(offset)
-            xd_result = await self.db.execute(xdept_query)
-            items.extend(xd_result.scalars().all())
-        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
-        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
-        url_map = {}
-        content_map = {}
-        if raw_ids:
-            raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url, RawContent.original_content)
-                .where(RawContent.id.in_(raw_ids))
-            )
-            for row in raw_result.all():
-                url_map[str(row.id)] = row.original_url
-                content_map[str(row.id)] = row.original_content
+                if strict_mode:
+                    xdept_query = (
+                        xdept_query
+                        .where(self._strict_relevance_filter())
+                        .where(ProcessedContent.attractiveness_score >= self._strict_supplement_min_attractiveness())
+                    )
+                if existing_ids:
+                    xdept_query = xdept_query.where(
+                        ProcessedContent.id.not_in(existing_ids)
+                    )
+                candidate_limit = self._supplement_candidate_limit(supplement_slots)
+                xdept_query = xdept_query.order_by(
+                    _image_priority,
+                    ProcessedContent.attractiveness_score.desc(),
+                    ProcessedContent.published_at.desc()
+                ).limit(candidate_limit).offset(offset)
+                xd_result = await self.db.execute(xdept_query)
+                supplement_candidates = xd_result.scalars().all()
+                _, _, candidate_source_map = await self._build_raw_context(supplement_candidates)
+                items.extend(
+                    self._apply_source_diversity_cap(
+                        supplement_candidates,
+                        limit=supplement_slots,
+                        source_map=candidate_source_map,
+                    )
+                )
+        url_map, content_map, source_map = await self._build_raw_context(items)
+        items = self._apply_section_item_controls(items, limit=limit, source_map=source_map)
         
         # Format response
         feed_items = []
@@ -291,38 +477,52 @@ class FeedService:
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        # Cross-department supplement for low-content departments (disabled in strict mode)
-        if department and len(items) < limit and not self._strict_mode_enabled():
-            existing_ids = [item.id for item in items]
-            xdept_query = (
-                select(ProcessedContent)
-                .where(ProcessedContent.status == "published")
-            )
-            if existing_ids:
-                xdept_query = xdept_query.where(
-                    ProcessedContent.id.not_in(existing_ids)
+        # Cross-department supplement for sparse department sections.
+        if department and len(items) < limit:
+            strict_mode = self._strict_mode_enabled()
+            supplement_slots = limit - len(items)
+            if strict_mode:
+                if self._strict_supplement_enabled():
+                    supplement_slots = min(supplement_slots, self._strict_supplement_max_items())
+                else:
+                    supplement_slots = 0
+            if supplement_slots > 0:
+                existing_ids = [item.id for item in items]
+                xdept_query = (
+                    select(ProcessedContent)
+                    .where(ProcessedContent.status == "published")
                 )
-            xdept_query = xdept_query.order_by(
-                _image_priority,
-                ProcessedContent.attractiveness_score.desc(),
-                ProcessedContent.view_count.desc()
-            ).limit(limit - len(items))
-            xd_result = await self.db.execute(xdept_query)
-            items.extend(xd_result.scalars().all())
+                if strict_mode:
+                    recent_window = datetime.now(timezone.utc) - timedelta(days=30)
+                    xdept_query = (
+                        xdept_query
+                        .where(ProcessedContent.published_at >= recent_window)
+                        .where(self._strict_relevance_filter())
+                        .where(ProcessedContent.attractiveness_score >= self._strict_supplement_min_attractiveness())
+                    )
+                if existing_ids:
+                    xdept_query = xdept_query.where(
+                        ProcessedContent.id.not_in(existing_ids)
+                    )
+                candidate_limit = self._supplement_candidate_limit(supplement_slots)
+                xdept_query = xdept_query.order_by(
+                    _image_priority,
+                    ProcessedContent.attractiveness_score.desc(),
+                    ProcessedContent.view_count.desc()
+                ).limit(candidate_limit)
+                xd_result = await self.db.execute(xdept_query)
+                supplement_candidates = xd_result.scalars().all()
+                _, _, candidate_source_map = await self._build_raw_context(supplement_candidates)
+                items.extend(
+                    self._apply_source_diversity_cap(
+                        supplement_candidates,
+                        limit=supplement_slots,
+                        source_map=candidate_source_map,
+                    )
+                )
         
-        # Fetch original URLs and content
-        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
-        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
-        url_map = {}
-        content_map = {}
-        if raw_ids:
-            raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url, RawContent.original_content)
-                .where(RawContent.id.in_(raw_ids))
-            )
-            for row in raw_result.all():
-                url_map[str(row.id)] = row.original_url
-                content_map[str(row.id)] = row.original_content
+        url_map, content_map, source_map = await self._build_raw_context(items)
+        items = self._apply_section_item_controls(items, limit=limit, source_map=source_map)
         
         return [
             {
@@ -365,18 +565,41 @@ class FeedService:
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
-        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
-        url_map = {}
-        content_map = {}
-        if raw_ids:
-            raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url, RawContent.original_content)
-                .where(RawContent.id.in_(raw_ids))
-            )
-            for row in raw_result.all():
-                url_map[str(row.id)] = row.original_url
-                content_map[str(row.id)] = row.original_content
+        if department and len(items) < limit and self._strict_mode_enabled() and self._strict_supplement_enabled():
+            supplement_slots = min(limit - len(items), self._strict_supplement_max_items())
+            if supplement_slots > 0:
+                recent_window = datetime.now(timezone.utc) - timedelta(days=45)
+                existing_ids = [item.id for item in items]
+                supplement_query = (
+                    select(ProcessedContent)
+                    .where(ProcessedContent.status == "published")
+                    .where(ProcessedContent.category.in_(["career", "startup"]))
+                    .where(ProcessedContent.published_at >= recent_window)
+                    .where(self._strict_relevance_filter())
+                    .where(ProcessedContent.attractiveness_score >= self._strict_supplement_min_attractiveness())
+                )
+                if existing_ids:
+                    supplement_query = supplement_query.where(
+                        ProcessedContent.id.not_in(existing_ids)
+                    )
+                candidate_limit = self._supplement_candidate_limit(supplement_slots)
+                supplement_query = supplement_query.order_by(
+                    ProcessedContent.attractiveness_score.desc(),
+                    ProcessedContent.published_at.desc(),
+                ).limit(candidate_limit)
+                supplement_result = await self.db.execute(supplement_query)
+                supplement_candidates = supplement_result.scalars().all()
+                _, _, candidate_source_map = await self._build_raw_context(supplement_candidates)
+                items.extend(
+                    self._apply_source_diversity_cap(
+                        supplement_candidates,
+                        limit=supplement_slots,
+                        source_map=candidate_source_map,
+                    )
+                )
+
+        url_map, content_map, source_map = await self._build_raw_context(items)
+        items = self._apply_section_item_controls(items, limit=limit, source_map=source_map)
 
         return [
             {
@@ -500,40 +723,50 @@ class FeedService:
             fb_result = await self.db.execute(fallback_query)
             items.extend(fb_result.scalars().all())
 
-        # Cross-department supplement: fill remaining with top general content (disabled in strict mode)
-        if department and len(items) < limit and not self._strict_mode_enabled():
-            existing_ids = [item.id for item in items]
-            xdept_query = (
-                select(ProcessedContent)
-                .where(ProcessedContent.status == "published")
-                .where(ProcessedContent.published_at >= recent_window)
-                .where(ProcessedContent.attractiveness_score >= 25)
-            )
-            if existing_ids:
-                xdept_query = xdept_query.where(
-                    ProcessedContent.id.not_in(existing_ids)
+        # Cross-department supplement for sparse department sections.
+        if department and len(items) < limit:
+            strict_mode = self._strict_mode_enabled()
+            supplement_slots = limit - len(items)
+            min_attractiveness = 25
+            if strict_mode:
+                if self._strict_supplement_enabled():
+                    supplement_slots = min(supplement_slots, self._strict_supplement_max_items())
+                    min_attractiveness = max(min_attractiveness, self._strict_supplement_min_attractiveness())
+                else:
+                    supplement_slots = 0
+            if supplement_slots > 0:
+                existing_ids = [item.id for item in items]
+                xdept_query = (
+                    select(ProcessedContent)
+                    .where(ProcessedContent.status == "published")
+                    .where(ProcessedContent.published_at >= recent_window)
+                    .where(ProcessedContent.attractiveness_score >= min_attractiveness)
                 )
-            xdept_query = xdept_query.order_by(
-                _image_priority,
-                ProcessedContent.attractiveness_score.desc(),
-                ProcessedContent.published_at.desc(),
-            ).limit(limit - len(items))
-            xd_result = await self.db.execute(xdept_query)
-            items.extend(xd_result.scalars().all())
+                if strict_mode:
+                    xdept_query = xdept_query.where(self._strict_relevance_filter())
+                if existing_ids:
+                    xdept_query = xdept_query.where(
+                        ProcessedContent.id.not_in(existing_ids)
+                    )
+                candidate_limit = self._supplement_candidate_limit(supplement_slots)
+                xdept_query = xdept_query.order_by(
+                    _image_priority,
+                    ProcessedContent.attractiveness_score.desc(),
+                    ProcessedContent.published_at.desc(),
+                ).limit(candidate_limit)
+                xd_result = await self.db.execute(xdept_query)
+                supplement_candidates = xd_result.scalars().all()
+                _, _, candidate_source_map = await self._build_raw_context(supplement_candidates)
+                items.extend(
+                    self._apply_source_diversity_cap(
+                        supplement_candidates,
+                        limit=supplement_slots,
+                        source_map=candidate_source_map,
+                    )
+                )
 
-        # Fetch original URLs and content
-        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
-        raw_ids = [raw_id for raw_id in raw_ids if raw_id]
-        url_map = {}
-        content_map = {}
-        if raw_ids:
-            raw_result = await self.db.execute(
-                select(RawContent.id, RawContent.original_url, RawContent.original_content)
-                .where(RawContent.id.in_(raw_ids))
-            )
-            for row in raw_result.all():
-                url_map[str(row.id)] = row.original_url
-                content_map[str(row.id)] = row.original_content
+        url_map, content_map, source_map = await self._build_raw_context(items)
+        items = self._apply_section_item_controls(items, limit=limit, source_map=source_map)
 
         return [
             {
@@ -670,6 +903,8 @@ class FeedService:
         result = await self.db.execute(query)
         items = result.scalars().all()
 
+        _, _, source_map = await self._build_raw_context(items)
+        items = self._apply_section_item_controls(items, limit=total, source_map=source_map)
         # Fetch original URLs and metadata
         raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
         raw_ids = [raw_id for raw_id in raw_ids if raw_id]

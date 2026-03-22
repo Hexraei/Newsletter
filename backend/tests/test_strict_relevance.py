@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -37,18 +37,18 @@ def test_strict_gate_blocks_low_geo_and_low_actionability(monkeypatch: pytest.Mo
     raw = _make_raw("General tech chatter", "Random global update without student value.")
     source = Source(name="Generic Blog", source_type="rss", url="https://example.com", platform="rss")
 
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
 
     passed, geo, actionability, knowledge = processor._passes_strict_relevance_gate(raw, source)
 
     assert passed is False
-    assert geo < 45
-    assert actionability < 25
-    assert knowledge < 32
+    assert geo < 30
+    assert actionability < 15
+    assert knowledge < 20
 
 
 def test_strict_gate_allows_global_actionability_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -59,17 +59,17 @@ def test_strict_gate_allows_global_actionability_override(monkeypatch: pytest.Mo
     )
     source = Source(name="Generic Blog", source_type="rss", url="https://example.com", platform="rss")
 
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
 
     passed, geo, actionability, _knowledge = processor._passes_strict_relevance_gate(raw, source)
 
     assert passed is True
-    assert geo < 45
-    assert actionability >= 65
+    assert geo < 30
+    assert actionability >= 58
 
 
 def test_strict_gate_allows_knowledge_signal_path(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -80,17 +80,17 @@ def test_strict_gate_allows_knowledge_signal_path(monkeypatch: pytest.MonkeyPatc
     )
     source = Source(name="IEEE Spectrum", source_type="academic", url="https://example.com", platform="rss")
 
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
 
     passed, _geo, actionability, knowledge = processor._passes_strict_relevance_gate(raw, source)
 
     assert passed is True
-    assert actionability < 25
-    assert knowledge >= 32
+    assert actionability < 15
+    assert knowledge >= 20
 
 
 def test_noise_filter_rejects_self_promo_pattern() -> None:
@@ -116,11 +116,11 @@ def test_strict_prefilter_matches_gate_outcome(monkeypatch: pytest.MonkeyPatch) 
     processor = _make_processor()
     raw = _make_raw("Global roundup", "Generic update without India student actionability.")
     source = Source(name="Generic Source", source_type="rss", url="https://example.com", platform="rss")
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
 
     gate = processor._passes_strict_relevance_gate(raw, source)
     prefilter = processor._strict_prefilter_decision(raw, source)
@@ -128,7 +128,15 @@ def test_strict_prefilter_matches_gate_outcome(monkeypatch: pytest.MonkeyPatch) 
     assert prefilter == gate
 
 
-def _make_processed(title: str, department: str, *, geo: int, actionability: int, score: int = 80) -> ProcessedContent:
+def _make_processed(
+    title: str,
+    department: str,
+    *,
+    geo: int,
+    actionability: int,
+    knowledge: int = 0,
+    score: int = 80,
+) -> ProcessedContent:
     return ProcessedContent(
         title=title,
         summary="summary",
@@ -142,8 +150,22 @@ def _make_processed(title: str, department: str, *, geo: int, actionability: int
         visualizations={
             "geo_relevance_score": geo,
             "student_actionability_score": actionability,
-            "knowledge_relevance_score": 0,
+            "knowledge_relevance_score": knowledge,
         },
+    )
+
+
+def _make_source(name: str, source_type: str, url: str) -> Source:
+    return Source(name=name, source_type=source_type, url=url, platform="rss")
+
+
+def _make_raw_for_source(source_id: int, url: str, title: str) -> RawContent:
+    return RawContent(
+        source_id=source_id,
+        original_url=url,
+        original_title=title,
+        original_content="raw body",
+        content_hash=uuid4().hex,
     )
 
 
@@ -157,11 +179,11 @@ async def test_trending_strict_filter_excludes_non_relevant(db_session, monkeypa
 
     monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
     monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
 
     service = FeedService(db_session)
     items = await service.get_trending_content(limit=10, department=dept)
@@ -172,7 +194,128 @@ async def test_trending_strict_filter_excludes_non_relevant(db_session, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_trending_strict_mode_disables_cross_department_supplement(
+async def test_trending_strict_mode_dedupes_near_repeat_titles_with_ranking_preference(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dept = f"TEST-{uuid4().hex[:8]}"
+    keep_item = _make_processed("Mega Internship Drive 2026", dept, geo=88, actionability=55, score=79)
+    drop_repeat = _make_processed("mega internship-drive 2026!!!", dept, geo=92, actionability=60, score=70)
+    other_item = _make_processed("Distinct scholarship update", dept, geo=90, actionability=55, score=68)
+    db_session.add_all([keep_item, drop_repeat, other_item])
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_SOURCE_DIVERSITY_CAP", 2, raising=False)
+
+    service = FeedService(db_session)
+    items = await service.get_trending_content(limit=5, department=dept)
+    titles = [item["title"] for item in items]
+
+    assert "Mega Internship Drive 2026" in titles
+    assert "mega internship-drive 2026!!!" not in titles
+    assert "Distinct scholarship update" in titles
+
+
+@pytest.mark.asyncio
+async def test_trending_strict_mode_supplements_sparse_department_with_relevant_items(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    primary_dept = f"TEST-{uuid4().hex[:8]}"
+    other_dept = f"TEST-{uuid4().hex[:8]}"
+    only_primary = _make_processed("Only primary", primary_dept, geo=80, actionability=45, score=88)
+    other_item = _make_processed("Other dept item", other_dept, geo=90, actionability=50, score=96)
+    non_relevant_other = _make_processed("Other non relevant", other_dept, geo=5, actionability=5, score=99)
+    db_session.add_all([only_primary, other_item, non_relevant_other])
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MAX_ITEMS", 1, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MIN_ATTRACTIVENESS", 80, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
+
+    service = FeedService(db_session)
+    items = await service.get_trending_content(limit=3, department=primary_dept)
+    titles = {item["title"] for item in items}
+
+    assert len(items) == 2
+    assert "Only primary" in titles
+    assert "Other dept item" in titles
+    assert "Other non relevant" not in titles
+
+
+@pytest.mark.asyncio
+async def test_trending_strict_mode_supplement_applies_source_diversity_cap_when_feasible(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    primary_dept = f"TEST-{uuid4().hex[:8]}"
+    other_dept = f"TEST-{uuid4().hex[:8]}"
+
+    source_a = _make_source("Source A", "rss", "https://a.example.com/feed")
+    source_b = _make_source("Source B", "rss", "https://b.example.com/feed")
+    source_c = _make_source("Source C", "reddit", "https://reddit.com/r/test")
+    db_session.add_all([source_a, source_b, source_c])
+    await db_session.flush()
+
+    raw_a_1 = _make_raw_for_source(source_a.id, "https://a.example.com/story-1", "A1")
+    raw_a_2 = _make_raw_for_source(source_a.id, "https://a.example.com/story-2", "A2")
+    raw_b_1 = _make_raw_for_source(source_b.id, "https://b.example.com/story-1", "B1")
+    raw_c_1 = _make_raw_for_source(source_c.id, "https://c.example.com/story-1", "C1")
+    db_session.add_all([raw_a_1, raw_a_2, raw_b_1, raw_c_1])
+    await db_session.flush()
+
+    primary_item = _make_processed("Primary dept anchor", primary_dept, geo=25, actionability=40, knowledge=5, score=60)
+    supp_a_1 = _make_processed("A supplement 1", other_dept, geo=25, actionability=40, knowledge=5, score=79)
+    supp_a_1.raw_content_id = raw_a_1.id
+    supp_a_2 = _make_processed("A supplement 2", other_dept, geo=25, actionability=40, knowledge=5, score=78)
+    supp_a_2.raw_content_id = raw_a_2.id
+    supp_b_1 = _make_processed("B supplement", other_dept, geo=25, actionability=40, knowledge=5, score=77)
+    supp_b_1.raw_content_id = raw_b_1.id
+    supp_c_1 = _make_processed("C supplement", other_dept, geo=25, actionability=40, knowledge=5, score=76)
+    supp_c_1.raw_content_id = raw_c_1.id
+    db_session.add_all([primary_item, supp_a_1, supp_a_2, supp_b_1, supp_c_1])
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MAX_ITEMS", 3, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MIN_ATTRACTIVENESS", 70, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_SOURCE_DIVERSITY_CAP", 1, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 99, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 5, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 999, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 999, raising=False)
+
+    service = FeedService(db_session)
+    items = await service.get_trending_content(limit=4, department=primary_dept)
+    titles = {item["title"] for item in items}
+
+    assert len(items) == 4
+    assert "Primary dept anchor" in titles
+    assert "A supplement 1" in titles
+    assert "A supplement 2" not in titles
+    assert "B supplement" in titles
+    assert "C supplement" in titles
+
+
+@pytest.mark.asyncio
+async def test_trending_strict_mode_can_disable_supplement_with_config(
     db_session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -185,11 +328,12 @@ async def test_trending_strict_mode_disables_cross_department_supplement(
 
     monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
     monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
-    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", False, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 30, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 15, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 20, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 58, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 65, raising=False)
 
     service = FeedService(db_session)
     items = await service.get_trending_content(limit=3, department=primary_dept)
@@ -238,6 +382,7 @@ async def test_get_career_content_respects_department_filter(db_session, monkeyp
 
     monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
     monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", False, raising=False)
 
     service = FeedService(db_session)
     ece_items = await service.get_career_content(limit=10, department="ECE")
@@ -245,3 +390,95 @@ async def test_get_career_content_respects_department_filter(db_session, monkeyp
 
     assert "ECE role" in titles
     assert "ME role" not in titles
+
+
+@pytest.mark.asyncio
+async def test_get_career_content_strict_supplement_applies_floor_and_cap(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    primary_dept = f"TEST-{uuid4().hex[:8]}"
+    other_dept = f"TEST-{uuid4().hex[:8]}"
+    primary_item = _make_processed("Primary ECE role", primary_dept, geo=85, actionability=60, score=92)
+    primary_item.category = "career"
+    supplement_good = _make_processed("Other high quality role", other_dept, geo=90, actionability=70, score=980)
+    supplement_good.category = "career"
+    supplement_low = _make_processed("Other low quality role", other_dept, geo=90, actionability=70, score=40)
+    supplement_low.category = "career"
+    db_session.add_all([primary_item, supplement_good, supplement_low])
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MAX_ITEMS", 1, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MIN_ATTRACTIVENESS", 900, raising=False)
+
+    service = FeedService(db_session)
+    items = await service.get_career_content(limit=3, department=primary_dept)
+    titles = {item["title"] for item in items}
+
+    assert len(items) == 2
+    assert "Primary ECE role" in titles
+    assert "Other high quality role" in titles
+    assert "Other low quality role" not in titles
+
+
+@pytest.mark.asyncio
+async def test_personalized_feed_strict_supplement_respects_recency(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    primary_dept = f"TEST-{uuid4().hex[:8]}"
+    other_dept = f"TEST-{uuid4().hex[:8]}"
+
+    primary_item = _make_processed("Primary feed item", primary_dept, geo=80, actionability=55, score=86)
+    supplement_fresh = _make_processed("Fresh supplement", other_dept, geo=88, actionability=60, score=980)
+    supplement_stale = _make_processed("Stale supplement", other_dept, geo=90, actionability=65, score=970)
+    supplement_stale.published_at = datetime.now(timezone.utc) - timedelta(days=45)
+    db_session.add_all([primary_item, supplement_fresh, supplement_stale])
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MAX_ITEMS", 2, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MIN_ATTRACTIVENESS", 900, raising=False)
+
+    service = FeedService(db_session)
+    response = await service.get_personalized_feed(department=primary_dept, limit=3)
+    titles = {item["title"] for item in response["items"]}
+
+    assert "Primary feed item" in titles
+    assert "Fresh supplement" in titles
+    assert "Stale supplement" not in titles
+
+
+@pytest.mark.asyncio
+async def test_breaking_news_strict_supplement_fills_missing_slots(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    primary_dept = f"TEST-{uuid4().hex[:8]}"
+    other_dept = f"TEST-{uuid4().hex[:8]}"
+
+    primary_item = _make_processed("Primary breaking baseline", primary_dept, geo=86, actionability=52, score=45)
+    supplement_item = _make_processed("Cross dept supplement breaking", other_dept, geo=92, actionability=70, score=980)
+    non_relevant_high = _make_processed("Cross dept non relevant", other_dept, geo=5, actionability=5, score=999)
+    db_session.add_all([primary_item, supplement_item, non_relevant_high])
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_ENABLED", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MAX_ITEMS", 1, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_SUPPLEMENT_MIN_ATTRACTIVENESS", 900, raising=False)
+
+    service = FeedService(db_session)
+    items = await service.get_breaking_news(limit=3, department=primary_dept)
+    titles = {item["title"] for item in items}
+
+    assert len(items) == 2
+    assert "Primary breaking baseline" in titles
+    assert "Cross dept supplement breaking" in titles
+    assert "Cross dept non relevant" not in titles
