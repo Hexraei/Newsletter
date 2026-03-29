@@ -14,7 +14,7 @@ redis==5.0.1
 
 # Authentication
 python-jose[cryptography]==3.5.0
-bcrypt==4.1.0
+bcrypt==4.0.1
 
 # Pydantic & Validation
 pydantic==2.5.3
@@ -41,6 +41,7 @@ slowapi==0.1.9
 python-dateutil==2.8.2
 httpx==0.26.0
 tenacity==8.2.3
+fake-useragent==1.5.1
 
 # Testing
 pytest==7.4.4

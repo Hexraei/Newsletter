@@ -126,6 +126,12 @@ Security/cookies:
 
 ---
 
+## Known Render startup gotchas (already patched)
+
+- Python must be `3.11.0` (avoid 3.14 for this dependency set).
+- `fake-useragent` is required by scraper imports and must be present in backend deps.
+- `bcrypt` is pinned to `4.0.1` for compatibility with current auth stack on Render.
+
 ## Production guardrails
 
 - Keep `ENVIRONMENT=production`, `DEBUG=false`.
