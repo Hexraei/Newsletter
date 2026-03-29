@@ -227,6 +227,15 @@ python scrapers/run_general.py --mode india_strict --process-limit 1500
 python scrapers/refresh_cache.py
 ```
 
+### Production deployment (Render + Neon)
+
+Use `docs/DEPLOY_RENDER_NEON_HANDOFF.md` for a step-by-step cloud rollout split into:
+
+- local/repo prep already handled
+- your console actions in Neon and Render
+- migration/bootstrap commands
+- post-deploy verification checklist
+
 ### AI Provider Configuration
 
 | Provider | Setup |

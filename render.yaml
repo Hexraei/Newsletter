@@ -5,6 +5,8 @@ services:
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: ENVIRONMENT
+        value: "production"
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
@@ -13,9 +15,17 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: "lax"
       - key: GROQ_API_KEY
+        sync: false
+      - key: UNSPLASH_ACCESS_KEY
         sync: false
       - key: DEBUG
         value: "false"
+      - key: LOG_FORMAT
+        value: "json"
       - key: PYTHON_VERSION
         value: "3.11.0"
