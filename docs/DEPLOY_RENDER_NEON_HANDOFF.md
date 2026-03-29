@@ -53,7 +53,9 @@ postgresql+asyncpg://USER:PASSWORD@HOST/DB?sslmode=require
 
 1. Render -> New -> Blueprint -> select this repo.
 2. Confirm service from `render.yaml` (`newsday-backend`).
-3. Set environment variables in Render:
+3. In Render service settings, set **Python Version = 3.11.0** explicitly.
+   - This avoids Python 3.14 builds, which can fail on `pydantic-core` metadata/wheel resolution.
+4. Set environment variables in Render:
    - Required:
      - `DATABASE_URL` = **Neon pooled URL**
      - `SECRET_KEY` (strong random)
@@ -64,7 +66,7 @@ postgresql+asyncpg://USER:PASSWORD@HOST/DB?sslmode=require
      - `GROQ_API_KEY` (or your preferred AI provider key)
    - Optional:
      - `COOKIE_DOMAIN` if using custom apex/subdomain cookie sharing
-4. Deploy service.
+5. Deploy service.
 
 ## 3) Run migrations (one-time)
 
