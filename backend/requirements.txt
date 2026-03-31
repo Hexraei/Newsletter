@@ -41,6 +41,7 @@ slowapi==0.1.9
 python-dateutil==2.8.2
 httpx==0.26.0
 tenacity==8.2.3
+python-json-logger==2.0.7
 fake-useragent==1.5.1
 feedparser==6.0.11
 beautifulsoup4==4.12.3

@@ -30,15 +30,25 @@ from app.models import get_db, init_db
 def configure_logging():
     """Configure structured logging based on environment."""
     log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    missing_json_logger = False
 
     if settings.LOG_FORMAT == "json":
-        from pythonjsonlogger import jsonlogger
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = jsonlogger.JsonFormatter(
-            fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
-            rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
-        )
-        handler.setFormatter(formatter)
+        try:
+            from pythonjsonlogger import jsonlogger
+        except ModuleNotFoundError:
+            missing_json_logger = True
+            handler = logging.StreamHandler(sys.stdout)
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            handler.setFormatter(formatter)
+        else:
+            handler = logging.StreamHandler(sys.stdout)
+            formatter = jsonlogger.JsonFormatter(
+                fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
+                rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
+            )
+            handler.setFormatter(formatter)
     else:
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
@@ -55,6 +65,11 @@ def configure_logging():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+    if missing_json_logger:
+        logging.getLogger(__name__).warning(
+            "python-json-logger is not installed; falling back to plain-text logs"
+        )
 
 
 configure_logging()
