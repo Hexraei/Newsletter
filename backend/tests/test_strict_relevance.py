@@ -6,9 +6,11 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import text
 
 from app.config import settings
 from app.models import ProcessedContent, RawContent, Source
+from app.services.cache_service import get_cache
 from app.services.content_processor import ContentProcessor
 from app.services.feed_service import FeedService
 import app.services.feed_service as feed_service_module
@@ -482,3 +484,97 @@ async def test_breaking_news_strict_supplement_fills_missing_slots(
     assert "Primary breaking baseline" in titles
     assert "Cross dept supplement breaking" in titles
     assert "Cross dept non relevant" not in titles
+
+
+@pytest.mark.asyncio
+async def test_trending_falls_back_when_no_strict_relevance_data_exists(
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dept = f"TEST-{uuid4().hex[:8]}"
+    legacy_item = _make_processed("Legacy production item", dept, geo=0, actionability=0, knowledge=0, score=91)
+    db_session.add(legacy_item)
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+
+    service = FeedService(db_session)
+    items = await service.get_trending_content(limit=5, department=dept)
+    titles = {item["title"] for item in items}
+
+    assert await service._use_strict_relevance() is False
+    assert "Legacy production item" in titles
+
+
+@pytest.mark.asyncio
+async def test_all_sections_ignores_stale_empty_cached_feed(
+    async_client,
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dept = f"TEST-{uuid4().hex[:8]}"
+    fallback_item = _make_processed("Cached fallback item", dept, geo=0, actionability=0, knowledge=0, score=93)
+    db_session.add(fallback_item)
+    await db_session.commit()
+
+    monkeypatch.setattr(feed_service_module, "_IS_SQLITE", db_session.bind.dialect.name == "sqlite")
+    monkeypatch.setattr(settings, "RELEVANCE_STRICT_MODE", True, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_ACTIONABILITY_SCORE", 25, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_MIN_KNOWLEDGE_SCORE", 32, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_ACTIONABILITY_OVERRIDE", 65, raising=False)
+    monkeypatch.setattr(settings, "RELEVANCE_GLOBAL_KNOWLEDGE_OVERRIDE", 72, raising=False)
+
+    empty_payload = (
+        '{"breaking":[],"department":[],"trending":[],"career":[],'
+        '"research_papers":{"featured":[],"papers":[]}}'
+    )
+    if db_session.bind.dialect.name == "sqlite":
+        await db_session.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS cached_feeds (
+                    department TEXT PRIMARY KEY,
+                    data TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        await db_session.execute(
+            text(
+                """
+                INSERT INTO cached_feeds (department, data, updated_at)
+                VALUES (:department, :data, CURRENT_TIMESTAMP)
+                ON CONFLICT(department) DO UPDATE
+                SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                """
+            ),
+            {"department": dept, "data": empty_payload},
+        )
+    else:
+        await db_session.execute(
+            text(
+                """
+                INSERT INTO cached_feeds (department, data, updated_at)
+                VALUES (:department, CAST(:data AS JSONB), NOW())
+                ON CONFLICT (department) DO UPDATE
+                SET data = EXCLUDED.data, updated_at = NOW()
+                """
+            ),
+            {"department": dept, "data": empty_payload},
+        )
+    await db_session.commit()
+    await get_cache().clear()
+
+    response = await async_client.get(f"/api/v1/feed/all-sections?department={dept}")
+    assert response.status_code == 200
+    data = response.json()["data"]
+
+    assert any(item["title"] == "Cached fallback item" for item in data["department"])

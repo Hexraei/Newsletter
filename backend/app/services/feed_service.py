@@ -42,6 +42,7 @@ class FeedService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._strict_relevance_available: Optional[bool] = None
 
     def _strict_mode_enabled(self) -> bool:
         return bool(getattr(settings, "RELEVANCE_STRICT_MODE", True))
@@ -94,6 +95,31 @@ class FeedService:
             | (action_expr >= global_override)
             | (knowledge_expr >= global_knowledge_override)
         )
+
+    async def _use_strict_relevance(self) -> bool:
+        """Only enforce strict relevance when the dataset actually supports it.
+
+        Older production rows may not have the relevance diagnostics populated yet.
+        When that happens, applying the strict gate to every query would zero out
+        the homepage despite having plenty of published content.
+        """
+        if not self._strict_mode_enabled():
+            return False
+
+        if self._strict_relevance_available is not None:
+            return self._strict_relevance_available
+
+        try:
+            result = await self.db.execute(
+                select(func.count(ProcessedContent.id))
+                .where(ProcessedContent.status == "published")
+                .where(self._strict_relevance_filter())
+            )
+            self._strict_relevance_available = bool(result.scalar() or 0)
+        except Exception:
+            self._strict_relevance_available = False
+
+        return self._strict_relevance_available
 
     def _normalize_raw_id(self, raw_id: Optional[str]) -> Optional[str]:
         if not raw_id:
@@ -272,12 +298,13 @@ class FeedService:
         offset: int = 0
     ) -> Dict:
         """Generate a personalized content feed."""
+        strict_mode = await self._use_strict_relevance()
         
         # Base query - published content only
         query = select(ProcessedContent).where(
             ProcessedContent.status == "published"
         )
-        if self._strict_mode_enabled():
+        if strict_mode:
             query = query.where(self._strict_relevance_filter())
         
         # Filter by recency — try 30 days first, fall back to all content if empty
@@ -353,7 +380,6 @@ class FeedService:
 
         # Cross-department supplement for sparse department sections.
         if department and len(items) < limit:
-            strict_mode = self._strict_mode_enabled()
             supplement_slots = limit - len(items)
             if strict_mode:
                 if self._strict_supplement_enabled():
@@ -431,6 +457,7 @@ class FeedService:
     
     async def get_trending_content(self, limit: int = 10, department: str = None) -> List[dict]:
         """Get trending content based on engagement scores."""
+        strict_mode = await self._use_strict_relevance()
         text_col = func.lower(func.coalesce(ProcessedContent.title, '') + ' ' + func.coalesce(ProcessedContent.summary, ''))
         career_priority = case(
             (
@@ -462,7 +489,7 @@ class FeedService:
             select(ProcessedContent)
             .where(ProcessedContent.status == "published")
         )
-        if self._strict_mode_enabled():
+        if strict_mode:
             query = query.where(self._strict_relevance_filter())
         
         if department:
@@ -479,7 +506,6 @@ class FeedService:
 
         # Cross-department supplement for sparse department sections.
         if department and len(items) < limit:
-            strict_mode = self._strict_mode_enabled()
             supplement_slots = limit - len(items)
             if strict_mode:
                 if self._strict_supplement_enabled():
@@ -547,6 +573,7 @@ class FeedService:
     
     async def get_career_content(self, limit: int = 3, department: str = None) -> List[dict]:
         """Get career/startup content, optionally filtered to a department."""
+        strict_mode = await self._use_strict_relevance()
 
         query = (
             select(ProcessedContent)
@@ -558,14 +585,14 @@ class FeedService:
             )
             .limit(limit)
         )
-        if self._strict_mode_enabled():
+        if strict_mode:
             query = query.where(self._strict_relevance_filter())
         if department:
             query = query.where(_dept_filter(department))
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        if department and len(items) < limit and self._strict_mode_enabled() and self._strict_supplement_enabled():
+        if department and len(items) < limit and strict_mode and self._strict_supplement_enabled():
             supplement_slots = min(limit - len(items), self._strict_supplement_max_items())
             if supplement_slots > 0:
                 recent_window = datetime.now(timezone.utc) - timedelta(days=45)
@@ -631,6 +658,7 @@ class FeedService:
         - is_breaking bonus: +10
         - urgent term bonus: +6 if title/summary contains breaking/outage/security/etc.
         """
+        strict_mode = await self._use_strict_relevance()
 
         now = datetime.now(timezone.utc)
         recent_window = now - timedelta(days=30)  # extended window; recency_boost rewards truly new content
@@ -683,7 +711,7 @@ class FeedService:
             .where(ProcessedContent.status == "published")
             .where(ProcessedContent.published_at >= recent_window)
         )
-        if self._strict_mode_enabled():
+        if strict_mode:
             query = query.where(self._strict_relevance_filter())
         if department:
             query = query.where(_dept_filter(department))
@@ -707,7 +735,7 @@ class FeedService:
                 .where(ProcessedContent.published_at >= fallback_window)
                 .where(ProcessedContent.attractiveness_score >= 25)
             )
-            if self._strict_mode_enabled():
+            if strict_mode:
                 fallback_query = fallback_query.where(self._strict_relevance_filter())
             if department:
                 fallback_query = fallback_query.where(_dept_filter(department))
@@ -725,7 +753,6 @@ class FeedService:
 
         # Cross-department supplement for sparse department sections.
         if department and len(items) < limit:
-            strict_mode = self._strict_mode_enabled()
             supplement_slots = limit - len(items)
             min_attractiveness = 25
             if strict_mode:
@@ -819,6 +846,7 @@ class FeedService:
     
     async def get_daily_digest(self, limit: int = 5, department: str = None) -> Dict:
         """Generate a daily digest of top content."""
+        strict_mode = await self._use_strict_relevance()
         
         today = datetime.now(timezone.utc).date()
         today_start = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
@@ -830,7 +858,7 @@ class FeedService:
             .where(ProcessedContent.published_at >= today_start)
             .where(ProcessedContent.attractiveness_score >= 50)
         )
-        if self._strict_mode_enabled():
+        if strict_mode:
             query = query.where(self._strict_relevance_filter())
         if department:
             query = query.where(_dept_filter(department))
@@ -849,7 +877,7 @@ class FeedService:
                 .where(ProcessedContent.status == "published")
                 .where(ProcessedContent.id.notin_(existing_ids) if existing_ids else True)
                 .where(ProcessedContent.attractiveness_score >= 60)
-                .where(self._strict_relevance_filter() if self._strict_mode_enabled() else True)
+                .where(self._strict_relevance_filter() if strict_mode else True)
                 .where(_dept_filter(department) if department else True)
                 .order_by(ProcessedContent.published_at.desc())
                 .limit(remaining)
@@ -880,6 +908,7 @@ class FeedService:
         self, department: str = None, featured_limit: int = 3, general_limit: int = 10
     ) -> Dict:
         """Get research papers split into featured (top) and general (rest)."""
+        strict_mode = await self._use_strict_relevance()
         total = featured_limit + general_limit
 
         query = (
@@ -889,7 +918,7 @@ class FeedService:
                 ProcessedContent.content_type == "research_paper",
             )
         )
-        if self._strict_mode_enabled():
+        if strict_mode:
             query = query.where(self._strict_relevance_filter())
 
         if department:
@@ -961,6 +990,7 @@ class FeedService:
     
     async def get_feed_stats(self) -> Dict:
         """Get feed statistics."""
+        strict_mode = await self._use_strict_relevance()
         
         # Total published content
         result = await self.db.execute(
@@ -1028,6 +1058,7 @@ class FeedService:
             "by_category": by_category,
             "average_attractiveness_score": round(avg_score, 2),
             "strict_relevance_enabled": self._strict_mode_enabled(),
+            "strict_relevance_effective": strict_mode,
             "strict_relevant_count": strict_relevant,
             "india_signal_share": round((india_count / total_published) * 100, 2) if total_published else 0.0,
             "tamil_signal_share": round((tamil_count / total_published) * 100, 2) if total_published else 0.0,

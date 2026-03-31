@@ -33,6 +33,19 @@ def _normalize_raw_id(raw_id: str | None) -> str | None:
     return raw
 
 
+def _cached_sections_have_content(payload: dict) -> bool:
+    """Treat fully empty cached sections as stale and recompute live data."""
+    if not isinstance(payload, dict):
+        return False
+
+    list_sections = ("breaking", "department", "trending", "career")
+    if any(payload.get(section) for section in list_sections):
+        return True
+
+    research = payload.get("research_papers") or {}
+    return bool(research.get("featured") or research.get("papers"))
+
+
 # ---------------------------------------------------------------------------
 # Cached data-fetching helpers (in-memory TTL cache sits in front of DB/service)
 # ---------------------------------------------------------------------------
@@ -75,7 +88,8 @@ async def _fetch_all_sections(
             cached_data = row[0]
             if isinstance(cached_data, str):
                 cached_data = json.loads(cached_data)
-            return {"success": True, "data": cached_data}
+            if _cached_sections_have_content(cached_data):
+                return {"success": True, "data": cached_data}
     except Exception:
         pass  # cached_feeds table may not exist (e.g. SQLite local dev)
 
