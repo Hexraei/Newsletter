@@ -75,6 +75,7 @@ else:
         max_overflow=10,
         pool_timeout=10,
         pool_recycle=1800,
+        pool_pre_ping=True,
         echo=settings.DEBUG,
         connect_args=_connect_args,
     )
