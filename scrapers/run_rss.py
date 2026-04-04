@@ -135,6 +135,9 @@ async def main(only_india: bool = False):
                     status="pending",
                 )
                 db.add(raw)
+                # Force one-row insert execution to avoid asyncpg insertmanyvalues
+                # sentinel mismatches on UUID-returning rows in batch flush.
+                await db.flush()
                 stored += 1
 
             await db.commit()
@@ -256,6 +259,9 @@ async def run_department_knowledge_stage():
                     status="pending",
                 )
                 db.add(raw)
+                # Force one-row insert execution to avoid asyncpg insertmanyvalues
+                # sentinel mismatches on UUID-returning rows in batch flush.
+                await db.flush()
                 stored += 1
 
             await db.commit()
