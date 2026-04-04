@@ -376,16 +376,17 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
     c = conn.cursor()
     ph = _placeholder()
     join = _join_clause()
+    unsplash_like = "%%unsplash%%" if _IS_POSTGRES else "%unsplash%"
 
-    c.execute("""
+    c.execute(f"""
         SELECT COUNT(*)
         FROM processed_content
         WHERE status = 'published'
           AND (
             featured_image_url IS NULL
-            OR LOWER(COALESCE(featured_image_url, '')) NOT LIKE '%unsplash%'
+            OR LOWER(COALESCE(featured_image_url, '')) NOT LIKE {ph}
           )
-    """)
+    """, (unsplash_like,))
     total_candidates = c.fetchone()[0]
     db_label = "PostgreSQL" if _IS_POSTGRES else "SQLite"
     print(f"Database: {db_label}")
@@ -399,12 +400,12 @@ async def backfill_images(limit: int = 200, batch_size: int = 50):
         JOIN raw_content r ON {join}
         WHERE (
             p.featured_image_url IS NULL
-            OR LOWER(COALESCE(p.featured_image_url, '')) NOT LIKE '%unsplash%'
+            OR LOWER(COALESCE(p.featured_image_url, '')) NOT LIKE {ph}
         )
           AND p.status = 'published'
         ORDER BY p.attractiveness_score DESC
         LIMIT {ph}
-    """, (limit,))
+    """, (unsplash_like, limit))
     rows = c.fetchall()
 
     if not rows:

@@ -326,6 +326,9 @@ async def store_papers(papers: list, dept_key: str) -> tuple[int, int]:
                 },
             )
             db.add(raw)
+            # Flush each insert to avoid asyncpg insertmanyvalues sentinel mismatches
+            # on large batched inserts with UUID-returning rows.
+            await db.flush()
             stored += 1
 
         try:
