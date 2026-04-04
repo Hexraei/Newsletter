@@ -10,6 +10,7 @@ on:
 jobs:
   migrate:
     name: Alembic Upgrade Head
+    environment: "NEWSLETTER SECRETS"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,13 +28,17 @@ jobs:
       - name: Run Alembic migrations
         if: github.event.inputs.confirm == 'run'
         working-directory: backend
-        run: alembic upgrade head
+        run: |
+          export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+asyncpg://}"
+          alembic upgrade head
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL || secrets.DATABASE_URL }}
 
       - name: Verify migrations
         if: github.event.inputs.confirm == 'run'
         working-directory: backend
-        run: alembic current
+        run: |
+          export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+asyncpg://}"
+          alembic current
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL || secrets.DATABASE_URL }}
