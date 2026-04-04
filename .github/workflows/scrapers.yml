@@ -11,6 +11,7 @@ env:
 jobs:
   migrate:
     name: Apply DB Migrations
+    environment: "NEWSLETTER SECRETS"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,7 +28,9 @@ jobs:
 
       - name: Run Alembic migrations
         working-directory: backend
-        run: alembic upgrade head
+        run: |
+          export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+asyncpg://}"
+          alembic upgrade head
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -38,6 +41,7 @@ jobs:
 
   scrape-rss:
     name: RSS Feeds
+    environment: "NEWSLETTER SECRETS"
     needs: migrate
     if: github.event.schedule == '30 18 * * 0,3' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -76,6 +80,7 @@ jobs:
 
   scrape-general:
     name: General Scrapers
+    environment: "NEWSLETTER SECRETS"
     needs: migrate
     if: github.event.schedule == '30 18 * * 0,3' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -114,6 +119,7 @@ jobs:
 
   scrape-research:
     name: Research Papers
+    environment: "NEWSLETTER SECRETS"
     needs: migrate
     if: github.event.schedule == '30 18 * * 0,3' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -151,6 +157,7 @@ jobs:
 
   backfill-images:
     name: Backfill Article Images
+    environment: "NEWSLETTER SECRETS"
     needs: [scrape-rss, scrape-general]
     if: always() && (needs.scrape-rss.result == 'success' || needs.scrape-general.result == 'success')
     runs-on: ubuntu-latest
