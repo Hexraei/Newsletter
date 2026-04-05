@@ -59,8 +59,8 @@ async def list_providers():
 )
 @limiter.limit("10/minute")
 async def summarize_content(
-    req: Request,
-    request: SummarizeRequest,
+    request: Request,
+    payload: SummarizeRequest,
     current_user=Depends(get_optional_current_user)
 ):
     """Summarize content using AI.
@@ -71,7 +71,7 @@ async def summarize_content(
     try:
         provider = AIProvider()
         
-        result = await provider.summarize(request.title, request.content, request.category)
+        result = await provider.summarize(payload.title, payload.content, payload.category)
         provider_name = provider.get_provider_name()
         await provider.close()
         
@@ -104,8 +104,8 @@ async def summarize_content(
 )
 @limiter.limit("10/minute")
 async def generate_headline(
-    req: Request,
-    request: HeadlineRequest,
+    request: Request,
+    payload: HeadlineRequest,
     current_user=Depends(get_optional_current_user)
 ):
     """Generate a catchy headline using AI.
@@ -115,13 +115,13 @@ async def generate_headline(
     try:
         provider = AIProvider()
         
-        headline = await provider.headline(request.title, request.content)
+        headline = await provider.headline(payload.title, payload.content)
         provider_name = provider.get_provider_name()
         await provider.close()
         
         return SingleResponse(data={
             "headline": headline,
-            "original": request.title,
+            "original": payload.title,
             "provider": provider_name
         })
         
@@ -148,8 +148,8 @@ async def generate_headline(
 )
 @limiter.limit("10/minute")
 async def generate_embedding(
-    req: Request,
-    request: EmbedRequest,
+    request: Request,
+    payload: EmbedRequest,
     current_user=Depends(get_optional_current_user)
 ):
     """Generate a vector embedding for text.
@@ -160,7 +160,7 @@ async def generate_embedding(
     try:
         provider = AIProvider()
         
-        embedding = await provider.embed(request.text)
+        embedding = await provider.embed(payload.text)
         provider_name = provider.get_provider_name()
         await provider.close()
         
