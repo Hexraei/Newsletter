@@ -27,6 +27,31 @@ def _dept_filter(department: str):
     return ProcessedContent.department_tags.contains([department])
 
 
+def _normalize_raw_id(raw_id: Optional[str]) -> Optional[str]:
+    if not raw_id:
+        return None
+    raw = str(raw_id).strip().lower()
+    if _IS_SQLITE:
+        return raw.replace("-", "")
+    return raw
+
+
+def _normalize_title_key(title: Optional[str]) -> Optional[str]:
+    if not title:
+        return None
+    normalized = re.sub(r"[^a-z0-9]+", "", title.lower())
+    return normalized or None
+
+
+def _extract_host(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    host = (urlparse(url).netloc or "").lower().strip()
+    if host.startswith("www."):
+        host = host[4:]
+    return host or None
+
+
 _image_priority = case(
     (
         (ProcessedContent.featured_image_url != None) &
@@ -121,20 +146,6 @@ class FeedService:
 
         return self._strict_relevance_available
 
-    def _normalize_raw_id(self, raw_id: Optional[str]) -> Optional[str]:
-        if not raw_id:
-            return None
-        raw = str(raw_id).strip().lower()
-        if _IS_SQLITE:
-            return raw.replace("-", "")
-        return raw
-
-    def _normalize_title_key(self, title: Optional[str]) -> Optional[str]:
-        if not title:
-            return None
-        normalized = re.sub(r"[^a-z0-9]+", "", title.lower())
-        return normalized or None
-
     def _source_diversity_cap(self) -> int:
         return max(0, int(getattr(settings, "RELEVANCE_SOURCE_DIVERSITY_CAP", 2)))
 
@@ -163,7 +174,7 @@ class FeedService:
         bucket_counts: Dict[str, int] = defaultdict(int)
 
         for item in items:
-            raw_id = self._normalize_raw_id(item.raw_content_id)
+            raw_id = _normalize_raw_id(item.raw_content_id)
             source_info: Dict[str, Optional[str]] = source_map.get(raw_id, {}) if raw_id else {}
             bucket = source_info.get("host") or source_info.get("source_type")
 
@@ -184,14 +195,6 @@ class FeedService:
 
         return selected[:limit]
 
-    def _extract_host(self, url: Optional[str]) -> Optional[str]:
-        if not url:
-            return None
-        host = (urlparse(url).netloc or "").lower().strip()
-        if host.startswith("www."):
-            host = host[4:]
-        return host or None
-
     async def _build_raw_context(
         self, items: List[ProcessedContent]
     ) -> tuple[Dict[str, str], Dict[str, str], Dict[str, Dict[str, Optional[str]]]]:
@@ -203,7 +206,7 @@ class FeedService:
             if not raw_value:
                 continue
             raw_ids.append(raw_value)
-            normalized = self._normalize_raw_id(raw_value)
+            normalized = _normalize_raw_id(raw_value)
             if normalized and normalized != raw_value:
                 raw_ids.append(normalized)
         raw_ids = list(dict.fromkeys(raw_ids))
@@ -227,13 +230,13 @@ class FeedService:
         content_map: Dict[str, str] = {}
         source_map: Dict[str, Dict[str, Optional[str]]] = {}
         for row in raw_result.all():
-            key = self._normalize_raw_id(row.id)
+            key = _normalize_raw_id(row.id)
             if not key:
                 continue
             url_map[key] = row.original_url
             content_map[key] = row.original_content
             source_map[key] = {
-                "host": self._extract_host(row.original_url) or self._extract_host(row.source_url),
+                "host": _extract_host(row.original_url) or _extract_host(row.source_url),
                 "source_type": (row.source_type or "").strip().lower() or None,
             }
         return url_map, content_map, source_map
@@ -250,7 +253,7 @@ class FeedService:
         deduped_items: List[ProcessedContent] = []
         for item in items:
             content_id = str(item.id) if item.id else None
-            title_key = self._normalize_title_key(item.title)
+            title_key = _normalize_title_key(item.title)
             if content_id and content_id in seen_ids:
                 continue
             if title_key and title_key in seen_title_keys:
@@ -274,7 +277,7 @@ class FeedService:
         bucket_counts: Dict[str, int] = defaultdict(int)
 
         for item in deduped_items:
-            raw_id = self._normalize_raw_id(item.raw_content_id)
+            raw_id = _normalize_raw_id(item.raw_content_id)
             source_info: Dict[str, Optional[str]] = source_map.get(raw_id, {}) if raw_id else {}
             bucket = source_info.get("host") or source_info.get("source_type")
             if bucket and bucket_counts[bucket] >= cap:
@@ -426,7 +429,7 @@ class FeedService:
         # Format response
         feed_items = []
         for item in items:
-            raw_id = self._normalize_raw_id(item.raw_content_id)
+            raw_id = _normalize_raw_id(item.raw_content_id)
             feed_items.append({
                 "id": str(item.id),
                 "title": item.title,
@@ -555,7 +558,7 @@ class FeedService:
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
-                "content": content_map.get(self._normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
+                "content": content_map.get(_normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
                 "is_breaking": item.is_breaking,
@@ -566,7 +569,7 @@ class FeedService:
                 "content_blocks": item.content_blocks,
                 "featured_image_url": item.featured_image_url,
                 "image_credit": (item.visualizations or {}).get("image_credit"),
-                "original_url": url_map.get(self._normalize_raw_id(item.raw_content_id), None)
+                "original_url": url_map.get(_normalize_raw_id(item.raw_content_id), None)
             }
             for item in items
         ]
@@ -633,7 +636,7 @@ class FeedService:
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
-                "content": content_map.get(self._normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
+                "content": content_map.get(_normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
                 "category": item.category,
                 "attractiveness_score": item.attractiveness_score,
                 "is_breaking": item.is_breaking,
@@ -644,7 +647,7 @@ class FeedService:
                 "content_blocks": item.content_blocks,
                 "featured_image_url": item.featured_image_url,
                 "image_credit": (item.visualizations or {}).get("image_credit"),
-                "original_url": url_map.get(self._normalize_raw_id(item.raw_content_id), None),
+                "original_url": url_map.get(_normalize_raw_id(item.raw_content_id), None),
             }
             for item in items
         ]
@@ -800,7 +803,7 @@ class FeedService:
                 "id": str(item.id),
                 "title": item.title,
                 "summary": item.summary,
-                "content": content_map.get(self._normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
+                "content": content_map.get(_normalize_raw_id(item.raw_content_id), "") if item.raw_content_id else "",
                 "content_blocks": item.content_blocks,
                 "category": item.category,
                 "topic_tags": item.topic_tags,
@@ -812,7 +815,7 @@ class FeedService:
                 "image_credit": (item.visualizations or {}).get("image_credit"),
                 "published_at": item.published_at.isoformat() if item.published_at else None,
                 "detected_at": item.breaking_detected_at.isoformat() if item.breaking_detected_at else None,
-                "original_url": url_map.get(self._normalize_raw_id(item.raw_content_id), None),
+                "original_url": url_map.get(_normalize_raw_id(item.raw_content_id), None),
             }
             for item in items
         ]
@@ -935,7 +938,7 @@ class FeedService:
         _, _, source_map = await self._build_raw_context(items)
         items = self._apply_section_item_controls(items, limit=total, source_map=source_map)
         # Fetch original URLs and metadata
-        raw_ids = [self._normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
+        raw_ids = [_normalize_raw_id(item.raw_content_id) for item in items if item.raw_content_id]
         raw_ids = [raw_id for raw_id in raw_ids if raw_id]
         url_map = {}
         meta_map = {}
@@ -952,7 +955,7 @@ class FeedService:
                 }
 
         def _to_dict(item):
-            raw_id = self._normalize_raw_id(item.raw_content_id) or ""
+            raw_id = _normalize_raw_id(item.raw_content_id) or ""
             meta = meta_map.get(raw_id, {})
             return {
                 "id": str(item.id),

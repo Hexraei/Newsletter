@@ -106,6 +106,20 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def clean_database() -> AsyncGenerator[None, None]:
+    """Keep test cases isolated by clearing all tables before each test."""
+    if not _db_available:
+        yield
+        return
+
+    async with test_engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
+
+    yield
+
+
 @pytest_asyncio.fixture
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Create an async HTTP client."""

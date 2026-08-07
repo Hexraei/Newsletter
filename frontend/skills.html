@@ -235,24 +235,14 @@
   </style>
 </head>
 <body>
-<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
-    ⚡ You're offline — showing cached content
-</div>
-<a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
+  <script src="/static/layout_shell.js?v=20260423"></script>
+  <script>window.NewsdayLayoutShell.inject();</script>
 
   <script src="auth_session.js?v=20260319"></script>
+  <script src="/static/page_utils.js?v=20260423"></script>
   <!-- AUTH GATE -->
   <script>
-    window.__newsdayAuthReady = (async function () {
-      if (!window.NewsdayAuth) {
-        window.location.replace('auth.html');
-        return false;
-      }
-      return window.NewsdayAuth.ensureAuthenticated({
-        redirectTo: 'auth.html',
-        syncProfileOnSuccess: true,
-      });
-    })();
+    window.__newsdayAuthReady = window.NewsdayPageUtils.requireAuth();
   </script>
 
   <nav class="navbar" aria-label="Main navigation">

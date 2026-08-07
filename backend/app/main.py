@@ -120,6 +120,27 @@ STATIC_EXTENSIONS= frozenset([
     '.woff', '.woff2', '.ico',
 ])
 USER_SPECIFIC_SEGMENTS = frozenset(["/save", "/read", "/feedback", "/search"])
+FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+NO_CACHE_HEADERS = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+
+def serve_frontend_asset(
+    filename: str,
+    *,
+    media_type: str | None = None,
+    not_found_detail: str | None = None,
+):
+    """Serve a frontend file from repository root/frontend."""
+    path = FRONTEND_DIR / filename
+    if path.exists():
+        return FileResponse(
+            str(path),
+            media_type=media_type,
+            headers=NO_CACHE_HEADERS,
+        )
+    if not_found_detail:
+        return JSONResponse(status_code=404, content={"detail": not_found_detail})
+    return RedirectResponse(url="/")
 
 
 @app.middleware("http")
@@ -199,13 +220,8 @@ async def health_check(db: AsyncSession = Depends(get_db)):
 @app.get("/index.html", tags=["Root"], include_in_schema=False)
 async def root():
     """Serve frontend index.html directly (no-cache) or show API info."""
-    frontend_dir = Path(__file__).parent.parent.parent / "frontend"
-    index_path = frontend_dir / "index.html"
-    if index_path.exists():
-        return FileResponse(
-            str(index_path),
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-        )
+    if (FRONTEND_DIR / "index.html").exists():
+        return serve_frontend_asset("index.html")
     return {
         "app": "NEWS DAY API",
         "docs": "/docs",
@@ -216,101 +232,68 @@ async def root():
 @app.get("/sw.js", tags=["Root"], include_in_schema=False)
 async def service_worker():
     """Serve service worker from root scope with no-cache headers."""
-    sw_path = Path(__file__).parent.parent.parent / "frontend" / "sw.js"
-    if sw_path.exists():
-        return FileResponse(
-            str(sw_path),
-            media_type="application/javascript",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-        )
-    return JSONResponse(status_code=404, content={"detail": "Service worker not found"})
+    return serve_frontend_asset(
+        "sw.js",
+        media_type="application/javascript",
+        not_found_detail="Service worker not found",
+    )
 
 
 @app.get("/auth_session.js", tags=["Root"], include_in_schema=False)
 async def auth_session_script():
     """Serve shared auth helper from root path used by frontend pages."""
-    script_path = Path(__file__).parent.parent.parent / "frontend" / "auth_session.js"
-    if script_path.exists():
-        return FileResponse(
-            str(script_path),
-            media_type="application/javascript",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-        )
-    return JSONResponse(status_code=404, content={"detail": "auth_session.js not found"})
+    return serve_frontend_asset(
+        "auth_session.js",
+        media_type="application/javascript",
+        not_found_detail="auth_session.js not found",
+    )
 
 
 @app.get("/department.html", tags=["Root"])
 async def department_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "department.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("department.html")
 
 
 @app.get("/stories.html", tags=["Root"])
 async def stories_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "stories.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("stories.html")
 
 
 @app.get("/research.html", tags=["Root"])
 async def research_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "research.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("research.html")
 
 
 @app.get("/auth.html", tags=["Root"])
 async def auth_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "auth.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("auth.html")
 
 
 @app.get("/skills.html", tags=["Root"])
 async def skills_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "skills.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("skills.html")
 
 
 @app.get("/insights.html", tags=["Root"])
 async def insights_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "insights.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("insights.html")
 
 
 @app.get("/reader.html", tags=["Root"])
 async def reader_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "reader.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("reader.html")
 
 
 @app.get("/privacy", tags=["Root"])
 @app.get("/privacy.html", tags=["Root"], include_in_schema=False)
 async def privacy_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "privacy.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("privacy.html")
 
 
 @app.get("/terms", tags=["Root"])
 @app.get("/terms.html", tags=["Root"], include_in_schema=False)
 async def terms_page():
-    path = Path(__file__).parent.parent.parent / "frontend" / "terms.html"
-    if path.exists():
-        return FileResponse(str(path), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return RedirectResponse(url="/")
+    return serve_frontend_asset("terms.html")
 
 
 @app.get("/robots.txt", tags=["Root"])
@@ -327,7 +310,7 @@ async def sitemap_xml():
 app.include_router(router)
 
 # Mount static files (frontend)
-frontend_path = Path(__file__).parent.parent.parent / "frontend"
+frontend_path = FRONTEND_DIR
 if frontend_path.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
     logger.info(f"Static files mounted from: {frontend_path}")

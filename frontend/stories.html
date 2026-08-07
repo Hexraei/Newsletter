@@ -711,24 +711,14 @@
   </style>
 </head>
 <body>
-<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:6px 12px;font-size:13px;z-index:9999;font-family:sans-serif;">
-    ⚡ You're offline — showing cached content
-</div>
-<a href="#main-content" class="skip-link" style="position:absolute;top:-40px;left:0;background:#818cf8;color:#fff;padding:8px 16px;z-index:10000;font-size:14px;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
+  <script src="/static/layout_shell.js?v=20260423"></script>
+  <script>window.NewsdayLayoutShell.inject();</script>
 
   <script src="auth_session.js?v=20260319"></script>
+  <script src="/static/page_utils.js?v=20260423"></script>
   <!-- AUTH GATE -->
   <script>
-    window.__newsdayAuthReady = (async function () {
-      if (!window.NewsdayAuth) {
-        window.location.replace('auth.html');
-        return false;
-      }
-      return window.NewsdayAuth.ensureAuthenticated({
-        redirectTo: 'auth.html',
-        syncProfileOnSuccess: true,
-      });
-    })();
+    window.__newsdayAuthReady = window.NewsdayPageUtils.requireAuth();
   </script>
 
   <!-- NAVBAR -->
@@ -1149,59 +1139,17 @@
     /* ================================================================
        UTILS (shared with index.html)
     ================================================================ */
-    function fetchWithTimeout(url, options = {}, timeout = 8000) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeout);
-      return fetch(url, { ...options, signal: controller.signal })
-        .finally(() => clearTimeout(timer));
-    }
-
-    function escapeHtml(str) {
-      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    }
-
-    function shortText(value, max = 110) {
-      const text = String(value || '').replace(/\s+/g, ' ').trim();
-      if (!text) return '';
-      return text.length > max ? text.slice(0, max - 3).trim() + '...' : text;
-    }
-
-    function normalizeText(value) { return String(value || '').toLowerCase(); }
-
-    function cleanAiLine(value) {
-      return String(value || '')
-        .replace(/\*\*/g, '')
-        .replace(/^#+\s*/g, '')
-        .replace(/^(hook|why it matters|key points|action step)\s*:\s*/i, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    function stripSourcePrefix(text) {
-      let out = String(text || '').trim();
-      if (!out) return out;
-      out = out.replace(/^(reddit|hacker\s*news|github|medium|product\s*hunt|x|twitter|cs\s*desk|campus\s*tech)\s*[-|:]\s*/i, '');
-      out = out.replace(/^r\/[a-z0-9_]+\s*[-|:]\s*/i, '');
-      out = out.replace(/^(reddit|hacker\s*news|github|medium)\s*[-|:]\s*r\/[a-z0-9_]+\s*[-|:]\s*/i, '');
-      return out.trim();
-    }
-
-    function countWords(text) { return String(text || '').trim().split(/\s+/).filter(Boolean).length; }
-
-    function trimToWordCount(text, maxWords) {
-      const words = String(text || '').trim().split(/\s+/).filter(Boolean);
-      if (words.length <= maxWords) return words.join(' ');
-      return words.slice(0, maxWords).join(' ').replace(/[,:;\-]+$/, '') + '.';
-    }
-
-    function isUsefulAiLine(value) {
-      const text = cleanAiLine(value);
-      if (!text) return false;
-      if (text.length < 16) return false;
-      if (/^\W+$/.test(text)) return false;
-      if (/^key points?$/i.test(text)) return false;
-      return /[a-zA-Z]{4,}/.test(text);
-    }
+    const {
+      fetchWithTimeout,
+      escapeHtml,
+      shortText,
+      normalizeText,
+      cleanAiLine,
+      stripSourcePrefix,
+      countWords,
+      trimToWordCount,
+      isUsefulAiLine,
+    } = window.NewsdayPageUtils;
 
     function normalizeCompareText(value) {
       return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();

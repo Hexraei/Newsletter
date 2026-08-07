@@ -1,27 +1,32 @@
+"""Dialect-agnostic SQLAlchemy type helpers.
+
+These helpers use SQLite-compatible base types with PostgreSQL-specific variants.
+This avoids import-time coupling to DATABASE_URL and keeps tests/local SQLite usable.
 """
-Dialect-agnostic column type aliases.
 
-Uses PostgreSQL-native types (JSONB, ARRAY, UUID) when running against Postgres,
-falls back to generic SQLAlchemy equivalents for SQLite local dev.
-"""
-import os
-from pathlib import Path
+from sqlalchemy import JSON, String
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
-# Load .env early so DATABASE_URL is available before models import
-from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
-_DB_URL = os.environ.get("DATABASE_URL", "")
-_IS_SQLITE = _DB_URL.startswith("sqlite")
+JSONB = JSON().with_variant(PG_JSONB, "postgresql")
 
-if _IS_SQLITE:
-    from sqlalchemy import JSON as JSONB
-    from sqlalchemy import JSON as ARRAY  # store arrays as JSON lists
-    from sqlalchemy import String as _Str
 
-    def UUID(as_uuid=False):  # noqa: N802
-        return _Str(36)
-else:
-    from sqlalchemy.dialects.postgresql import JSONB, ARRAY, UUID  # noqa: F401
+def ARRAY(item_type):  # noqa: N802
+    """Portable array type.
+
+    SQLite stores arrays as JSON lists; PostgreSQL uses native ARRAY.
+    """
+    return JSON().with_variant(PG_ARRAY(item_type), "postgresql")
+
+
+def UUID(as_uuid=False):  # noqa: N802
+    """Portable UUID type.
+
+    SQLite stores UUIDs as strings; PostgreSQL uses native UUID.
+    """
+    return String(36).with_variant(PG_UUID(as_uuid=as_uuid), "postgresql")
+
 
 __all__ = ["JSONB", "ARRAY", "UUID"]
