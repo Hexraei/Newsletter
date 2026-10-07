@@ -3,27 +3,15 @@
 import pytest
 from httpx import AsyncClient
 
-# DB-dependent tests may raise exceptions when the database schema
-# is unavailable (e.g. missing tables in SQLite fallback).
-# We mark these so the suite still passes without a full PostgreSQL setup.
-_db_required = pytest.mark.xfail(
-    reason="Requires database with processed_content table",
-    raises=Exception,
-    strict=False,
-)
-
-
-@_db_required
 @pytest.mark.asyncio
 async def test_trending_returns_list(async_client: AsyncClient):
     """Trending endpoint returns a list of articles."""
     resp = await async_client.get("/api/v1/feed/trending?limit=5")
     assert resp.status_code == 200
     data = resp.json()
-    assert isinstance(data.get("data") or data, (list, dict))
+    assert isinstance(data, list)
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_breaking_returns_list(async_client: AsyncClient):
     """Breaking endpoint returns a list."""
@@ -31,7 +19,6 @@ async def test_breaking_returns_list(async_client: AsyncClient):
     assert resp.status_code == 200
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_all_sections_returns_data(async_client: AsyncClient):
     """All-sections unified endpoint returns data."""
@@ -46,7 +33,6 @@ async def test_search_requires_query(async_client: AsyncClient):
     assert resp.status_code == 422
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_search_escapes_wildcards(async_client: AsyncClient):
     """Search with SQL wildcards should not cause errors."""
@@ -54,7 +40,6 @@ async def test_search_escapes_wildcards(async_client: AsyncClient):
     assert resp.status_code == 200
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_search_xss_payload(async_client: AsyncClient):
     """Search with XSS payload should not cause errors."""
@@ -78,7 +63,6 @@ async def test_breaking_limit_validation(async_client: AsyncClient):
     assert resp.status_code == 422
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_category_endpoint(async_client: AsyncClient):
     """Category endpoint returns 200 for valid category."""
@@ -86,7 +70,6 @@ async def test_category_endpoint(async_client: AsyncClient):
     assert resp.status_code == 200
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_daily_digest(async_client: AsyncClient):
     """Daily digest endpoint returns 200."""
@@ -101,7 +84,6 @@ async def test_feed_cache_stats(async_client: AsyncClient):
     assert resp.status_code == 200
 
 
-@_db_required
 @pytest.mark.asyncio
 async def test_feed_stats(async_client: AsyncClient):
     """Feed stats endpoint returns data."""

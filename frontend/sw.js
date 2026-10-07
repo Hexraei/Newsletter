@@ -1,6 +1,6 @@
-const CACHE_NAME = 'newsday-v2';
-const STATIC_CACHE = 'newsday-static-v2';
-const API_CACHE = 'newsday-api-v2';
+const CACHE_NAME = 'newsday-v3';
+const STATIC_CACHE = 'newsday-static-v3';
+const API_CACHE = 'newsday-api-v3';
 
 // Pages to pre-cache (must match backend routes)
 const PRECACHE_URLS = [
@@ -40,18 +40,14 @@ self.addEventListener('fetch', event => {
 
     // API requests: Network First, Cache Fallback
     if (url.pathname.startsWith('/api/')) {
-        // Don't cache user-specific or mutation endpoints
-        if (url.pathname.includes('/save') ||
-            url.pathname.includes('/read') ||
-            url.pathname.includes('/feedback') ||
-            url.pathname.includes('/auth/')) {
-            return;
-        }
+        // Only explicitly public feed responses can enter shared offline caches.
+        const publicPath = /^\/api\/v1\/(feed\/(trending|breaking|daily-digest|all-sections|category\/[^/]+))$/.test(url.pathname);
+        if (!publicPath || url.origin !== self.location.origin) return;
 
         event.respondWith(
             fetch(event.request)
                 .then(response => {
-                    if (response.ok) {
+                    if (response.ok && !/private|no-store/i.test(response.headers.get("Cache-Control") || "")) {
                         const clone = response.clone();
                         caches.open(API_CACHE).then(cache => cache.put(event.request, clone));
                     }
@@ -67,6 +63,7 @@ self.addEventListener('fetch', event => {
         event.respondWith(
             fetch(event.request)
                 .then(response => {
+                    if (!response.ok) return response;
                     const clone = response.clone();
                     caches.open(STATIC_CACHE).then(cache => cache.put(event.request, clone));
                     return response;

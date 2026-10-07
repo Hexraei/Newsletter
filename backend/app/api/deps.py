@@ -135,3 +135,21 @@ async def get_optional_current_user(
         import logging as _log
         _log.getLogger(__name__).debug("Token decode failed", exc_info=True)
         return None
+
+
+async def get_refresh_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    header_token: Optional[str] = Depends(oauth2_scheme),
+) -> User:
+    """Authenticate refresh requests using the long-lived refresh token."""
+    token = request.cookies.get("refresh_token") or header_token
+    payload = decode_token(token) if token else None
+    if not payload or payload.get("type") != "refresh" or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+    from sqlalchemy import select
+    result = await db.execute(select(User).where(User.id == payload["sub"]))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+    return user

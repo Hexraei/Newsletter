@@ -18,15 +18,16 @@ from app.api.v1.auth import limiter as auth_limiter
 from app.main import app
 from app.models import Base, get_db
 
-# Test database URL — fall back to SQLite when PostgreSQL is unavailable
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/newsletter_test")
-SQLITE_FALLBACK_URL = "sqlite+aiosqlite:///./test_newsletter.db"
+# Explicit test database URL; the default is isolated in-memory SQLite.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 
 _db_available = False
 
 
 def _build_engine(url: str):
-    return create_async_engine(url, echo=False, future=True)
+    from sqlalchemy.pool import NullPool, StaticPool
+    return create_async_engine(url, echo=False, future=True,
+                               poolclass=StaticPool if url.startswith("sqlite") else NullPool)
 
 
 test_engine = _build_engine(TEST_DATABASE_URL)
@@ -57,36 +58,15 @@ app.state.limiter = Limiter(key_func=get_remote_address, enabled=False)
 auth_limiter.enabled = False
 
 
-@pytest_asyncio.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database() -> AsyncGenerator[None, None]:
-    """Create test database tables. Falls back to SQLite if PostgreSQL is unavailable."""
+    """Create isolated test tables. A configured database failure must fail the suite."""
     global test_engine, TestingSessionLocal, _db_available
 
-    try:
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
-        _db_available = True
-    except Exception:
-        # PostgreSQL unavailable — switch to SQLite so DB-dependent tests can run
-        await test_engine.dispose()
-        test_engine = _build_engine(SQLITE_FALLBACK_URL)
-        TestingSessionLocal.configure(bind=test_engine)
-        try:
-            async with test_engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            _db_available = True
-        except Exception:
-            yield
-            return
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    _db_available = True
 
     yield
 

@@ -1,8 +1,9 @@
 """Skill rankings model for placement skill recommendations."""
 
 from datetime import datetime
+from uuid import uuid4
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Uuid, DateTime, Integer, String, Text
 from app.models.compat import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +14,7 @@ class SkillRanking(Base):
     """Cached skill rankings per department."""
 
     __tablename__ = "skill_rankings"
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
 
     department: Mapped[str] = mapped_column(String(10), index=True, nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1)

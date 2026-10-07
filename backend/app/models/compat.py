@@ -1,32 +1,14 @@
-"""Dialect-agnostic SQLAlchemy type helpers.
-
-These helpers use SQLite-compatible base types with PostgreSQL-specific variants.
-This avoids import-time coupling to DATABASE_URL and keeps tests/local SQLite usable.
-"""
-
+"""Types matching the shipped Alembic schema on PostgreSQL and SQLite."""
 from sqlalchemy import JSON, String
-from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
-from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
+JSONB = JSON
 
-JSONB = JSON().with_variant(PG_JSONB, "postgresql")
+def ARRAY(item_type):
+    """Store list fields as JSON, as the existing migrations do."""
+    return JSON()
 
-
-def ARRAY(item_type):  # noqa: N802
-    """Portable array type.
-
-    SQLite stores arrays as JSON lists; PostgreSQL uses native ARRAY.
-    """
-    return JSON().with_variant(PG_ARRAY(item_type), "postgresql")
-
-
-def UUID(as_uuid=False):  # noqa: N802
-    """Portable UUID type.
-
-    SQLite stores UUIDs as strings; PostgreSQL uses native UUID.
-    """
-    return String(36).with_variant(PG_UUID(as_uuid=as_uuid), "postgresql")
-
+def UUID(as_uuid=False):
+    """Keep UUID-like identifiers as strings, matching migrated foreign keys."""
+    return String(36)
 
 __all__ = ["JSONB", "ARRAY", "UUID"]

@@ -124,7 +124,10 @@
       if (refreshed) me = await api('/auth/me');
     }
 
-    if (!me.ok || !me.data || !me.data.data) return null;
+    if (!me.ok || !me.data || !me.data.data) {
+      if (me.status === 401 || me.status === 403) clearSession();
+      return null;
+    }
     var user = me.data.data;
     saveSession({}, { user: user });
     return user;

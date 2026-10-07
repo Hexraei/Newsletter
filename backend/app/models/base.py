@@ -1,12 +1,10 @@
 """SQLAlchemy base configuration."""
 
-import ssl
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import DateTime, func
-from sqlalchemy import Uuid
+from sqlalchemy import DateTime, String, func
 from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -17,7 +15,7 @@ class Base(AsyncAttrs, DeclarativeBase):
     """Base class for all models."""
     
     id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+        String(36),
         primary_key=True,
         default=lambda: str(uuid4())
     )
@@ -45,19 +43,9 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 
 # Build connect_args and engine kwargs based on DB type
-_connect_args: dict = {}
-_db_url = settings.DATABASE_URL
+from app.database_url import async_database_config
+_db_url, _connect_args = async_database_config(settings.DATABASE_URL)
 _is_sqlite = _db_url.startswith("sqlite")
-
-if not _is_sqlite and ("ssl=require" in _db_url or "sslmode=require" in _db_url):
-    _ssl_ctx = ssl.create_default_context()
-    _ssl_ctx.check_hostname = False
-    _ssl_ctx.verify_mode = ssl.CERT_NONE
-    _connect_args["ssl"] = _ssl_ctx
-    # Strip ssl param from URL — asyncpg handles it via connect_args
-    _db_url = _db_url.replace("?ssl=require", "").replace("&ssl=require", "")
-    _db_url = _db_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
-    _db_url = _db_url.replace("?channel_binding=require", "").replace("&channel_binding=require", "")
 
 # SQLite doesn't support pool_size/max_overflow; use StaticPool for single-file DB
 if _is_sqlite:

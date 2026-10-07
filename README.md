@@ -288,7 +288,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 | Images | Unsplash-first image pipeline; fallback via OG/source images and semantic providers (Openverse/Wikimedia/Pixabay/Pexels) with attribution metadata |
 | Research | Semantic Scholar API · Crossref API · OpenAlex API · PubMed API |
 | Frontend | HTML/CSS/JS (no build step) |
-| CI | GitHub Actions (black, isort, mypy, flake8) |
+| CI | GitHub Actions (SQLite/PostgreSQL tests, migrations, fatal lint, JS syntax) |
 
 ### Security
 
@@ -307,7 +307,7 @@ The system auto-selects the best available provider at runtime with automatic fa
 - **Connection pool safety** — DB pool allows overflow with timeouts to prevent deadlocks under load
 - **Structured logging** — Python `logging` module (no `print()` in production paths)
 - **Docker hardened** — secrets via `${VAR:?}` required env vars, `DEBUG=false`, no `--reload`, Alembic migrations run before app startup
-- **CI enforced** — black, isort, mypy, flake8 checks block on failure
+- **CI enforced** - SQLite/PostgreSQL tests, fresh migrations, fatal Python lint and JS syntax checks block on failure
 
 > For full details on the 11 security/reliability fixes applied, see [SECURITY_FIXES_REPORT.md](SECURITY_FIXES_REPORT.md).
 
@@ -350,3 +350,24 @@ The system auto-selects the best available provider at runtime with automatic fa
 ## License
 
 This project is proprietary. See [LICENSE](LICENSE) for details.
+
+### Regression checks
+
+Run `cd backend && python -m pytest tests/` after installing
+`backend/requirements.txt`. Tests use an isolated in-memory SQLite database by
+default. Set `TEST_DATABASE_URL` to a **disposable** PostgreSQL database to exercise
+that dialect; the fixtures create/drop tables and never silently fall back to a
+second database. CI runs both dialects and a fresh Alembic migration.
+
+For deployment, run `alembic upgrade head` from `backend` before starting the
+server. Revision `c8d9e0f1a2b3` adds the missing user department key and optional
+materialized feed cache. Existing migrated IDs/list fields retain their string/
+JSON storage; do not replace them with UUID/native-array columns without a
+separate reviewed data migration. Standard `postgresql://` URLs are normalized to
+the async driver. Required SSL validates certificates.
+
+Password-reset delivery requires `SENDGRID_API_KEY` and `FROM_EMAIL` in the
+service environment. Without that setup, the development fallback writes the
+reset link to the server log, not the user's inbox. External AI/image/scraper
+services also need their own configured credentials; local regression fixtures
+do not prove those third-party services are reachable in production.

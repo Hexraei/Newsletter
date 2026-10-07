@@ -127,7 +127,7 @@ class ProcessedContent(Base):
     __tablename__ = "processed_content"
     
     raw_content_id: Mapped[Optional[str]] = mapped_column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("raw_content.id"),
         nullable=True
     )
@@ -171,9 +171,9 @@ class ProcessedContent(Base):
     
     # Media
     featured_image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    visualizations: Mapped[Optional[list]] = mapped_column(
+    visualizations: Mapped[Optional[dict]] = mapped_column(
         JSONB,
-        default=list,
+        default=dict,
         server_default="{}"
     )
     
@@ -335,3 +335,12 @@ class VelocityMetrics(Base):
     velocity_score: Mapped[float] = mapped_column(default=0.0)
     
     is_breaking_candidate: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class CachedFeed(Base):
+    """Optional materialized feed cache used by refresh jobs."""
+    __tablename__ = "cached_feeds"
+    id = None
+    created_at = None
+    department: Mapped[str] = mapped_column(String(20), primary_key=True)
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False)

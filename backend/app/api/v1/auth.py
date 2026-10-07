@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import (
     get_current_active_user,
     get_current_user,
+    get_refresh_user,
     get_db,
     get_optional_current_user,
 )
@@ -164,12 +165,12 @@ async def login(
 @limiter.limit("10/minute")
 async def refresh_token(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_refresh_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Refresh access token.
 
-    Issues a new access/refresh token pair. The current token must still be valid.
+    Issues a new access/refresh token pair. The refresh token must still be valid.
     New tokens are returned as both JSON body and httpOnly cookies.
     """
     auth_service = AuthService(db)
@@ -396,17 +397,15 @@ async def reset_password(
         401: {"description": "Not authenticated"},
     }
 )
-async def logout(
-    current_user: User = Depends(get_current_active_user)
-):
+async def logout():
     """Logout the current user.
 
     Clears httpOnly auth cookies. The client should also discard
     any locally stored tokens or session data.
     """
     response = JSONResponse(content={"success": True, "message": "Logged out successfully"})
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/api/v1/auth/refresh")
+    response.delete_cookie("access_token", path="/", domain=settings.COOKIE_DOMAIN)
+    response.delete_cookie("refresh_token", path="/api/v1/auth/refresh", domain=settings.COOKIE_DOMAIN)
     return response
 
 

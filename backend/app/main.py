@@ -5,7 +5,7 @@ import sys
 import uuid
 from pathlib import Path
 # Add scraper_platform to Python path
-scraper_path = str(Path(__file__).parent.parent.parent / "scraper_platform")
+scraper_path = str(Path(__file__).resolve().parent.parent.parent / "scraper_platform")
 if scraper_path not in sys.path:
     sys.path.insert(0, scraper_path)
 
@@ -119,8 +119,8 @@ STATIC_EXTENSIONS= frozenset([
     '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg',
     '.woff', '.woff2', '.ico',
 ])
-USER_SPECIFIC_SEGMENTS = frozenset(["/save", "/read", "/feedback", "/search"])
-FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+USER_SPECIFIC_SEGMENTS = frozenset(["/save", "/read", "/feedback", "/search", "/personalized"])
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 NO_CACHE_HEADERS = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 
@@ -160,10 +160,14 @@ async def add_cache_headers(request: Request, call_next):
     path = request.url.path
 
     if path.startswith("/api/v1/feed/") and request.method == "GET":
-        if not any(seg in path for seg in USER_SPECIFIC_SEGMENTS):
+        if any(seg in path for seg in USER_SPECIFIC_SEGMENTS):
+            response.headers["Cache-Control"] = "private, no-store"
+        elif response.status_code == 200:
             response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    elif path.startswith("/api/v1/auth/") or path.startswith("/api/v1/skills/"):
+        response.headers["Cache-Control"] = "private, no-store"
     elif any(path.endswith(ext) for ext in STATIC_EXTENSIONS):
-        response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
     elif path.startswith("/api/v1/ai/") and request.method == "GET":
         response.headers["Cache-Control"] = "public, max-age=3600"
 

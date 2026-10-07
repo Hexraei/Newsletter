@@ -716,8 +716,6 @@ class ContentProcessor:
         if raw_id is None:
             return None
         normalized = str(raw_id).strip().lower()
-        if _IS_SQLITE:
-            normalized = normalized.replace("-", "")
         return normalized or None
 
     def _fallback_department_tags(

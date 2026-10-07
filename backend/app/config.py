@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     def validate_secret_key(cls, v: str, info) -> str:
         if v in _INSECURE_DEFAULTS:
             import os
-            env = os.getenv("ENVIRONMENT", "development")
+            env = info.data.get("ENVIRONMENT", "development")
             if env != "development":
                 raise ValueError(
                     f"SECRET_KEY must be changed from default in {env} mode. "
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     def validate_jwt_secret_key(cls, v: str, info) -> str:
         if v in _INSECURE_DEFAULTS:
             import os
-            env = os.getenv("ENVIRONMENT", "development")
+            env = info.data.get("ENVIRONMENT", "development")
             if env != "development":
                 raise ValueError(
                     f"JWT_SECRET_KEY must be changed from default in {env} mode. "

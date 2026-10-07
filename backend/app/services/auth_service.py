@@ -87,7 +87,7 @@ class AuthService:
     
     async def update_user(self, user: User, user_data: UserUpdate) -> User:
         """Update user information."""
-        ALLOWED_FIELDS = {"full_name", "department", "year_of_study", "college_name", "password"}
+        ALLOWED_FIELDS = {"full_name", "department", "year_of_study", "college_name", "password", "graduation_year", "interests", "content_preferences", "notification_settings"}
         update_data = user_data.model_dump(exclude_unset=True)
         
         # Filter to only allowed fields — block is_admin, is_active, etc.
@@ -166,7 +166,10 @@ class AuthService:
         )
         user = result.scalar_one_or_none()
 
-        if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now(timezone.utc):
+        expiry = user.reset_token_expiry if user else None
+        if expiry is not None and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if not user or not expiry or expiry < datetime.now(timezone.utc):
             if user:
                 user.reset_token = None
                 user.reset_token_expiry = None

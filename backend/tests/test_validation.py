@@ -122,8 +122,5 @@ async def test_password_too_long(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_search_valid_query(async_client: AsyncClient):
     """Search with valid query returns 200 (or xfail if DB unavailable)."""
-    try:
-        resp = await async_client.get("/api/v1/feed/search?q=python")
-        assert resp.status_code == 200
-    except Exception:
-        pytest.xfail("Database unavailable for search query")
+    resp = await async_client.get("/api/v1/feed/search?q=python")
+    assert resp.status_code == 200

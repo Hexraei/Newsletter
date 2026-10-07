@@ -13,26 +13,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import ProcessedContent, RawContent, Source
 from app.config import settings
 
-_IS_SQLITE = os.environ.get("DATABASE_URL", "").startswith("sqlite")
+_IS_SQLITE = False  # Compatibility for old test imports; queries use the session dialect.
 
 
-def _dept_filter(department: str):
+def _dept_filter(department: str, is_sqlite: bool = False):
     """Return a SQLAlchemy filter for department_tags containing *department*.
 
     PostgreSQL uses the native ``@>`` (contains) operator on JSONB arrays.
     SQLite stores JSON as TEXT, so we fall back to a LIKE match.
     """
-    if _IS_SQLITE:
-        return ProcessedContent.department_tags.like(f'%"{department}"%')
-    return ProcessedContent.department_tags.contains([department])
+    if is_sqlite:
+        from sqlalchemy import cast, String
+        return cast(ProcessedContent.department_tags, String).like(f'%"{department}"%')
+    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy import cast
+    return cast(ProcessedContent.department_tags, JSONB).contains([department])
 
 
 def _normalize_raw_id(raw_id: Optional[str]) -> Optional[str]:
     if not raw_id:
         return None
     raw = str(raw_id).strip().lower()
-    if _IS_SQLITE:
-        return raw.replace("-", "")
     return raw
 
 
@@ -67,6 +68,7 @@ class FeedService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.is_sqlite = db.bind.dialect.name == "sqlite"
         self._strict_relevance_available: Optional[bool] = None
 
     def _strict_mode_enabled(self) -> bool:
@@ -83,7 +85,7 @@ class FeedService:
 
     def _strict_relevance_filter(self):
         """Filter for strict TN/India relevance based on stored diagnostics."""
-        if _IS_SQLITE:
+        if self.is_sqlite:
             geo_expr = func.coalesce(
                 func.cast(func.json_extract(ProcessedContent.visualizations, "$.geo_relevance_score"), Integer),
                 0,
@@ -98,15 +100,15 @@ class FeedService:
             )
         else:
             geo_expr = func.coalesce(
-                func.cast(ProcessedContent.visualizations["geo_relevance_score"].astext, Integer),
+                func.cast(ProcessedContent.visualizations["geo_relevance_score"].as_string(), Integer),
                 0,
             )
             action_expr = func.coalesce(
-                func.cast(ProcessedContent.visualizations["student_actionability_score"].astext, Integer),
+                func.cast(ProcessedContent.visualizations["student_actionability_score"].as_string(), Integer),
                 0,
             )
             knowledge_expr = func.coalesce(
-                func.cast(ProcessedContent.visualizations["knowledge_relevance_score"].astext, Integer),
+                func.cast(ProcessedContent.visualizations["knowledge_relevance_score"].as_string(), Integer),
                 0,
             )
         min_geo = int(getattr(settings, "RELEVANCE_MIN_GEO_SCORE", 45))
@@ -324,7 +326,7 @@ class FeedService:
         
         # Apply department filter
         if department:
-            query = query.where(_dept_filter(department))
+            query = query.where(_dept_filter(department, self.is_sqlite))
         
         # Prefer career/opportunity and knowledge/tech items over generic updates.
         text_col = func.lower(func.coalesce(ProcessedContent.title, '') + ' ' + func.coalesce(ProcessedContent.summary, ''))
@@ -496,7 +498,7 @@ class FeedService:
             query = query.where(self._strict_relevance_filter())
         
         if department:
-            query = query.where(_dept_filter(department))
+            query = query.where(_dept_filter(department, self.is_sqlite))
         
         query = query.order_by(
             mix_priority.desc(),
@@ -591,7 +593,7 @@ class FeedService:
         if strict_mode:
             query = query.where(self._strict_relevance_filter())
         if department:
-            query = query.where(_dept_filter(department))
+            query = query.where(_dept_filter(department, self.is_sqlite))
         result = await self.db.execute(query)
         items = result.scalars().all()
 
@@ -666,7 +668,7 @@ class FeedService:
         now = datetime.now(timezone.utc)
         recent_window = now - timedelta(days=30)  # extended window; recency_boost rewards truly new content
 
-        if _IS_SQLITE:
+        if self.is_sqlite:
             # SQLite: use julianday for age calculation
             age_hours = (func.julianday('now') - func.julianday(ProcessedContent.published_at)) * 24.0
         else:
@@ -717,7 +719,7 @@ class FeedService:
         if strict_mode:
             query = query.where(self._strict_relevance_filter())
         if department:
-            query = query.where(_dept_filter(department))
+            query = query.where(_dept_filter(department, self.is_sqlite))
         primary_query = (
             query
             .where(total_score >= 40)
@@ -741,7 +743,7 @@ class FeedService:
             if strict_mode:
                 fallback_query = fallback_query.where(self._strict_relevance_filter())
             if department:
-                fallback_query = fallback_query.where(_dept_filter(department))
+                fallback_query = fallback_query.where(_dept_filter(department, self.is_sqlite))
             if existing_ids:
                 fallback_query = fallback_query.where(
                     ProcessedContent.id.not_in(existing_ids)
@@ -864,7 +866,7 @@ class FeedService:
         if strict_mode:
             query = query.where(self._strict_relevance_filter())
         if department:
-            query = query.where(_dept_filter(department))
+            query = query.where(_dept_filter(department, self.is_sqlite))
         query = query.order_by(ProcessedContent.attractiveness_score.desc()).limit(limit)
         
         result = await self.db.execute(query)
@@ -881,7 +883,7 @@ class FeedService:
                 .where(ProcessedContent.id.notin_(existing_ids) if existing_ids else True)
                 .where(ProcessedContent.attractiveness_score >= 60)
                 .where(self._strict_relevance_filter() if strict_mode else True)
-                .where(_dept_filter(department) if department else True)
+                .where(_dept_filter(department, self.is_sqlite) if department else True)
                 .order_by(ProcessedContent.published_at.desc())
                 .limit(remaining)
             )
@@ -925,7 +927,7 @@ class FeedService:
             query = query.where(self._strict_relevance_filter())
 
         if department:
-            query = query.where(_dept_filter(department))
+            query = query.where(_dept_filter(department, self.is_sqlite))
 
         query = query.order_by(
             ProcessedContent.attractiveness_score.desc(),

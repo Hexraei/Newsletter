@@ -28,8 +28,6 @@ def _normalize_raw_id(raw_id: str | None) -> str | None:
     if not raw_id:
         return None
     raw = str(raw_id).strip().lower()
-    if _IS_SQLITE:
-        return raw.replace("-", "")
     return raw
 
 
@@ -80,10 +78,11 @@ async def _fetch_all_sections(
 
     from sqlalchemy import text as sa_text
     try:
-        row = (await db.execute(
-            sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
-            {"d": dept_key},
-        )).first()
+        async with db.begin_nested():
+            row = (await db.execute(
+                sa_text("SELECT data FROM cached_feeds WHERE department = :d"),
+                {"d": dept_key},
+            )).first()
         if row and row[0]:
             cached_data = row[0]
             if isinstance(cached_data, str):
